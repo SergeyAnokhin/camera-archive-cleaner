@@ -1,0 +1,5 @@
+cameras:
+  - id: "foscam_fi9805w"
+    name: "Foscam FI9805W"
+    path_snapshots: "C:\\REPOS\\camera-snapshots-cleaner-claude\\CameraArchive\\Foscam\\FI9805W_C4D6553DECE1\\snap"
+    path_videos: "C:\\REPOS\\camera-snapshots-cleaner-claude\\CameraArchive\\Foscam\\FI9805W_C4D6553DECE1\\record"
