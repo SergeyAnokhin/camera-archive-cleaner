@@ -143,3 +143,5 @@ vite.config.ts.timestamp-*
 .vite/
 /CameraArchive/*
 /backend/__pycache__/*
+/backend/snapshots.db
+/backend/snapshots.db*

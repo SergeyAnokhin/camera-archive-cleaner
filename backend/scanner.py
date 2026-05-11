@@ -1,13 +1,18 @@
+import logging
 import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 from config import Camera
-from database import upsert_file
+from database import delete_camera_files, upsert_file
+
+logger = logging.getLogger(__name__)
 
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov"}
+
+_LOG_EVERY = 1000
 
 # Patterns that encode timestamp in filename.
 # Each pattern must have named groups: year, month, day, hour, minute, second.
@@ -35,9 +40,15 @@ def _timestamp_from_filename(name: str) -> datetime | None:
 
 
 def scan_camera(conn: sqlite3.Connection, camera: Camera) -> int:
+    deleted = delete_camera_files(conn, camera.id)
+    if deleted:
+        logger.info("[%s] Cleared %d old records before scan", camera.id, deleted)
+
+    logger.info("[%s] Starting scan: %s", camera.id, camera.name)
     count = 0
     count += _scan_dir(conn, camera.id, camera.path_snapshots, "photo")
     count += _scan_dir(conn, camera.id, camera.path_videos, "video")
+    logger.info("[%s] Scan complete: %d files total", camera.id, count)
     return count
 
 
@@ -45,6 +56,7 @@ def _scan_dir(conn: sqlite3.Connection, camera_id: str,
               directory: str, file_type: str) -> int:
     path = Path(directory)
     if not path.exists():
+        logger.warning("[%s] Directory not found, skipping: %s", camera_id, directory)
         return 0
 
     extensions = PHOTO_EXTENSIONS if file_type == "photo" else VIDEO_EXTENSIONS
@@ -63,4 +75,8 @@ def _scan_dir(conn: sqlite3.Connection, camera_id: str,
         upsert_file(conn, camera_id, file_type, str(file), file.stat().st_size, dt.isoformat())
         count += 1
 
+        if count % _LOG_EVERY == 0:
+            logger.info("[%s] %ss processed: %d", camera_id, file_type, count)
+
+    logger.info("[%s] %s scan done: %d files", camera_id, file_type, count)
     return count

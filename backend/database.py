@@ -30,6 +30,11 @@ def init_db() -> None:
         """)
 
 
+def delete_camera_files(conn: sqlite3.Connection, camera_id: str) -> int:
+    cursor = conn.execute("DELETE FROM files WHERE camera_id = ?", (camera_id,))
+    return cursor.rowcount
+
+
 def upsert_file(conn: sqlite3.Connection, camera_id: str, file_type: str,
                 file_path: str, file_size: int, timestamp: str) -> None:
     conn.execute(
@@ -37,6 +42,7 @@ def upsert_file(conn: sqlite3.Connection, camera_id: str, file_type: str,
         INSERT INTO files (camera_id, file_type, file_path, file_size, timestamp)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(file_path) DO UPDATE SET
+            camera_id = excluded.camera_id,
             file_size = excluded.file_size,
             timestamp = excluded.timestamp
         """,
@@ -95,7 +101,7 @@ def get_stats_by_camera(conn: sqlite3.Connection,
 def get_stats_grouped(conn: sqlite3.Connection, group_by: str,
                       camera_id: str | None = None,
                       date_from: str | None = None, date_to: str | None = None):
-    fmt = {"year": "%Y", "month": "%Y-%m", "day": "%Y-%m-%d"}[group_by]
+    fmt = {"year": "%Y", "month": "%Y-%m", "day": "%Y-%m-%d", "hour": "%H"}[group_by]
     where, params = _where(camera_id, date_from, date_to)
     return conn.execute(
         f"""

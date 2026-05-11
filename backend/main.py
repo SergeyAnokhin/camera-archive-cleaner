@@ -1,6 +1,13 @@
+import logging
 import time
 from datetime import datetime
 from typing import Literal
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -88,7 +95,7 @@ def stats(
         description="Filter by camera ID. Leave empty for all cameras. "
                     "Use GET /cameras to see available IDs.",
     ),
-    group_by: Literal["total", "camera", "year", "month", "day"] = Query(
+    group_by: Literal["total", "camera", "year", "month", "day", "hour"] = Query(
         default="total",
         description="Aggregation level.",
     ),
@@ -130,7 +137,7 @@ def stats(
             totals_row = get_stats_total(conn, None, dt_from, dt_to)
             return {"cameras": items, "totals": _row_to_dict(totals_row)}
 
-        # year / month / day
+        # year / month / day / hour
         rows = get_stats_grouped(conn, group_by, camera_id, dt_from, dt_to)
         return {
             "group_by": group_by,

@@ -1,0 +1,40 @@
+:root {
+  /* Backgrounds */
+  --bg-page:       #111827;
+  --bg-card:       #1f2937;
+  --bg-card-hover: #263245;
+  --bg-input:      #374151;
+
+  /* Accent */
+  --accent:        #0ea5e9;
+  --accent-dim:    #0369a1;
+  --accent-glow:   rgba(14, 165, 233, 0.15);
+
+  /* Text */
+  --text-primary:  #f1f5f9;
+  --text-muted:    #94a3b8;
+  --text-dim:      #64748b;
+
+  /* Heatmap intensity (blue family, 0 = empty, 9 = max) */
+  --heat-0: #1e2a3a;
+  --heat-1: #0c4a6e;
+  --heat-2: #075985;
+  --heat-3: #0369a1;
+  --heat-4: #0284c7;
+  --heat-5: #0ea5e9;
+  --heat-6: #38bdf8;
+  --heat-7: #7dd3fc;
+  --heat-8: #bae6fd;
+  --heat-9: #e0f2fe;
+
+  /* Structure */
+  --radius:    8px;
+  --radius-sm: 4px;
+  --border:    1px solid #374151;
+  --shadow:    0 2px 8px rgba(0, 0, 0, 0.4);
+
+  /* Spacing */
+  --gap-sm: 8px;
+  --gap-md: 16px;
+  --gap-lg: 24px;
+}

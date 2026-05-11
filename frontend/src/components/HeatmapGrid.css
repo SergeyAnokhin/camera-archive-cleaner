@@ -1,0 +1,30 @@
+.heatmap-wrapper {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: var(--border);
+  padding: var(--gap-lg);
+}
+
+.heatmap-grid {
+  display: grid;
+  gap: var(--gap-sm);
+}
+
+.heatmap-grid.level-year  { grid-template-columns: repeat(4, 1fr); }
+.heatmap-grid.level-month { grid-template-columns: repeat(4, 1fr); }
+.heatmap-grid.level-day   { grid-template-columns: repeat(7, 1fr); }
+.heatmap-grid.level-hour  { grid-template-columns: repeat(6, 1fr); }
+
+.heatmap-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: var(--gap-lg);
+  font-size: 13px;
+}
+
+.heatmap-empty .mdi {
+  display: block;
+  font-size: 32px;
+  color: var(--text-dim);
+  margin-bottom: var(--gap-sm);
+}
