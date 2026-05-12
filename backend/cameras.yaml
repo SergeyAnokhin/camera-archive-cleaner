@@ -7,3 +7,7 @@ cameras:
     name: "Foscam FI9805W"
     path_snapshots: "\\\\192.168.1.91\\Camera\\Foscam\\FI9805W_C4D6553DECE1\\snap"
     path_videos: "\\\\192.168.1.91\\Camera\\Foscam\\FI9805W_C4D6553DECE1\\record"
+  - id: "foscamHut"
+    name: "Foscam Hut"
+    path_snapshots: "\\\\192.168.1.91\\Camera\\FoscamHut\\FI9800P_00626E870C7B\\snap"
+    path_videos: "\\\\192.168.1.91\\Camera\\FoscamHut\\FI9800P_00626E870C7B\\record"
