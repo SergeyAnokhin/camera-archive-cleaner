@@ -53,6 +53,18 @@
   flex-shrink: 0;
 }
 
+.hv-view-mode-select {
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: calc(var(--font-base) * 0.88);
+  padding: 4px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.hv-view-mode-select:focus { outline: none; border-color: var(--accent); }
+
 /* ── Distribution chart ── */
 .hv-dist-root {
   background: var(--bg-surface);
@@ -151,7 +163,7 @@
 /* ── File grid ── */
 .hv-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--thumb-w, 140px), 1fr));
   gap: var(--gap-sm);
   overflow: visible;
 }
@@ -168,12 +180,11 @@
   overflow: hidden;
   cursor: pointer;
   position: relative;
-  min-height: 120px;
+  aspect-ratio: 4 / 3;
   z-index: 0;
 }
 
 .hv-card-skeleton {
-  min-height: 120px;
   cursor: default;
 }
 
@@ -201,19 +212,19 @@
 
 .hv-photo-img {
   width: 100%;
-  height: 120px;
+  height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.hv-img-skeleton { width: 100%; height: 120px; }
+.hv-img-skeleton { width: 100%; height: 100%; }
 
 .hv-img-error {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 120px;
+  height: 100%;
   color: var(--text-dim);
   font-size: calc(var(--font-base) * 1.8);
 }
@@ -368,4 +379,133 @@
   color: var(--text-muted);
   min-width: 52px;
   text-align: center;
+}
+
+/* ── Selection mode ── */
+.hv-select-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: calc(var(--font-base) * 0.88);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.hv-select-btn:hover { color: var(--text-primary); background: rgba(255,255,255,0.06); }
+.hv-select-btn.active { color: var(--accent); border-color: var(--accent); }
+
+.hv-delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.40);
+  border-radius: var(--radius);
+  color: #f87171;
+  font-size: calc(var(--font-base) * 0.88);
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.hv-delete-btn:hover:not(:disabled) { background: rgba(239, 68, 68, 0.28); }
+.hv-delete-btn:disabled { opacity: 0.5; cursor: default; }
+
+.hv-card-checkbox {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 3px;
+  padding: 2px;
+  font-size: calc(var(--font-base) * 1.1);
+  color: var(--text-muted);
+  z-index: 5;
+  line-height: 1;
+  pointer-events: none;
+}
+.hv-card-checkbox.checked { color: var(--accent); }
+
+.hv-card.hv-selected {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.hv-delete-error {
+  background: #450a0a;
+  border: 1px solid #7f1d1d;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: #fca5a5;
+  font-size: calc(var(--font-base) * 0.88);
+}
+
+/* ── Selection bar (horizontal) ── */
+.hv-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  flex-wrap: wrap;
+}
+
+.hv-sbar-spacer { flex: 1; }
+
+.hv-sbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: calc(var(--font-base) * 0.88);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+.hv-sbar-btn:hover:not(:disabled) { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.hv-sbar-btn:disabled { opacity: 0.4; cursor: default; }
+.hv-sbar-danger { color: #f87171; }
+.hv-sbar-danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.15) !important; color: #f87171; }
+.hv-sbar-cancel { color: var(--text-dim); }
+
+.hv-sbar-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--accent);
+  padding: 0 6px;
+}
+
+/* ── Hour stats in distribution header ── */
+.hv-dist-hourstat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.hv-dist-hourstat .mdi {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.hv-dist-stat-sep {
+  color: var(--text-dim);
+  opacity: 0.5;
+  line-height: 1;
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { clearDatabase, clearThumbnails } from '../api.js'
+import { clearDatabase, clearThumbnails, clearDiffThumbnails } from '../api.js'
 import './ToolsModal.css'
 
 const FONT_KEY = 'font-base'
@@ -22,6 +22,16 @@ const ZOOM_MIN = 1.0
 const ZOOM_MAX = 3.0
 const ZOOM_STEP = 0.25
 const ZOOM_DEFAULT = 1.5
+
+const THUMB_WIDTH_KEY     = 'thumb_width'
+const THUMB_WIDTH_MIN     = 80
+const THUMB_WIDTH_MAX     = 400
+const THUMB_WIDTH_DEFAULT = 140
+
+const DIFF_THRESHOLD_KEY     = 'diff_threshold'
+const DIFF_THRESHOLD_MIN     = 0
+const DIFF_THRESHOLD_MAX     = 100
+const DIFF_THRESHOLD_DEFAULT = 20
 
 function applyFontSize(px) {
   document.documentElement.style.setProperty('--font-base', px + 'px')
@@ -46,11 +56,20 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
   const [hoverZoom, setHoverZoom] = useState(() => {
     return Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT
   })
-  const [dbConfirm, setDbConfirm]     = useState(false)
+  const [thumbWidth, setThumbWidth] = useState(() => {
+    return Number(localStorage.getItem(THUMB_WIDTH_KEY)) || THUMB_WIDTH_DEFAULT
+  })
+  const [diffThreshold, setDiffThreshold] = useState(() => {
+    const v = localStorage.getItem(DIFF_THRESHOLD_KEY)
+    return v !== null ? Number(v) : DIFF_THRESHOLD_DEFAULT
+  })
+  const [dbConfirm, setDbConfirm]           = useState(false)
   const [dbBusy, setDbBusy]           = useState(false)
   const [dbResult, setDbResult]       = useState(null)
-  const [thumbBusy, setThumbBusy]     = useState(false)
-  const [thumbResult, setThumbResult] = useState(null)
+  const [thumbBusy, setThumbBusy]         = useState(false)
+  const [thumbResult, setThumbResult]     = useState(null)
+  const [diffThumbBusy, setDiffThumbBusy]     = useState(false)
+  const [diffThumbResult, setDiffThumbResult] = useState(null)
 
   function handleFontChange(e) {
     const px = Number(e.target.value)
@@ -82,6 +101,20 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     document.dispatchEvent(new CustomEvent('hover-zoom-change', { detail: v }))
   }
 
+  function handleThumbWidthChange(e) {
+    const v = Number(e.target.value)
+    setThumbWidth(v)
+    localStorage.setItem(THUMB_WIDTH_KEY, v)
+    document.dispatchEvent(new CustomEvent('thumb-width-change', { detail: v }))
+  }
+
+  function handleDiffThresholdChange(e) {
+    const v = Number(e.target.value)
+    setDiffThreshold(v)
+    localStorage.setItem(DIFF_THRESHOLD_KEY, v)
+    document.dispatchEvent(new CustomEvent('diff-threshold-change', { detail: v }))
+  }
+
   async function handleClearDb() {
     if (!dbConfirm) { setDbConfirm(true); return }
     setDbBusy(true)
@@ -111,6 +144,21 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     }
   }
 
+  async function handleClearDiffThumbnails() {
+    setDiffThumbBusy(true)
+    setDiffThumbResult(null)
+    try {
+      const res = await clearDiffThumbnails()
+      setDiffThumbResult({ ok: true, text: `Deleted ${res.deleted_files ?? 0} files.` })
+    } catch (e) {
+      setDiffThumbResult({ ok: false, text: e.message })
+    } finally {
+      setDiffThumbBusy(false)
+    }
+  }
+
+  const [activeTab, setActiveTab] = useState('general')
+
   function handleBackdropClick(e) {
     if (e.target === e.currentTarget) onClose()
   }
@@ -121,6 +169,12 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  const TABS = [
+    { id: 'general',     label: 'General' },
+    { id: 'hour_view',   label: 'Hour view' },
+    { id: 'maintenance', label: 'Maintenance' },
+  ]
+
   return (
     <div className="modal-backdrop" onClick={handleBackdropClick}>
       <div className="modal-card">
@@ -129,127 +183,166 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
-        {/* Font size */}
-        <div className="modal-section">
-          <div className="modal-section-title">Font size</div>
-          <div className="font-slider-row">
-            <span className="font-size-label">A</span>
-            <input
-              type="range"
-              min={FONT_MIN}
-              max={FONT_MAX}
-              step="1"
-              value={fontSize}
-              onChange={handleFontChange}
-              className="font-slider"
-            />
-            <span className="font-size-label large">A</span>
-            <span className="font-size-value">{fontSize} px</span>
-          </div>
-        </div>
-
-        {/* Previews per cell */}
-        <div className="modal-section">
-          <div className="modal-section-title">Preview thumbnails per cell</div>
-          <div className="font-slider-row">
-            <span className="font-size-label">0</span>
-            <input
-              type="range"
-              min={PREVIEWS_PER_CELL_MIN}
-              max={PREVIEWS_PER_CELL_MAX}
-              step="1"
-              value={previewsPerCell}
-              onChange={handlePreviewsPerCellChange}
-              className="font-slider"
-            />
-            <span className="font-size-label">{PREVIEWS_PER_CELL_MAX}</span>
-            <span className="font-size-value">{previewsPerCell}</span>
-          </div>
-          <div className="modal-setting-hint">Thumbnails shown inside each heatmap cell (year/month/day). Set 0 to disable.</div>
-        </div>
-
-        {/* Hour view page size */}
-        <div className="modal-section">
-          <div className="modal-section-title">Hour view — photos per page</div>
-          <div className="font-slider-row">
-            <input
-              type="number"
-              min={PAGE_SIZE_MIN}
-              max={PAGE_SIZE_MAX}
-              step="10"
-              value={pageSize}
-              onChange={handlePageSizeChange}
-              className="modal-number-input"
-            />
-            <span className="font-size-value" style={{ marginLeft: 0 }}>per page</span>
-          </div>
-          <div className="modal-setting-hint">Number of items per page when browsing a specific hour ({PAGE_SIZE_MIN}–{PAGE_SIZE_MAX}).</div>
-        </div>
-
-        {/* Hover zoom */}
-        <div className="modal-section">
-          <div className="modal-section-title">Hover zoom (hour view)</div>
-          <div className="font-slider-row">
-            <span className="font-size-label">1×</span>
-            <input
-              type="range"
-              min={ZOOM_MIN}
-              max={ZOOM_MAX}
-              step={ZOOM_STEP}
-              value={hoverZoom}
-              onChange={handleHoverZoomChange}
-              className="font-slider"
-            />
-            <span className="font-size-label">{ZOOM_MAX}×</span>
-            <span className="font-size-value">{hoverZoom.toFixed(2)}×</span>
-          </div>
-          <div className="modal-setting-hint">Scale factor when hovering a photo. Set to 1× to disable.</div>
-        </div>
-
-        {/* Clear database */}
-        <div className="modal-section">
-          <div className="modal-section-title">Danger zone</div>
-          <div className="modal-action-row">
-            <div className="modal-action-info">
-              <span className="modal-action-name">Clear database</span>
-              <span className="modal-action-desc">Remove all scanned file records</span>
-            </div>
-            {dbConfirm ? (
-              <div className="modal-confirm-group">
-                <span className="modal-confirm-text">Sure?</span>
-                <button className="modal-btn danger" onClick={handleClearDb} disabled={dbBusy}>
-                  {dbBusy ? <i className="mdi mdi-loading mdi-spin" /> : 'Yes, clear'}
-                </button>
-                <button className="modal-btn neutral" onClick={() => setDbConfirm(false)}>Cancel</button>
-              </div>
-            ) : (
-              <button className="modal-btn danger-outline" onClick={handleClearDb}>
-                <i className="mdi mdi-database-remove-outline" /> Clear
-              </button>
-            )}
-          </div>
-          {dbResult && (
-            <div className={`modal-result ${dbResult.ok ? 'ok' : 'err'}`}>{dbResult.text}</div>
-          )}
-        </div>
-
-        {/* Clear thumbnails */}
-        <div className="modal-section">
-          <div className="modal-action-row">
-            <div className="modal-action-info">
-              <span className="modal-action-name">Clear thumbnails</span>
-              <span className="modal-action-desc">Delete all cached preview images</span>
-            </div>
-            <button className="modal-btn danger-outline" onClick={handleClearThumbnails} disabled={thumbBusy}>
-              {thumbBusy
-                ? <i className="mdi mdi-loading mdi-spin" />
-                : <><i className="mdi mdi-image-remove-outline" /> Clear</>
-              }
+        <div className="modal-tabs">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              className={`modal-tab${activeTab === t.id ? ' active' : ''}`}
+              onClick={() => setActiveTab(t.id)}
+            >
+              {t.label}
             </button>
-          </div>
-          {thumbResult && (
-            <div className={`modal-result ${thumbResult.ok ? 'ok' : 'err'}`}>{thumbResult.text}</div>
-          )}
+          ))}
+        </div>
+
+        <div className="modal-tab-content">
+
+          {activeTab === 'general' && <>
+            {/* Font size */}
+            <div className="modal-section">
+              <div className="modal-section-title">Font size</div>
+              <div className="font-slider-row">
+                <span className="font-size-label">A</span>
+                <input type="range" min={FONT_MIN} max={FONT_MAX} step="1"
+                  value={fontSize} onChange={handleFontChange} className="font-slider" />
+                <span className="font-size-label large">A</span>
+                <span className="font-size-value">{fontSize} px</span>
+              </div>
+            </div>
+
+            {/* Previews per cell */}
+            <div className="modal-section">
+              <div className="modal-section-title">Preview thumbnails per cell</div>
+              <div className="font-slider-row">
+                <span className="font-size-label">0</span>
+                <input type="range" min={PREVIEWS_PER_CELL_MIN} max={PREVIEWS_PER_CELL_MAX} step="1"
+                  value={previewsPerCell} onChange={handlePreviewsPerCellChange} className="font-slider" />
+                <span className="font-size-label">{PREVIEWS_PER_CELL_MAX}</span>
+                <span className="font-size-value">{previewsPerCell}</span>
+              </div>
+              <div className="modal-setting-hint">Thumbnails shown inside each heatmap cell (year/month/day). Set 0 to disable.</div>
+            </div>
+          </>}
+
+          {activeTab === 'hour_view' && <>
+            {/* Photos per page */}
+            <div className="modal-section">
+              <div className="modal-section-title">Photos per page</div>
+              <div className="font-slider-row">
+                <input type="number" min={PAGE_SIZE_MIN} max={PAGE_SIZE_MAX} step="10"
+                  value={pageSize} onChange={handlePageSizeChange} className="modal-number-input" />
+                <span className="font-size-value" style={{ marginLeft: 0 }}>per page</span>
+              </div>
+              <div className="modal-setting-hint">Number of items per page when browsing a specific hour ({PAGE_SIZE_MIN}–{PAGE_SIZE_MAX}).</div>
+            </div>
+
+            {/* Thumbnail width */}
+            <div className="modal-section">
+              <div className="modal-section-title">Thumbnail width</div>
+              <div className="font-slider-row">
+                <span className="font-size-label">{THUMB_WIDTH_MIN}</span>
+                <input type="range" min={THUMB_WIDTH_MIN} max={THUMB_WIDTH_MAX} step="10"
+                  value={thumbWidth} onChange={handleThumbWidthChange} className="font-slider" />
+                <span className="font-size-label">{THUMB_WIDTH_MAX}</span>
+                <span className="font-size-value">{thumbWidth} px</span>
+              </div>
+              <div className="modal-setting-hint">Minimum column width of photo cards.</div>
+            </div>
+
+            {/* Hover zoom */}
+            <div className="modal-section">
+              <div className="modal-section-title">Hover zoom</div>
+              <div className="font-slider-row">
+                <span className="font-size-label">1×</span>
+                <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={ZOOM_STEP}
+                  value={hoverZoom} onChange={handleHoverZoomChange} className="font-slider" />
+                <span className="font-size-label">{ZOOM_MAX}×</span>
+                <span className="font-size-value">{hoverZoom.toFixed(2)}×</span>
+              </div>
+              <div className="modal-setting-hint">Scale factor when hovering a photo. Set to 1× to disable.</div>
+            </div>
+
+            {/* Motion diff threshold */}
+            <div className="modal-section">
+              <div className="modal-section-title">Motion diff — change threshold</div>
+              <div className="font-slider-row">
+                <span className="font-size-label">{DIFF_THRESHOLD_MIN}</span>
+                <input type="range" min={DIFF_THRESHOLD_MIN} max={DIFF_THRESHOLD_MAX} step="1"
+                  value={diffThreshold} onChange={handleDiffThresholdChange} className="font-slider" />
+                <span className="font-size-label">{DIFF_THRESHOLD_MAX}</span>
+                <span className="font-size-value">{diffThreshold}</span>
+              </div>
+              <div className="modal-setting-hint">Pixels with a channel delta below this value are darkened in Motion diff mode. Higher = only significant changes shown.</div>
+            </div>
+          </>}
+
+          {activeTab === 'maintenance' && <>
+            {/* Clear database */}
+            <div className="modal-section">
+              <div className="modal-section-title">Danger zone</div>
+              <div className="modal-action-row">
+                <div className="modal-action-info">
+                  <span className="modal-action-name">Clear database</span>
+                  <span className="modal-action-desc">Remove all scanned file records</span>
+                </div>
+                {dbConfirm ? (
+                  <div className="modal-confirm-group">
+                    <span className="modal-confirm-text">Sure?</span>
+                    <button className="modal-btn danger" onClick={handleClearDb} disabled={dbBusy}>
+                      {dbBusy ? <i className="mdi mdi-loading mdi-spin" /> : 'Yes, clear'}
+                    </button>
+                    <button className="modal-btn neutral" onClick={() => setDbConfirm(false)}>Cancel</button>
+                  </div>
+                ) : (
+                  <button className="modal-btn danger-outline" onClick={handleClearDb}>
+                    <i className="mdi mdi-database-remove-outline" /> Clear
+                  </button>
+                )}
+              </div>
+              {dbResult && (
+                <div className={`modal-result ${dbResult.ok ? 'ok' : 'err'}`}>{dbResult.text}</div>
+              )}
+            </div>
+
+            {/* Clear thumbnails */}
+            <div className="modal-section">
+              <div className="modal-action-row">
+                <div className="modal-action-info">
+                  <span className="modal-action-name">Clear thumbnails</span>
+                  <span className="modal-action-desc">Delete all cached preview images</span>
+                </div>
+                <button className="modal-btn danger-outline" onClick={handleClearThumbnails} disabled={thumbBusy}>
+                  {thumbBusy
+                    ? <i className="mdi mdi-loading mdi-spin" />
+                    : <><i className="mdi mdi-image-remove-outline" /> Clear</>
+                  }
+                </button>
+              </div>
+              {thumbResult && (
+                <div className={`modal-result ${thumbResult.ok ? 'ok' : 'err'}`}>{thumbResult.text}</div>
+              )}
+            </div>
+
+            {/* Clear diff thumbnails */}
+            <div className="modal-section">
+              <div className="modal-action-row">
+                <div className="modal-action-info">
+                  <span className="modal-action-name">Clear diff thumbnails</span>
+                  <span className="modal-action-desc">Delete all cached Motion diff images</span>
+                </div>
+                <button className="modal-btn danger-outline" onClick={handleClearDiffThumbnails} disabled={diffThumbBusy}>
+                  {diffThumbBusy
+                    ? <i className="mdi mdi-loading mdi-spin" />
+                    : <><i className="mdi mdi-image-remove-outline" /> Clear</>
+                  }
+                </button>
+              </div>
+              {diffThumbResult && (
+                <div className={`modal-result ${diffThumbResult.ok ? 'ok' : 'err'}`}>{diffThumbResult.text}</div>
+              )}
+            </div>
+          </>}
+
         </div>
       </div>
     </div>

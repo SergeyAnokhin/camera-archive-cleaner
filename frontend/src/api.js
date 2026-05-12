@@ -35,8 +35,8 @@ export function triggerScan(cameraId = null) {
   return post('/scan' + buildQuery({ camera_id: cameraId }))
 }
 
-export function getStatsTotal(cameraId = null) {
-  return get('/stats' + buildQuery({ group_by: 'total', camera_id: cameraId }))
+export function getStatsTotal(cameraId = null, dateFrom = null, dateTo = null) {
+  return get('/stats' + buildQuery({ group_by: 'total', camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
 export function getStatsGrouped(groupBy, { cameraId = null, dateFrom = null, dateTo = null } = {}) {
@@ -89,4 +89,34 @@ export function clearDatabase() {
 
 export function clearThumbnails() {
   return del('/thumbnails')
+}
+
+export function getDiffThumbnailUrl(fileId, pageIds, threshold) {
+  return `${BASE}/diff_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
+}
+
+export function clearDiffThumbnails() {
+  return del('/diff_thumbnails')
+}
+
+async function postJson(path, body) {
+  const res = await fetch(BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`API ${res.status}: ${path}`)
+  return res.json()
+}
+
+export function previewDelete(fileIds) {
+  return postJson('/delete/preview', { file_ids: fileIds })
+}
+
+export function confirmDelete(fileIds) {
+  return postJson('/delete/confirm', { file_ids: fileIds })
+}
+
+export function deleteByRange(cameraId, dateFrom, dateTo) {
+  return postJson('/delete/by_range', { camera_id: cameraId, date_from: dateFrom, date_to: dateTo })
 }

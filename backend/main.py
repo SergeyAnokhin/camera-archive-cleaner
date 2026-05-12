@@ -1,6 +1,7 @@
 import logging
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
 logging.basicConfig(
@@ -12,6 +13,7 @@ logging.basicConfig(
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from config import load_cameras
 from database import (
@@ -27,6 +29,7 @@ from database import (
     init_db,
 )
 from thumbnails import THUMB_DIR, get_or_create_thumbnail
+from diff_thumbnails import DIFF_THUMB_DIR, get_or_create_diff_thumbnail
 from scanner import scan_camera
 
 app = FastAPI(title="Camera Snapshots Cleaner", version="1.0.0")
@@ -160,6 +163,7 @@ def get_files(
                 "file_type": r["file_type"],
                 "timestamp": r["timestamp"],
                 "file_path": r["file_path"],
+                "file_size": r["file_size"],
             }
             for r in rows
         ]
@@ -186,6 +190,40 @@ def get_thumbnail(file_id: int):
 
 
 # ---------------------------------------------------------------------------
+# /diff_thumbnail/{file_id} — motion-diff thumbnail relative to page mean
+# ---------------------------------------------------------------------------
+
+@app.get("/diff_thumbnail/{file_id}", summary="Motion-diff thumbnail for a photo")
+def get_diff_thumbnail(
+    file_id: int,
+    page_ids: str = Query(description="Comma-separated photo file IDs on the current page"),
+    threshold: int = Query(default=20, ge=0, le=255),
+):
+    try:
+        ids = [int(x) for x in page_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid page_ids format")
+    if not ids:
+        raise HTTPException(status_code=400, detail="page_ids cannot be empty")
+
+    with get_connection() as conn:
+        file_row = get_file_by_id(conn, file_id)
+        if file_row is None:
+            raise HTTPException(status_code=404, detail="File not found")
+        if file_row["file_type"] != "photo":
+            raise HTTPException(status_code=400, detail="Diff thumbnails only available for photos")
+        try:
+            get_or_create_thumbnail(conn, file_id, file_row["file_path"])
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        try:
+            diff_path = get_or_create_diff_thumbnail(conn, file_id, ids, threshold)
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(str(diff_path), media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
 # /media/{file_id} — serve original file (photos and videos)
 # ---------------------------------------------------------------------------
 
@@ -195,7 +233,6 @@ def get_media(file_id: int):
         file_row = get_file_by_id(conn, file_id)
         if file_row is None:
             raise HTTPException(status_code=404, detail="File not found")
-        from pathlib import Path
         src = Path(file_row["file_path"])
         if not src.exists():
             raise HTTPException(status_code=404, detail="Source file not found on disk")
@@ -258,6 +295,175 @@ def get_previews(
 
 
 # ---------------------------------------------------------------------------
+# /delete — safe delete with video auto-matching
+# ---------------------------------------------------------------------------
+
+class PreviewRequest(BaseModel):
+    file_ids: list[int]
+
+class ConfirmRequest(BaseModel):
+    file_ids: list[int]
+
+
+@app.post("/delete/preview", summary="Preview files to delete, including auto-matched related videos")
+def delete_preview(req: PreviewRequest):
+    if not req.file_ids:
+        raise HTTPException(status_code=400, detail="file_ids cannot be empty")
+
+    with get_connection() as conn:
+        placeholders = ",".join("?" * len(req.file_ids))
+        rows = conn.execute(
+            f"SELECT id, file_type, timestamp, camera_id, file_path FROM files WHERE id IN ({placeholders})",
+            req.file_ids,
+        ).fetchall()
+
+        found_ids = {r["id"] for r in rows}
+        missing = [i for i in req.file_ids if i not in found_ids]
+        if missing:
+            raise HTTPException(status_code=404, detail=f"File IDs not found: {missing}")
+
+        selected = []
+        photo_entries = []
+        for r in rows:
+            item = {"id": r["id"], "file_type": r["file_type"], "timestamp": r["timestamp"], "file_path": r["file_path"]}
+            if r["file_type"] == "photo":
+                item["thumb_url"] = f"/api/thumbnail/{r['id']}"
+                photo_entries.append((r["camera_id"], r["timestamp"]))
+            selected.append(item)
+
+        # Auto-match related videos within ±5 seconds of any selected photo
+        seen_ids = set(req.file_ids)
+        related_videos = []
+        for camera_id, ts in photo_entries:
+            excl = ",".join("?" * len(seen_ids))
+            video_rows = conn.execute(
+                f"""
+                SELECT id, file_type, timestamp, file_path
+                FROM files
+                WHERE camera_id = ?
+                  AND file_type = 'video'
+                  AND id NOT IN ({excl})
+                  AND ABS((julianday(timestamp) - julianday(?)) * 86400.0) <= 5.0
+                """,
+                [camera_id] + list(seen_ids) + [ts],
+            ).fetchall()
+            for vr in video_rows:
+                if vr["id"] not in seen_ids:
+                    related_videos.append({
+                        "id": vr["id"],
+                        "file_type": "video",
+                        "timestamp": vr["timestamp"],
+                        "file_path": vr["file_path"],
+                    })
+                    seen_ids.add(vr["id"])
+
+    return {"selected": selected, "related_videos": related_videos}
+
+
+@app.post("/delete/confirm", summary="Physically delete files and remove DB records")
+def delete_confirm(req: ConfirmRequest):
+    if not req.file_ids:
+        raise HTTPException(status_code=400, detail="file_ids cannot be empty")
+
+    deleted = []
+    failed = []
+
+    with get_connection() as conn:
+        placeholders = ",".join("?" * len(req.file_ids))
+        rows = conn.execute(
+            f"""
+            SELECT f.id, f.file_path, t.thumb_path
+            FROM files f
+            LEFT JOIN thumbnails t ON t.file_id = f.id
+            WHERE f.id IN ({placeholders})
+            """,
+            req.file_ids,
+        ).fetchall()
+
+        rows_by_id = {r["id"]: r for r in rows}
+        ids_to_delete_from_db = []
+
+        for file_id in req.file_ids:
+            row = rows_by_id.get(file_id)
+            if row is None:
+                deleted.append(file_id)
+                continue
+
+            src = Path(row["file_path"])
+            try:
+                if src.exists():
+                    src.unlink()
+            except Exception as e:
+                failed.append({"id": file_id, "reason": str(e)})
+                continue
+
+            if row["thumb_path"]:
+                thumb = Path(row["thumb_path"])
+                try:
+                    if thumb.exists():
+                        thumb.unlink()
+                except Exception:
+                    pass
+
+            ids_to_delete_from_db.append(file_id)
+            deleted.append(file_id)
+
+        if ids_to_delete_from_db:
+            db_ph = ",".join("?" * len(ids_to_delete_from_db))
+            conn.execute(f"DELETE FROM files WHERE id IN ({db_ph})", ids_to_delete_from_db)
+
+    return {"deleted": deleted, "failed": failed}
+
+
+class RangeDeleteRequest(BaseModel):
+    camera_id: str | None = None
+    date_from: str
+    date_to: str
+
+
+@app.post("/delete/by_range", summary="Delete all files in a date range")
+def delete_by_range(req: RangeDeleteRequest):
+    deleted_count = 0
+    failed_count = 0
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT f.id, f.file_path, t.thumb_path
+            FROM files f LEFT JOIN thumbnails t ON t.file_id = f.id
+            WHERE (? IS NULL OR f.camera_id = ?)
+              AND f.timestamp >= ?
+              AND f.timestamp <= ?
+            """,
+            [req.camera_id, req.camera_id, req.date_from, req.date_to],
+        ).fetchall()
+
+        ids_ok = []
+        for row in rows:
+            src = Path(row["file_path"])
+            try:
+                if src.exists():
+                    src.unlink()
+            except Exception:
+                failed_count += 1
+                continue
+            if row["thumb_path"]:
+                try:
+                    thumb = Path(row["thumb_path"])
+                    if thumb.exists():
+                        thumb.unlink()
+                except Exception:
+                    pass
+            ids_ok.append(row["id"])
+            deleted_count += 1
+
+        if ids_ok:
+            ph = ",".join("?" * len(ids_ok))
+            conn.execute(f"DELETE FROM files WHERE id IN ({ph})", ids_ok)
+
+    return {"deleted_count": deleted_count, "failed_count": failed_count}
+
+
+# ---------------------------------------------------------------------------
 # /database  /thumbnails — maintenance actions
 # ---------------------------------------------------------------------------
 
@@ -279,6 +485,17 @@ def clear_thumbnails():
     with get_connection() as conn:
         deleted_rows = delete_all_thumbnails(conn)
     return {"deleted_files": deleted_files, "deleted_rows": deleted_rows}
+
+
+@app.delete("/diff_thumbnails", summary="Delete all cached diff thumbnail files")
+def clear_diff_thumbnails():
+    deleted_files = 0
+    if DIFF_THUMB_DIR.exists():
+        for f in DIFF_THUMB_DIR.iterdir():
+            if f.is_file():
+                f.unlink()
+                deleted_files += 1
+    return {"deleted_files": deleted_files}
 
 
 def _row_to_dict(row) -> dict:

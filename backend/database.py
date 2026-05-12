@@ -140,7 +140,7 @@ def get_files_paginated(conn: sqlite3.Connection, camera_id: str | None,
     offset = (page - 1) * page_size
     rows = conn.execute(
         f"""
-        SELECT id, file_type, file_path, timestamp
+        SELECT id, file_type, file_path, file_size, timestamp
         FROM files {where}
         ORDER BY timestamp ASC
         LIMIT ? OFFSET ?
@@ -152,7 +152,7 @@ def get_files_paginated(conn: sqlite3.Connection, camera_id: str | None,
 
 def get_file_by_id(conn: sqlite3.Connection, file_id: int):
     return conn.execute(
-        "SELECT id, file_type, file_path, timestamp FROM files WHERE id = ?",
+        "SELECT id, file_type, file_path, file_size, timestamp FROM files WHERE id = ?",
         (file_id,),
     ).fetchone()
 

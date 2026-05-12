@@ -64,6 +64,25 @@
   text-shadow: none;
 }
 
+.heatmap-cell-selected {
+  box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.cell-checkbox {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 3px;
+  padding: 1px;
+  font-size: calc(var(--font-base) * 1.1);
+  color: var(--text-muted);
+  z-index: 5;
+  line-height: 1;
+  pointer-events: none;
+}
+.cell-checkbox.checked { color: var(--accent); }
+
 .heatmap-cell-skeleton {
   border-radius: var(--radius);
   min-height: 80px;

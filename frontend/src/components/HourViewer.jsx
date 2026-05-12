@@ -1,16 +1,34 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { getFiles, getDistribution, getThumbnailUrl, getMediaUrl } from '../api.js'
+import { getFiles, getDistribution, getStatsTotal, getThumbnailUrl, getDiffThumbnailUrl, getMediaUrl, previewDelete, confirmDelete } from '../api.js'
+import DeleteConfirmModal from './DeleteConfirmModal.jsx'
 import './HourViewer.css'
 
-const PAGE_SIZE_KEY = 'hour_page_size'
+const PAGE_SIZE_KEY    = 'hour_page_size'
 const PAGE_SIZE_DEFAULT = 50
-const ZOOM_KEY = 'hover_zoom'
-const ZOOM_DEFAULT = 1.5
+const ZOOM_KEY         = 'hover_zoom'
+const ZOOM_DEFAULT     = 1.5
+const THUMB_WIDTH_KEY  = 'thumb_width'
+const THUMB_WIDTH_DEFAULT = 140
+const DIFF_THRESHOLD_KEY  = 'diff_threshold'
+const DIFF_THRESHOLD_DEFAULT = 20
+const VIEW_MODE_KEY    = 'hour_view_mode'
 
-function getPageSize() { return Number(localStorage.getItem(PAGE_SIZE_KEY)) || PAGE_SIZE_DEFAULT }
-function getHoverZoom() { return Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT }
+function getPageSize()     { return Number(localStorage.getItem(PAGE_SIZE_KEY)) || PAGE_SIZE_DEFAULT }
+function getHoverZoom()    { return Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT }
+function getThumbWidth()   { return Number(localStorage.getItem(THUMB_WIDTH_KEY)) || THUMB_WIDTH_DEFAULT }
+function getDiffThreshold() {
+  const v = localStorage.getItem(DIFF_THRESHOLD_KEY)
+  return v !== null ? Number(v) : DIFF_THRESHOLD_DEFAULT
+}
 
 function formatTime(ts) { return ts ? ts.substring(11, 19) : '' }
+
+function formatBytes(b) {
+  if (!b) return '0 B'
+  if (b >= 1e9) return `${(b / 1e9).toFixed(1)} GB`
+  if (b >= 1e6) return `${(b / 1e6).toFixed(0)} MB`
+  return `${(b / 1e3).toFixed(0)} KB`
+}
 
 // ---------------------------------------------------------------------------
 // Video modal
@@ -76,24 +94,42 @@ function VideoModal({ file, onClose }) {
 // Cards
 // ---------------------------------------------------------------------------
 
-function PhotoCard({ file, hoverZoom }) {
+function PhotoCard({ file, hoverZoom, viewMode, pagePhotoIds, diffThreshold, selectionMode, selected, onToggle, index }) {
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
 
+  const src = viewMode === 'motion_diff' && pagePhotoIds.length > 0
+    ? getDiffThumbnailUrl(file.id, pagePhotoIds, diffThreshold)
+    : getThumbnailUrl(file.id)
+
+  useEffect(() => {
+    setLoaded(false)
+    setError(false)
+  }, [src])
+
+  function handleClick(e) {
+    if (selectionMode) { onToggle(file, index, e.shiftKey) } else { setFullscreen(true) }
+  }
+
   return (
     <>
       <div
-        className="hv-card hv-card-photo"
-        style={{ '--hv-zoom': hoverZoom }}
-        title={`${formatTime(file.timestamp)} — click to enlarge`}
-        onClick={() => setFullscreen(true)}
+        className={`hv-card hv-card-photo${selectionMode && selected ? ' hv-selected' : ''}`}
+        style={{ '--hv-zoom': selectionMode ? 1 : hoverZoom }}
+        title={selectionMode ? formatTime(file.timestamp) : `${formatTime(file.timestamp)} — click to enlarge`}
+        onClick={handleClick}
       >
+        {selectionMode && (
+          <div className={`hv-card-checkbox${selected ? ' checked' : ''}`}>
+            <i className={`mdi mdi-${selected ? 'checkbox-marked' : 'checkbox-blank-outline'}`} />
+          </div>
+        )}
         {!loaded && !error && <div className="hv-img-skeleton skeleton" />}
         {error
           ? <div className="hv-img-error"><i className="mdi mdi-image-broken-variant" /></div>
           : <img
-              src={getThumbnailUrl(file.id)}
+              src={src}
               alt={formatTime(file.timestamp)}
               className="hv-photo-img"
               style={{ display: loaded ? 'block' : 'none' }}
@@ -103,7 +139,7 @@ function PhotoCard({ file, hoverZoom }) {
         }
         <span className="hv-card-time">{formatTime(file.timestamp)}</span>
       </div>
-      {fullscreen && (
+      {!selectionMode && fullscreen && (
         <div className="hv-lightbox" onClick={() => setFullscreen(false)}>
           <img src={getMediaUrl(file.id)} alt={formatTime(file.timestamp)} className="hv-lightbox-img" />
         </div>
@@ -112,16 +148,68 @@ function PhotoCard({ file, hoverZoom }) {
   )
 }
 
-function VideoCard({ file }) {
+function VideoCard({ file, selectionMode, selected, onToggle, index }) {
   const [modalOpen, setModalOpen] = useState(false)
+
+  function handleClick(e) {
+    if (selectionMode) { onToggle(file, index, e.shiftKey) } else { setModalOpen(true) }
+  }
+
   return (
     <>
-      <div className="hv-card hv-card-video" onClick={() => setModalOpen(true)} title={`${formatTime(file.timestamp)} — click to play`}>
+      <div
+        className={`hv-card hv-card-video${selectionMode && selected ? ' hv-selected' : ''}`}
+        onClick={handleClick}
+        title={`${formatTime(file.timestamp)}${selectionMode ? '' : ' — click to play'}`}
+      >
+        {selectionMode && (
+          <div className={`hv-card-checkbox${selected ? ' checked' : ''}`}>
+            <i className={`mdi mdi-${selected ? 'checkbox-marked' : 'checkbox-blank-outline'}`} />
+          </div>
+        )}
         <i className="mdi mdi-video hv-video-icon" />
         <span className="hv-card-time">{formatTime(file.timestamp)}</span>
       </div>
-      {modalOpen && <VideoModal file={file} onClose={() => setModalOpen(false)} />}
+      {!selectionMode && modalOpen && <VideoModal file={file} onClose={() => setModalOpen(false)} />}
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Selection bar (horizontal, below distribution chart)
+// ---------------------------------------------------------------------------
+
+function SelectionBar({ files, selectedCount, selectionStats, onSelectAll, onSelectNone, onDelete, onCancel, loading }) {
+  return (
+    <div className="hv-select-bar">
+      <button className="hv-sbar-btn" onClick={onSelectAll}>
+        <i className="mdi mdi-select-all" /> All ({files.length})
+      </button>
+      <button className="hv-sbar-btn" onClick={onSelectNone} disabled={selectedCount === 0}>
+        <i className="mdi mdi-select-off" /> None
+      </button>
+      {selectedCount > 0 && (
+        <div className="hv-sbar-stats">
+          {selectionStats.photos > 0 && <span><i className="mdi mdi-image-outline" /> {selectionStats.photos}</span>}
+          {selectionStats.videos > 0 && <span><i className="mdi mdi-video-outline" /> {selectionStats.videos}</span>}
+          {selectionStats.bytes > 0 && <span>{formatBytes(selectionStats.bytes)}</span>}
+        </div>
+      )}
+      <div className="hv-sbar-spacer" />
+      <button
+        className="hv-sbar-btn hv-sbar-danger"
+        onClick={onDelete}
+        disabled={loading || selectedCount === 0}
+      >
+        {loading
+          ? <i className="mdi mdi-loading mdi-spin" />
+          : <><i className="mdi mdi-delete-outline" /> Delete {selectedCount}</>
+        }
+      </button>
+      <button className="hv-sbar-btn hv-sbar-cancel" onClick={onCancel}>
+        <i className="mdi mdi-close" /> Cancel
+      </button>
+    </div>
   )
 }
 
@@ -129,7 +217,7 @@ function VideoCard({ file }) {
 // Distribution chart  (60 bars = 1 per minute)
 // ---------------------------------------------------------------------------
 
-function DistributionChart({ buckets, pageSize, page, total, onGoToPage }) {
+function DistributionChart({ buckets, pageSize, page, total, onGoToPage, hourStats }) {
   const chartRef = useRef(null)
   const maxCount  = useMemo(() => Math.max(...buckets.map(b => b.total_count), 1), [buckets])
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
@@ -185,6 +273,15 @@ function DistributionChart({ buckets, pageSize, page, total, onGoToPage }) {
         <span className="hv-dist-title">
           <i className="mdi mdi-chart-bar" /> Distribution per minute
         </span>
+        {hourStats && (
+          <span className="hv-dist-hourstat">
+            <span><i className="mdi mdi-image-outline" /> {hourStats.photo_count.toLocaleString()}</span>
+            <span className="hv-dist-stat-sep">·</span>
+            <span><i className="mdi mdi-video-outline" /> {hourStats.video_count.toLocaleString()}</span>
+            <span className="hv-dist-stat-sep">·</span>
+            <span>{formatBytes(hourStats.total_size_bytes)}</span>
+          </span>
+        )}
         <span className="hv-dist-hint">click to jump</span>
       </div>
       <div className="hv-dist-chart" ref={chartRef} onClick={handleClick}>
@@ -210,23 +307,55 @@ function DistributionChart({ buckets, pageSize, page, total, onGoToPage }) {
 // HourViewer
 // ---------------------------------------------------------------------------
 
-export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack }) {
+export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack, onFilesDeleted }) {
   const [files, setFiles]               = useState([])
   const [total, setTotal]               = useState(0)
   const [page, setPage]                 = useState(1)
   const [loading, setLoading]           = useState(false)
   const [pageSize, setPageSize]         = useState(getPageSize)
   const [hoverZoom, setHoverZoom]       = useState(getHoverZoom)
+  const [thumbWidth, setThumbWidth]     = useState(getThumbWidth)
+  const [diffThreshold, setDiffThreshold] = useState(getDiffThreshold)
+  const [viewMode, setViewMode]         = useState(() => localStorage.getItem(VIEW_MODE_KEY) || 'normal')
   const [distribution, setDistribution] = useState([])
+  const [hourStats, setHourStats]       = useState(null)
+
+  const [selectionMode, setSelectionMode]     = useState(false)
+  const [selectedMap, setSelectedMap]         = useState(new Map())
+  const [preview, setPreview]                 = useState(null)
+  const [previewLoading, setPreviewLoading]   = useState(false)
+  const [deleteLoading, setDeleteLoading]     = useState(false)
+  const [deleteError, setDeleteError]         = useState(null)
+  const [internalRefreshKey, setInternalRefreshKey] = useState(0)
+
+  const anchorIdxRef = useRef(null)
+  const anchorActionRef = useRef(null)  // true = selecting, false = deselecting
+
+  const selectedIds = useMemo(() => new Set(selectedMap.keys()), [selectedMap])
+
+  const selectionStats = useMemo(() => {
+    let photos = 0, videos = 0, bytes = 0
+    for (const f of selectedMap.values()) {
+      f.file_type === 'photo' ? photos++ : videos++
+      bytes += f.file_size || 0
+    }
+    return { photos, videos, bytes }
+  }, [selectedMap])
 
   useEffect(() => {
-    function onPageSize() { setPageSize(getPageSize()); setPage(1) }
-    function onZoom()     { setHoverZoom(getHoverZoom()) }
+    function onPageSize()      { setPageSize(getPageSize()); setPage(1) }
+    function onZoom()          { setHoverZoom(getHoverZoom()) }
+    function onThumbWidth()    { setThumbWidth(getThumbWidth()) }
+    function onDiffThreshold() { setDiffThreshold(getDiffThreshold()) }
     document.addEventListener('hour-page-size-change', onPageSize)
     document.addEventListener('hover-zoom-change', onZoom)
+    document.addEventListener('thumb-width-change', onThumbWidth)
+    document.addEventListener('diff-threshold-change', onDiffThreshold)
     return () => {
       document.removeEventListener('hour-page-size-change', onPageSize)
       document.removeEventListener('hover-zoom-change', onZoom)
+      document.removeEventListener('thumb-width-change', onThumbWidth)
+      document.removeEventListener('diff-threshold-change', onDiffThreshold)
     }
   }, [])
 
@@ -234,7 +363,13 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack }
     getDistribution(cameraId, dateFrom, dateTo)
       .then(data => setDistribution(data.buckets ?? []))
       .catch(() => setDistribution([]))
-  }, [cameraId, dateFrom, dateTo])
+  }, [cameraId, dateFrom, dateTo, internalRefreshKey])
+
+  useEffect(() => {
+    getStatsTotal(cameraId, dateFrom, dateTo)
+      .then(setHourStats)
+      .catch(() => setHourStats(null))
+  }, [cameraId, dateFrom, dateTo, internalRefreshKey])
 
   useEffect(() => {
     setLoading(true)
@@ -242,9 +377,109 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack }
       .then(data => { setFiles(data.files ?? []); setTotal(data.total ?? 0) })
       .catch(() => { setFiles([]); setTotal(0) })
       .finally(() => setLoading(false))
-  }, [cameraId, dateFrom, dateTo, page, pageSize])
+  }, [cameraId, dateFrom, dateTo, page, pageSize, internalRefreshKey])
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+
+  const pagePhotoIds = useMemo(
+    () => files.filter(f => f.file_type === 'photo').map(f => f.id),
+    [files]
+  )
+
+  function toggleSelectionMode() {
+    setSelectionMode(v => !v)
+    setSelectedMap(new Map())
+    anchorIdxRef.current = null
+    anchorActionRef.current = null
+    setDeleteError(null)
+  }
+
+  function toggleSelect(file, idx, shiftKey) {
+    setSelectedMap(prev => {
+      const next = new Map(prev)
+      if (shiftKey && anchorIdxRef.current !== null) {
+        const lo = Math.min(anchorIdxRef.current, idx)
+        const hi = Math.max(anchorIdxRef.current, idx)
+        const adding = anchorActionRef.current
+        for (let i = lo; i <= hi; i++) {
+          if (adding) next.set(files[i].id, files[i])
+          else next.delete(files[i].id)
+        }
+      } else {
+        const wasSelected = next.has(file.id)
+        wasSelected ? next.delete(file.id) : next.set(file.id, file)
+        anchorIdxRef.current = idx
+        anchorActionRef.current = !wasSelected
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (!selectionMode) return
+    function onKey(e) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      if (anchorIdxRef.current === null) return
+      const nextIdx = e.key === 'ArrowLeft' ? anchorIdxRef.current - 1 : anchorIdxRef.current + 1
+      if (nextIdx < 0 || nextIdx >= files.length) return
+      e.preventDefault()
+      setSelectedMap(prev => {
+        const map = new Map(prev)
+        if (anchorActionRef.current) map.set(files[nextIdx].id, files[nextIdx])
+        else map.delete(files[nextIdx].id)
+        return map
+      })
+      anchorIdxRef.current = nextIdx
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectionMode, files])
+
+  async function handleDeletePreview() {
+    if (selectedIds.size === 0) return
+    setPreviewLoading(true)
+    setDeleteError(null)
+    try {
+      const data = await previewDelete([...selectedIds])
+      setPreview(data)
+    } catch (e) {
+      setDeleteError(e.message)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    const allIds = [
+      ...preview.selected.map(f => f.id),
+      ...preview.related_videos.map(f => f.id),
+    ]
+    setDeleteLoading(true)
+    setDeleteError(null)
+    try {
+      const res = await confirmDelete(allIds)
+      setPreview(null)
+      setSelectionMode(false)
+      setSelectedMap(new Map())
+      anchorIdxRef.current = null
+      anchorActionRef.current = null
+      if (res.failed?.length > 0) {
+        setDeleteError(`Deleted ${res.deleted.length} files. ${res.failed.length} could not be removed from disk.`)
+      }
+      setInternalRefreshKey(k => k + 1)
+      onFilesDeleted?.()
+    } catch (e) {
+      setDeleteError(e.message)
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
+  function handleViewModeChange(e) {
+    const v = e.target.value
+    setViewMode(v)
+    localStorage.setItem(VIEW_MODE_KEY, v)
+  }
 
   return (
     <div className="hv-root">
@@ -275,6 +510,19 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack }
           </div>
         )}
 
+        <select className="hv-view-mode-select" value={viewMode} onChange={handleViewModeChange}>
+          <option value="normal">Normal</option>
+          <option value="motion_diff">Motion diff</option>
+        </select>
+
+        <button
+          className={`hv-select-btn${selectionMode ? ' active' : ''}`}
+          onClick={toggleSelectionMode}
+        >
+          <i className={`mdi mdi-${selectionMode ? 'close' : 'checkbox-multiple-marked-outline'}`} />
+          {selectionMode ? 'Cancel' : 'Select'}
+        </button>
+
         <span className="hv-count">{total.toLocaleString()} files</span>
       </div>
 
@@ -286,12 +534,27 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack }
           page={page}
           total={total}
           onGoToPage={setPage}
+          hourStats={hourStats}
+        />
+      )}
+
+      {/* Selection bar (horizontal, below chart) */}
+      {selectionMode && (
+        <SelectionBar
+          files={files}
+          selectedCount={selectedIds.size}
+          selectionStats={selectionStats}
+          onSelectAll={() => setSelectedMap(new Map(files.map(f => [f.id, f])))}
+          onSelectNone={() => setSelectedMap(new Map())}
+          onDelete={handleDeletePreview}
+          onCancel={toggleSelectionMode}
+          loading={previewLoading}
         />
       )}
 
       {/* File grid */}
       {loading ? (
-        <div className="hv-grid">
+        <div className="hv-grid" style={{ '--thumb-w': `${thumbWidth}px` }}>
           {Array.from({ length: Math.min(pageSize, 12) }).map((_, i) => (
             <div key={i} className="hv-card hv-card-skeleton skeleton" />
           ))}
@@ -301,13 +564,47 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack }
           <i className="mdi mdi-folder-open-outline" /> No files in this hour.
         </div>
       ) : (
-        <div className="hv-grid">
-          {files.map(file =>
+        <div className="hv-grid" style={{ '--thumb-w': `${thumbWidth}px` }}>
+          {files.map((file, index) =>
             file.file_type === 'video'
-              ? <VideoCard key={file.id} file={file} />
-              : <PhotoCard key={file.id} file={file} hoverZoom={hoverZoom} />
+              ? <VideoCard
+                  key={file.id}
+                  file={file}
+                  index={index}
+                  selectionMode={selectionMode}
+                  selected={selectedIds.has(file.id)}
+                  onToggle={toggleSelect}
+                />
+              : <PhotoCard
+                  key={file.id}
+                  file={file}
+                  index={index}
+                  hoverZoom={hoverZoom}
+                  viewMode={viewMode}
+                  pagePhotoIds={pagePhotoIds}
+                  diffThreshold={diffThreshold}
+                  selectionMode={selectionMode}
+                  selected={selectedIds.has(file.id)}
+                  onToggle={toggleSelect}
+                />
           )}
         </div>
+      )}
+
+      {deleteError && !preview && (
+        <div className="hv-delete-error">
+          <i className="mdi mdi-alert-circle-outline" /> {deleteError}
+        </div>
+      )}
+
+      {preview && (
+        <DeleteConfirmModal
+          preview={preview}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => { setPreview(null); setDeleteError(null) }}
+          busy={deleteLoading}
+          error={deleteError}
+        />
       )}
     </div>
   )

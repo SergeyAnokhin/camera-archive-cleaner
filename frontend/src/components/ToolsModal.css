@@ -16,7 +16,45 @@
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.10);
   width: 420px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 48px);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Tabs ── */
+.modal-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.modal-tab {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-size: calc(var(--font-base) * 0.85);
+  font-weight: 600;
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+  position: relative;
+  bottom: -1px;
+}
+.modal-tab:hover { color: var(--text-muted); background: rgba(255,255,255,0.04); }
+.modal-tab.active {
+  color: var(--accent);
+  background: #1a2436;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom-color: #1a2436;
+}
+
+.modal-tab-content {
+  overflow-y: auto;
+  flex: 1;
 }
 
 .modal-header {

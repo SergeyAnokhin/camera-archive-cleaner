@@ -45,7 +45,7 @@ function dateRangeForCell(period, level, contextDateFrom) {
   return null
 }
 
-export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previewsPerCell, contextDateFrom }) {
+export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selected, onToggle }) {
   const [previewIds, setPreviewIds] = useState([])
 
   const showPreviews = previewsPerCell > 0 && cell.photo_count > 0
@@ -70,11 +70,16 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
 
   return (
     <div
-      className={`heatmap-cell${isEmpty ? ' empty' : ''}${isLight ? ' light' : ''}`}
-      style={{ backgroundColor: `var(--heat-${cell.bucket})`, cursor: 'pointer' }}
-      onClick={() => onDrillInto(cell)}
+      className={`heatmap-cell${isEmpty ? ' empty' : ''}${isLight ? ' light' : ''}${selected ? ' heatmap-cell-selected' : ''}`}
+      style={{ backgroundColor: `var(--heat-${cell.bucket})` }}
+      onClick={() => selectionMode ? onToggle?.(cell) : onDrillInto(cell)}
       title={tooltip}
     >
+      {selectionMode && !isEmpty && (
+        <div className={`cell-checkbox${selected ? ' checked' : ''}`}>
+          <i className={`mdi mdi-${selected ? 'checkbox-marked' : 'checkbox-blank-outline'}`} />
+        </div>
+      )}
       <span className="cell-label">{cellLabel(cell.period, level)}</span>
       {!isEmpty && (
         <span className="cell-sublabel">{formatSize(cell.total_size_gb)}</span>

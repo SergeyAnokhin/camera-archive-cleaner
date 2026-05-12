@@ -146,3 +146,4 @@ vite.config.ts.timestamp-*
 /backend/snapshots.db
 /backend/snapshots.db*
 /backend/thumbnails_cache/*
+/backend/diff_thumbnails_cache/*
