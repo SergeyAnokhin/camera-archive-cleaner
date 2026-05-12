@@ -14,11 +14,25 @@ function formatTime(timestamp) {
 }
 
 function VideoModal({ file, onClose }) {
+  const [videoError, setVideoError] = useState(false)
+  const mediaUrl = getMediaUrl(file.id)
+
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  function handleVideoError(e) {
+    const ve = e.target.error
+    console.warn('[VideoModal] video error', ve?.code, ve?.message, 'src:', mediaUrl)
+    setVideoError(true)
+  }
+
+  function openExternal() {
+    console.log('[VideoModal] opening externally:', mediaUrl)
+    window.open(mediaUrl, '_blank')
+  }
 
   return (
     <div className="hv-lightbox hv-video-modal" onClick={onClose}>
@@ -28,9 +42,12 @@ function VideoModal({ file, onClose }) {
             <i className="mdi mdi-video" /> {formatTime(file.timestamp)}
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
+            <button className="hv-video-modal-btn" onClick={openExternal}>
+              <i className="mdi mdi-open-in-new" /> Open externally
+            </button>
             <a
               className="hv-video-modal-btn"
-              href={getMediaUrl(file.id)}
+              href={mediaUrl}
               download
               onClick={e => e.stopPropagation()}
             >
@@ -41,12 +58,24 @@ function VideoModal({ file, onClose }) {
             </button>
           </div>
         </div>
-        <video
-          className="hv-video-fullplayer"
-          src={getMediaUrl(file.id)}
-          controls
-          autoPlay
-        />
+
+        {videoError ? (
+          <div className="hv-video-error">
+            <i className="mdi mdi-alert-circle-outline hv-video-error-icon" />
+            <p>This video format can't be played in the browser.</p>
+            <button className="hv-video-error-btn" onClick={openExternal}>
+              <i className="mdi mdi-open-in-new" /> Open with external app
+            </button>
+          </div>
+        ) : (
+          <video
+            className="hv-video-fullplayer"
+            src={mediaUrl}
+            controls
+            autoPlay
+            onError={handleVideoError}
+          />
+        )}
       </div>
     </div>
   )

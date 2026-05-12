@@ -79,19 +79,15 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
       {!isEmpty && (
         <span className="cell-sublabel">{formatSize(cell.total_size_gb)}</span>
       )}
-      {!isEmpty && (
-        <div className="cell-counts">
-          {cell.photo_count > 0 && (
-            <span className="cell-count-item">
-              <i className="mdi mdi-image-outline" />{fmtCount(cell.photo_count)}
-            </span>
-          )}
-          {cell.video_count > 0 && (
-            <span className="cell-count-item">
-              <i className="mdi mdi-video-outline" />{fmtCount(cell.video_count)}
-            </span>
-          )}
-        </div>
+      {!isEmpty && cell.photo_count > 0 && (
+        <span className="cell-corner cell-corner-tl">
+          <i className="mdi mdi-image-outline" />{fmtCount(cell.photo_count)}
+        </span>
+      )}
+      {!isEmpty && cell.video_count > 0 && (
+        <span className="cell-corner cell-corner-tr">
+          <i className="mdi mdi-video-outline" />{fmtCount(cell.video_count)}
+        </span>
       )}
       {previewIds.length > 0 && (
         <div className="cell-previews">

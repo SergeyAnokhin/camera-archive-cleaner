@@ -206,6 +206,44 @@
   border-radius: 0 0 var(--radius) var(--radius);
 }
 
+.hv-video-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.hv-video-error-icon {
+  font-size: 48px;
+  color: var(--text-dim);
+}
+
+.hv-video-error p {
+  font-size: var(--font-base);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.hv-video-error-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.40);
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-size: var(--font-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.hv-video-error-btn:hover { background: rgba(14, 165, 233, 0.25); }
+
 /* Empty state */
 .hv-empty {
   text-align: center;

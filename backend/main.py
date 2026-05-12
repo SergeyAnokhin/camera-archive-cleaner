@@ -199,7 +199,14 @@ def get_media(file_id: int):
         if not src.exists():
             raise HTTPException(status_code=404, detail="Source file not found on disk")
     suffix = src.suffix.lower()
-    media_type = "video/mp4" if suffix in {".mp4", ".mov", ".avi", ".mkv"} else "application/octet-stream"
+    mime_map = {
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".mov": "video/quicktime",
+        ".avi": "video/x-msvideo",
+        ".mkv": "video/x-matroska",
+    }
+    media_type = mime_map.get(suffix, "application/octet-stream")
     return FileResponse(str(src), media_type=media_type)
 
 
