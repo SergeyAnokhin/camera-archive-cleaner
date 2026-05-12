@@ -503,10 +503,13 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         })
       } else if (e.key === ' ') {
         e.preventDefault()
+        const idx = focusedFileIndex ?? 0
+        const f = files[idx]
         setSelectionMode(true)
-        if (anchorIdxRef.current !== null && files[anchorIdxRef.current]) {
-          const f = files[anchorIdxRef.current]
+        if (f) {
           setSelectedMap(new Map([[f.id, f]]))
+          setFocusedFileIndex(idx)
+          anchorIdxRef.current = idx
           anchorActionRef.current = true
         }
       } else if (e.key === 'Delete') {
@@ -517,13 +520,16 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectionMode, totalPages, files, selectedIds, onBack])
+  }, [selectionMode, totalPages, files, selectedIds, onBack, focusedFileIndex])
 
   useEffect(() => {
     if (!selectionMode) return
     function onKey(e) {
-      if (e.key === 'Escape' || e.key === 'Backspace' || e.key === ' ') {
-        if (e.key === 'Backspace' && (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA')) return
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'SELECT') return
+
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        if (e.key === 'Backspace' && (tag === 'INPUT' || tag === 'TEXTAREA')) return
         e.preventDefault()
         e.stopImmediatePropagation()
         toggleSelectionMode()
@@ -534,22 +540,48 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         if (selectedIds.size > 0) handleDeletePreview()
         return
       }
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
-      if (anchorIdxRef.current === null) return
-      const nextIdx = e.key === 'ArrowLeft' ? anchorIdxRef.current - 1 : anchorIdxRef.current + 1
-      if (nextIdx < 0 || nextIdx >= files.length) return
+      if (e.key === ' ') {
+        e.preventDefault()
+        const idx = focusedFileIndex ?? anchorIdxRef.current
+        if (idx !== null && idx !== undefined && files[idx]) {
+          const f = files[idx]
+          setSelectedMap(prev => {
+            const next = new Map(prev)
+            const wasSelected = next.has(f.id)
+            wasSelected ? next.delete(f.id) : next.set(f.id, f)
+            anchorIdxRef.current = idx
+            anchorActionRef.current = !wasSelected
+            return next
+          })
+        }
+        return
+      }
+      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
+      if (files.length === 0) return
       e.preventDefault()
-      setSelectedMap(prev => {
-        const map = new Map(prev)
-        if (anchorActionRef.current) map.set(files[nextIdx].id, files[nextIdx])
-        else map.delete(files[nextIdx].id)
-        return map
-      })
+      const cols = getGridCols()
+      const curIdx = focusedFileIndex ?? anchorIdxRef.current ?? 0
+      let nextIdx = curIdx
+      if (e.key === 'ArrowRight') nextIdx = curIdx + 1
+      else if (e.key === 'ArrowLeft') nextIdx = curIdx - 1
+      else if (e.key === 'ArrowDown') nextIdx = curIdx + cols
+      else if (e.key === 'ArrowUp') nextIdx = curIdx - cols
+      nextIdx = Math.max(0, Math.min(files.length - 1, nextIdx))
+      if (nextIdx !== curIdx && anchorActionRef.current !== null) {
+        setSelectedMap(prev => {
+          const next = new Map(prev)
+          const f = files[nextIdx]
+          if (anchorActionRef.current) next.set(f.id, f)
+          else next.delete(f.id)
+          return next
+        })
+      }
+      setFocusedFileIndex(nextIdx)
       anchorIdxRef.current = nextIdx
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectionMode, files, selectedIds])
+  }, [selectionMode, files, selectedIds, focusedFileIndex])
 
   async function handleDeletePreview() {
     if (selectedIds.size === 0) return
@@ -765,10 +797,11 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       }}>
         {selectionMode ? (
           <>
+            <Kbd>↑ ↓ ← →</Kbd> navigate + extend &nbsp;·&nbsp;
+            <Kbd>Space</Kbd> toggle item &nbsp;·&nbsp;
             <Kbd>Shift+click</Kbd> range &nbsp;·&nbsp;
-            <Kbd>← →</Kbd> extend &nbsp;·&nbsp;
             <Kbd>Delete</Kbd> delete selected &nbsp;·&nbsp;
-            <Kbd>Space</Kbd> / <Kbd>Esc</Kbd> / <Kbd>⌫</Kbd> exit
+            <Kbd>Esc</Kbd> / <Kbd>⌫</Kbd> exit
           </>
         ) : (
           <>

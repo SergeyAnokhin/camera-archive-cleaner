@@ -493,7 +493,7 @@ export default function App() {
         selectedHour
           ? []
           : hourSelMode
-            ? [{ key: 'Click', label: 'toggle hour' }, { key: 'Space', label: 'toggle focused hour' }, { key: 'Esc / Cancel', label: 'exit' }]
+            ? [{ key: '↑ ↓ ← →', label: 'navigate' }, { key: 'Space', label: 'toggle focused' }, { key: 'Click', label: 'toggle hour' }, { key: 'Esc / Cancel', label: 'exit' }]
             : [
                 { key: '↑ ↓ ← →', label: 'navigate' },
                 { key: 'Enter', label: 'open' },
