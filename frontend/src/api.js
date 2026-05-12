@@ -75,6 +75,14 @@ export function getMediaUrl(fileId) {
   return `${BASE}/media/${fileId}`
 }
 
+export function getDistribution(cameraId, dateFrom, dateTo) {
+  return get('/distribution' + buildQuery({
+    camera_id: cameraId,
+    date_from: dateFrom,
+    date_to: dateTo,
+  }))
+}
+
 export function clearDatabase() {
   return del('/database')
 }

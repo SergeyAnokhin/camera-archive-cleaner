@@ -17,6 +17,12 @@ const PAGE_SIZE_MIN = 10
 const PAGE_SIZE_MAX = 200
 const PAGE_SIZE_DEFAULT = 50
 
+const ZOOM_KEY = 'hover_zoom'
+const ZOOM_MIN = 1.0
+const ZOOM_MAX = 3.0
+const ZOOM_STEP = 0.25
+const ZOOM_DEFAULT = 1.5
+
 function applyFontSize(px) {
   document.documentElement.style.setProperty('--font-base', px + 'px')
 }
@@ -36,6 +42,9 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
   })
   const [pageSize, setPageSize] = useState(() => {
     return Number(localStorage.getItem(PAGE_SIZE_KEY)) || PAGE_SIZE_DEFAULT
+  })
+  const [hoverZoom, setHoverZoom] = useState(() => {
+    return Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT
   })
   const [dbConfirm, setDbConfirm]     = useState(false)
   const [dbBusy, setDbBusy]           = useState(false)
@@ -64,6 +73,13 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     setPageSize(v)
     localStorage.setItem(PAGE_SIZE_KEY, v)
     document.dispatchEvent(new CustomEvent('hour-page-size-change', { detail: v }))
+  }
+
+  function handleHoverZoomChange(e) {
+    const v = Number(e.target.value)
+    setHoverZoom(v)
+    localStorage.setItem(ZOOM_KEY, v)
+    document.dispatchEvent(new CustomEvent('hover-zoom-change', { detail: v }))
   }
 
   async function handleClearDb() {
@@ -168,6 +184,26 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
             <span className="font-size-value" style={{ marginLeft: 0 }}>per page</span>
           </div>
           <div className="modal-setting-hint">Number of items per page when browsing a specific hour ({PAGE_SIZE_MIN}–{PAGE_SIZE_MAX}).</div>
+        </div>
+
+        {/* Hover zoom */}
+        <div className="modal-section">
+          <div className="modal-section-title">Hover zoom (hour view)</div>
+          <div className="font-slider-row">
+            <span className="font-size-label">1×</span>
+            <input
+              type="range"
+              min={ZOOM_MIN}
+              max={ZOOM_MAX}
+              step={ZOOM_STEP}
+              value={hoverZoom}
+              onChange={handleHoverZoomChange}
+              className="font-slider"
+            />
+            <span className="font-size-label">{ZOOM_MAX}×</span>
+            <span className="font-size-value">{hoverZoom.toFixed(2)}×</span>
+          </div>
+          <div className="modal-setting-hint">Scale factor when hovering a photo. Set to 1× to disable.</div>
         </div>
 
         {/* Clear database */}

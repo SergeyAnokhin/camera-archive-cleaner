@@ -205,6 +205,34 @@ def save_thumbnail_path(conn: sqlite3.Connection, file_id: int, path: str) -> No
     )
 
 
+def get_hour_distribution(conn: sqlite3.Connection, camera_id: str | None,
+                          date_from: str | None, date_to: str | None) -> list:
+    conditions, params = [], []
+    if camera_id:
+        conditions.append("camera_id = ?")
+        params.append(camera_id)
+    if date_from:
+        conditions.append("timestamp >= ?")
+        params.append(date_from)
+    if date_to:
+        conditions.append("timestamp <= ?")
+        params.append(date_to)
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    return conn.execute(
+        f"""
+        SELECT
+            CAST(strftime('%M', timestamp) AS INTEGER)      AS bucket,
+            COUNT(*)                                         AS total_count,
+            SUM(CASE WHEN file_type='photo' THEN 1 ELSE 0 END) AS photo_count,
+            SUM(CASE WHEN file_type='video' THEN 1 ELSE 0 END) AS video_count
+        FROM files {where}
+        GROUP BY bucket
+        ORDER BY bucket
+        """,
+        params,
+    ).fetchall()
+
+
 def delete_all_thumbnails(conn: sqlite3.Connection) -> int:
     cursor = conn.execute("DELETE FROM thumbnails")
     return cursor.rowcount

@@ -19,6 +19,7 @@ from database import (
     get_connection,
     get_file_by_id,
     get_files_paginated,
+    get_hour_distribution,
     get_sampled_photo_ids,
     get_stats_by_camera,
     get_stats_grouped,
@@ -208,6 +209,34 @@ def get_media(file_id: int):
     }
     media_type = mime_map.get(suffix, "application/octet-stream")
     return FileResponse(str(src), media_type=media_type)
+
+
+# ---------------------------------------------------------------------------
+# /distribution — 5-minute bucket counts for an hour
+# ---------------------------------------------------------------------------
+
+@app.get("/distribution", summary="5-minute file distribution within a time range")
+def distribution(
+    camera_id: str | None = Query(default=None),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+):
+    dt_from = date_from.isoformat() if date_from else None
+    dt_to = date_to.isoformat() if date_to else None
+    with get_connection() as conn:
+        rows = get_hour_distribution(conn, camera_id, dt_from, dt_to)
+    by_bucket = {r["bucket"]: r for r in rows}
+    buckets = [
+        {
+            "bucket": i,
+            "minute_start": i,
+            "total_count": by_bucket[i]["total_count"] if i in by_bucket else 0,
+            "photo_count": by_bucket[i]["photo_count"] if i in by_bucket else 0,
+            "video_count": by_bucket[i]["video_count"] if i in by_bucket else 0,
+        }
+        for i in range(60)
+    ]
+    return {"buckets": buckets}
 
 
 # ---------------------------------------------------------------------------
