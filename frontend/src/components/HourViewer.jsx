@@ -494,6 +494,11 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           else if (e.key === 'ArrowUp') next = cur - cols
           return Math.max(0, Math.min(files.length - 1, next))
         })
+      } else if (e.key === 'Enter') {
+        if (focusedFileIndex !== null && gridRef.current) {
+          const cards = gridRef.current.querySelectorAll('.hv-card')
+          cards[focusedFileIndex]?.click()
+        }
       } else if (e.key === 'Insert' || e.key === 'm' || e.key === 'M') {
         e.preventDefault()
         setViewMode(prev => {
@@ -806,6 +811,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         ) : (
           <>
             <Kbd>↑ ↓ ← →</Kbd> navigate &nbsp;·&nbsp;
+            <Kbd>Enter</Kbd> open &nbsp;·&nbsp;
             <Kbd>PgUp PgDn</Kbd> page &nbsp;·&nbsp;
             <Kbd>M</Kbd> / <Kbd>Ins</Kbd> view mode &nbsp;·&nbsp;
             <Kbd>Space</Kbd> select &nbsp;·&nbsp;

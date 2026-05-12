@@ -350,7 +350,12 @@ export default function App() {
       } else if (e.key === 'Escape' || e.key === 'Backspace') {
         if (e.key === 'Backspace' && (tag === 'INPUT' || tag === 'TEXTAREA')) return
         e.preventDefault()
-        if (drillStack.length > 0) setDrillStack(prev => prev.slice(0, -1))
+        if (hourSelMode) {
+          setHourSelMode(false)
+          setSelectedHourPeriods(new Map())
+        } else if (drillStack.length > 0) {
+          setDrillStack(prev => prev.slice(0, -1))
+        }
       } else if (e.key === ' ' && currentLevel === 'hour') {
         e.preventDefault()
         const cell = periods[idx]
@@ -366,7 +371,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedHour, periods, focusedPeriod, currentLevel, drillStack])
+  }, [selectedHour, periods, focusedPeriod, currentLevel, drillStack, hourSelMode])
 
   function handleToggleHourPeriod(cell) {
     setSelectedHourPeriods(prev => {
