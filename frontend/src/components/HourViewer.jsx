@@ -192,7 +192,7 @@ function SelectionBar({ files, selectedCount, selectionStats, onSelectAll, onSel
         <div className="hv-sbar-stats">
           {selectionStats.photos > 0 && <span><i className="mdi mdi-image-outline" /> {selectionStats.photos}</span>}
           {selectionStats.videos > 0 && <span><i className="mdi mdi-video-outline" /> {selectionStats.videos}</span>}
-          {selectionStats.bytes > 0 && <span>{formatBytes(selectionStats.bytes)}</span>}
+          <span>{formatBytes(selectionStats.bytes)}</span>
         </div>
       )}
       <div className="hv-sbar-spacer" />
@@ -214,22 +214,21 @@ function SelectionBar({ files, selectedCount, selectionStats, onSelectAll, onSel
 }
 
 // ---------------------------------------------------------------------------
-// Distribution chart  (60 bars = 1 per minute)
+// Distribution chart  (60 bars = 1 per minute, stacked photo/video by size)
 // ---------------------------------------------------------------------------
 
 function DistributionChart({ buckets, pageSize, page, total, onGoToPage, hourStats }) {
-  const chartRef = useRef(null)
-  const maxCount  = useMemo(() => Math.max(...buckets.map(b => b.total_count), 1), [buckets])
+  const chartRef   = useRef(null)
+  const [hoveredIdx, setHoveredIdx] = useState(null)
+  const maxSize    = useMemo(() => Math.max(...buckets.map(b => b.total_size_bytes ?? 0), 1), [buckets])
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
-  // cumulative[i] = total files in buckets 0..i-1
   const cumulative = useMemo(() => {
     const result = [0]
     for (const b of buckets) result.push(result[result.length - 1] + b.total_count)
     return result
   }, [buckets])
 
-  // Which minute range does the current page cover?
   const pageStart = (page - 1) * pageSize
   const pageEnd   = page * pageSize - 1
   let firstActive = -1, lastActive = -1
@@ -249,11 +248,9 @@ function DistributionChart({ buckets, pageSize, page, total, onGoToPage, hourSta
 
   function handleClick(e) {
     if (!chartRef.current) return
-    const rect   = chartRef.current.getBoundingClientRect()
-    const frac   = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    let idx      = Math.floor(frac * 60)
-
-    // If bucket is empty, find nearest non-empty
+    const rect = chartRef.current.getBoundingClientRect()
+    const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    let idx    = Math.floor(frac * 60)
     if (buckets[idx]?.total_count === 0) {
       let found = false
       for (let d = 1; d < 60 && !found; d++) {
@@ -262,10 +259,10 @@ function DistributionChart({ buckets, pageSize, page, total, onGoToPage, hourSta
       }
       if (!found) return
     }
-
-    const targetPage = Math.floor(cumulative[idx] / pageSize) + 1
-    onGoToPage(targetPage)
+    onGoToPage(Math.floor(cumulative[idx] / pageSize) + 1)
   }
+
+  const hovered = hoveredIdx !== null ? buckets[hoveredIdx] : null
 
   return (
     <div className="hv-dist-root">
@@ -286,13 +283,41 @@ function DistributionChart({ buckets, pageSize, page, total, onGoToPage, hourSta
       </div>
       <div className="hv-dist-chart" ref={chartRef} onClick={handleClick}>
         {highlightStyle && <div className="hv-dist-highlight" style={highlightStyle} />}
+
+        {/* Hover tooltip */}
+        {hovered && hovered.total_count > 0 && (
+          <div
+            className="hv-dist-tooltip"
+            style={{ left: `${Math.min(Math.max(((hoveredIdx + 0.5) / 60) * 100, 5), 87)}%` }}
+          >
+            <div className="hv-dist-tooltip-time">:{String(hoveredIdx).padStart(2, '0')}</div>
+            {hovered.photo_count > 0 && (
+              <div><i className="mdi mdi-image-outline" /> {hovered.photo_count} · {formatBytes(hovered.photo_size_bytes)}</div>
+            )}
+            {hovered.video_count > 0 && (
+              <div><i className="mdi mdi-video-outline" /> {hovered.video_count} · {formatBytes(hovered.video_size_bytes)}</div>
+            )}
+          </div>
+        )}
+
         {buckets.map((b, i) => {
           const showLabel = i % 15 === 0
-          const hPct      = b.total_count > 0 ? Math.max((b.total_count / maxCount) * 100, 4) : 0
+          const hPct = b.total_size_bytes > 0 ? Math.max((b.total_size_bytes / maxSize) * 100, 4) : 0
+          const videoPct = b.total_size_bytes > 0 ? ((b.video_size_bytes ?? 0) / b.total_size_bytes) * 100 : 0
           return (
-            <div key={i} className={`hv-dist-col${b.total_count === 0 ? ' empty' : ''}`}>
+            <div
+              key={i}
+              className={`hv-dist-col${b.total_count === 0 ? ' empty' : ''}`}
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
+            >
               <div className="hv-dist-bar-wrap">
-                {b.total_count > 0 && <div className="hv-dist-bar" style={{ height: `${hPct}%` }} />}
+                {b.total_size_bytes > 0 && (
+                  <div className="hv-dist-bar" style={{ height: `${hPct}%` }}>
+                    <div className="hv-dist-bar-video" style={{ height: `${videoPct}%` }} />
+                    <div className="hv-dist-bar-photo" />
+                  </div>
+                )}
               </div>
               <div className="hv-dist-label">{showLabel ? `:${String(i).padStart(2,'0')}` : ''}</div>
             </div>
@@ -414,6 +439,25 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack, 
       return next
     })
   }
+
+  useEffect(() => {
+    if (selectionMode) return
+    function onKey(e) {
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'SELECT') return
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault(); setPage(p => Math.max(1, p - 1))
+      } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        e.preventDefault(); setPage(p => Math.min(totalPages, p + 1))
+      } else if (e.key === 'Home') {
+        e.preventDefault(); setPage(1)
+      } else if (e.key === 'End') {
+        e.preventDefault(); setPage(totalPages)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectionMode, totalPages])
 
   useEffect(() => {
     if (!selectionMode) return
@@ -606,6 +650,37 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack, 
           error={deleteError}
         />
       )}
+
+      <div style={{
+        fontSize: 'calc(var(--font-base) * 0.72)',
+        color: 'var(--text-dim)',
+        textAlign: 'center',
+        paddingTop: 4,
+        userSelect: 'none',
+      }}>
+        {selectionMode ? (
+          <>
+            <Kbd>Shift+click</Kbd> range &nbsp;·&nbsp;
+            <Kbd>← →</Kbd> extend selection &nbsp;·&nbsp;
+            <Kbd>Esc</Kbd> / Cancel to exit
+          </>
+        ) : (
+          <>
+            <Kbd>← →</Kbd> / <Kbd>PgUp PgDn</Kbd> page &nbsp;·&nbsp;
+            <Kbd>Home</Kbd> / <Kbd>End</Kbd> first / last page
+          </>
+        )}
+      </div>
     </div>
+  )
+}
+
+function Kbd({ children }) {
+  return (
+    <kbd style={{
+      background: 'var(--bg-surface)', border: '1px solid rgba(255,255,255,0.12)',
+      borderRadius: '3px', padding: '0px 4px',
+      fontSize: 'inherit', fontFamily: 'inherit',
+    }}>{children}</kbd>
   )
 }

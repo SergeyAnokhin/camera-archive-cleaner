@@ -267,9 +267,12 @@ def distribution(
         {
             "bucket": i,
             "minute_start": i,
-            "total_count": by_bucket[i]["total_count"] if i in by_bucket else 0,
-            "photo_count": by_bucket[i]["photo_count"] if i in by_bucket else 0,
-            "video_count": by_bucket[i]["video_count"] if i in by_bucket else 0,
+            "total_count":       by_bucket[i]["total_count"]       if i in by_bucket else 0,
+            "photo_count":       by_bucket[i]["photo_count"]       if i in by_bucket else 0,
+            "video_count":       by_bucket[i]["video_count"]       if i in by_bucket else 0,
+            "photo_size_bytes":  by_bucket[i]["photo_size_bytes"]  if i in by_bucket else 0,
+            "video_size_bytes":  by_bucket[i]["video_size_bytes"]  if i in by_bucket else 0,
+            "total_size_bytes":  by_bucket[i]["total_size_bytes"]  if i in by_bucket else 0,
         }
         for i in range(60)
     ]

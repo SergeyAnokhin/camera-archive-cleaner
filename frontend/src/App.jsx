@@ -13,6 +13,14 @@ import { initFontSize } from './components/ToolsModal.jsx'
 const LEVELS = ['year', 'month', 'day', 'hour']
 const PREVIEWS_PER_CELL_KEY = 'previews_per_cell'
 const PREVIEWS_PER_CELL_DEFAULT = 3
+const NAV_STATE_KEY = 'nav_state'
+
+function loadNavState() {
+  try { return JSON.parse(localStorage.getItem(NAV_STATE_KEY) || 'null') ?? {} } catch { return {} }
+}
+function saveNavState(s) { localStorage.setItem(NAV_STATE_KEY, JSON.stringify(s)) }
+
+const _nav = loadNavState()
 
 function dateRangeForPeriod(period, level) {
   if (level === 'year') {
@@ -114,6 +122,31 @@ function DayDeleteBar({ dayEntry, cameraId, periods, onDeleted, onDrillBack }) {
   )
 }
 
+function KeyboardHints({ hints }) {
+  if (!hints.length) return null
+  return (
+    <div style={{
+      padding: '6px 16px 10px',
+      fontSize: 'calc(var(--font-base) * 0.75)',
+      color: 'var(--text-dim)',
+      textAlign: 'center',
+      userSelect: 'none',
+    }}>
+      {hints.map((h, i) => (
+        <span key={i}>
+          {i > 0 && <span style={{ margin: '0 8px', opacity: 0.4 }}>·</span>}
+          <kbd style={{
+            background: 'var(--bg-surface)', border: 'var(--border)',
+            borderRadius: '3px', padding: '0px 4px', fontSize: 'inherit',
+            fontFamily: 'inherit', marginRight: 4,
+          }}>{h.key}</kbd>
+          {h.label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 function HourSelBar({ periods, selectedMap, onSelectAll, onSelectNone, onClose, onDelete, loading, error }) {
   const [confirm, setConfirm] = useState(false)
   const count = selectedMap.size
@@ -184,14 +217,14 @@ function HourSelBar({ periods, selectedMap, onSelectAll, onSelectNone, onClose, 
 
 export default function App() {
   const [cameras, setCameras]           = useState([])
-  const [cameraId, setCameraId]         = useState(null)
-  const [drillStack, setDrillStack]     = useState([])
+  const [cameraId, setCameraId]         = useState(_nav.cameraId ?? null)
+  const [drillStack, setDrillStack]     = useState(_nav.drillStack ?? [])
   const [periods, setPeriods]           = useState([])
   const [totals, setTotals]             = useState(null)
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState(null)
   const [refreshKey, setRefreshKey]     = useState(0)
-  const [selectedHour, setSelectedHour] = useState(null)
+  const [selectedHour, setSelectedHour] = useState(_nav.selectedHour ?? null)
   const [previewsPerCell, setPreviewsPerCell] = useState(getPreviewsPerCell)
   const [hourSelMode, setHourSelMode]     = useState(false)
   const [selectedHourPeriods, setSelectedHourPeriods] = useState(new Map())
@@ -218,6 +251,21 @@ export default function App() {
   useEffect(() => {
     getCameras().then(setCameras).catch(() => {})
   }, [])
+
+  // Auto-select first camera if none selected or saved camera no longer exists
+  useEffect(() => {
+    if (cameras.length === 0) return
+    if (cameraId === null || !cameras.find(c => c.id === cameraId)) {
+      setCameraId(cameras[0].id)
+      setDrillStack([])
+      setSelectedHour(null)
+    }
+  }, [cameras]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist nav state to localStorage
+  useEffect(() => {
+    saveNavState({ cameraId, drillStack, selectedHour })
+  }, [cameraId, drillStack, selectedHour])
 
   useEffect(() => {
     getStatsTotal(cameraId).then(setTotals).catch(() => setTotals(null))
@@ -382,7 +430,14 @@ export default function App() {
             )}
           </>
         )}
+
       </main>
+
+      <KeyboardHints hints={
+        !selectedHour && hourSelMode
+          ? [{ key: 'Click', label: 'toggle hour' }, { key: 'Esc / Cancel', label: 'exit' }]
+          : []
+      } />
     </div>
   )
 }

@@ -221,10 +221,13 @@ def get_hour_distribution(conn: sqlite3.Connection, camera_id: str | None,
     return conn.execute(
         f"""
         SELECT
-            CAST(strftime('%M', timestamp) AS INTEGER)      AS bucket,
-            COUNT(*)                                         AS total_count,
-            SUM(CASE WHEN file_type='photo' THEN 1 ELSE 0 END) AS photo_count,
-            SUM(CASE WHEN file_type='video' THEN 1 ELSE 0 END) AS video_count
+            CAST(strftime('%M', timestamp) AS INTEGER)                          AS bucket,
+            COUNT(*)                                                             AS total_count,
+            SUM(CASE WHEN file_type='photo' THEN 1 ELSE 0 END)                  AS photo_count,
+            SUM(CASE WHEN file_type='video' THEN 1 ELSE 0 END)                  AS video_count,
+            SUM(CASE WHEN file_type='photo' THEN COALESCE(file_size,0) ELSE 0 END) AS photo_size_bytes,
+            SUM(CASE WHEN file_type='video' THEN COALESCE(file_size,0) ELSE 0 END) AS video_size_bytes,
+            SUM(COALESCE(file_size, 0))                                         AS total_size_bytes
         FROM files {where}
         GROUP BY bucket
         ORDER BY bucket
