@@ -7,6 +7,16 @@ const FONT_MIN = 12
 const FONT_MAX = 22
 const FONT_DEFAULT = 15
 
+const PREVIEWS_PER_CELL_KEY = 'previews_per_cell'
+const PREVIEWS_PER_CELL_MIN = 0
+const PREVIEWS_PER_CELL_MAX = 10
+const PREVIEWS_PER_CELL_DEFAULT = 3
+
+const PAGE_SIZE_KEY = 'hour_page_size'
+const PAGE_SIZE_MIN = 10
+const PAGE_SIZE_MAX = 200
+const PAGE_SIZE_DEFAULT = 50
+
 function applyFontSize(px) {
   document.documentElement.style.setProperty('--font-base', px + 'px')
 }
@@ -20,6 +30,13 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
   const [fontSize, setFontSize] = useState(() => {
     return Number(localStorage.getItem(FONT_KEY)) || FONT_DEFAULT
   })
+  const [previewsPerCell, setPreviewsPerCell] = useState(() => {
+    const v = localStorage.getItem(PREVIEWS_PER_CELL_KEY)
+    return v !== null ? Number(v) : PREVIEWS_PER_CELL_DEFAULT
+  })
+  const [pageSize, setPageSize] = useState(() => {
+    return Number(localStorage.getItem(PAGE_SIZE_KEY)) || PAGE_SIZE_DEFAULT
+  })
   const [dbConfirm, setDbConfirm]     = useState(false)
   const [dbBusy, setDbBusy]           = useState(false)
   const [dbResult, setDbResult]       = useState(null)
@@ -32,6 +49,21 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     applyFontSize(px)
     localStorage.setItem(FONT_KEY, px)
     document.dispatchEvent(new CustomEvent('font-base-change', { detail: px }))
+  }
+
+  function handlePreviewsPerCellChange(e) {
+    const v = Number(e.target.value)
+    setPreviewsPerCell(v)
+    localStorage.setItem(PREVIEWS_PER_CELL_KEY, v)
+    document.dispatchEvent(new CustomEvent('previews-per-cell-change', { detail: v }))
+  }
+
+  function handlePageSizeChange(e) {
+    const raw = Number(e.target.value)
+    const v = Math.max(PAGE_SIZE_MIN, Math.min(PAGE_SIZE_MAX, raw || PAGE_SIZE_DEFAULT))
+    setPageSize(v)
+    localStorage.setItem(PAGE_SIZE_KEY, v)
+    document.dispatchEvent(new CustomEvent('hour-page-size-change', { detail: v }))
   }
 
   async function handleClearDb() {
@@ -55,7 +87,7 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     setThumbResult(null)
     try {
       const res = await clearThumbnails()
-      setThumbResult({ ok: true, text: res.message ?? `Deleted ${res.deleted}.` })
+      setThumbResult({ ok: true, text: `Deleted ${res.deleted_files ?? 0} files.` })
     } catch (e) {
       setThumbResult({ ok: false, text: e.message })
     } finally {
@@ -98,6 +130,44 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
             <span className="font-size-label large">A</span>
             <span className="font-size-value">{fontSize} px</span>
           </div>
+        </div>
+
+        {/* Previews per cell */}
+        <div className="modal-section">
+          <div className="modal-section-title">Preview thumbnails per cell</div>
+          <div className="font-slider-row">
+            <span className="font-size-label">0</span>
+            <input
+              type="range"
+              min={PREVIEWS_PER_CELL_MIN}
+              max={PREVIEWS_PER_CELL_MAX}
+              step="1"
+              value={previewsPerCell}
+              onChange={handlePreviewsPerCellChange}
+              className="font-slider"
+            />
+            <span className="font-size-label">{PREVIEWS_PER_CELL_MAX}</span>
+            <span className="font-size-value">{previewsPerCell}</span>
+          </div>
+          <div className="modal-setting-hint">Thumbnails shown inside each heatmap cell (year/month/day). Set 0 to disable.</div>
+        </div>
+
+        {/* Hour view page size */}
+        <div className="modal-section">
+          <div className="modal-section-title">Hour view — photos per page</div>
+          <div className="font-slider-row">
+            <input
+              type="number"
+              min={PAGE_SIZE_MIN}
+              max={PAGE_SIZE_MAX}
+              step="10"
+              value={pageSize}
+              onChange={handlePageSizeChange}
+              className="modal-number-input"
+            />
+            <span className="font-size-value" style={{ marginLeft: 0 }}>per page</span>
+          </div>
+          <div className="modal-setting-hint">Number of items per page when browsing a specific hour ({PAGE_SIZE_MIN}–{PAGE_SIZE_MAX}).</div>
         </div>
 
         {/* Clear database */}

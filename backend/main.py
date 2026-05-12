@@ -11,15 +11,21 @@ logging.basicConfig(
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from config import load_cameras
 from database import (
+    delete_all_thumbnails,
     get_connection,
+    get_file_by_id,
+    get_files_paginated,
+    get_sampled_photo_ids,
     get_stats_by_camera,
     get_stats_grouped,
     get_stats_total,
     init_db,
 )
+from thumbnails import THUMB_DIR, get_or_create_thumbnail
 from scanner import scan_camera
 
 app = FastAPI(title="Camera Snapshots Cleaner", version="1.0.0")
@@ -38,7 +44,7 @@ def startup():
 
 
 # ---------------------------------------------------------------------------
-# /cameras — list configured cameras (useful to look up valid camera IDs)
+# /cameras
 # ---------------------------------------------------------------------------
 
 @app.get("/cameras", summary="List all configured cameras")
@@ -90,32 +96,16 @@ def scan(
 
 @app.get("/stats", summary="Get aggregated file statistics")
 def stats(
-    camera_id: str | None = Query(
-        default=None,
-        description="Filter by camera ID. Leave empty for all cameras. "
-                    "Use GET /cameras to see available IDs.",
-    ),
-    group_by: Literal["total", "camera", "year", "month", "day", "hour"] = Query(
-        default="total",
-        description="Aggregation level.",
-    ),
-    date_from: datetime | None = Query(
-        default=None,
-        description="Start of time range (inclusive). Format: `YYYY-MM-DDTHH:MM:SS`",
-        examples=["2023-11-27T00:00:00"],
-    ),
-    date_to: datetime | None = Query(
-        default=None,
-        description="End of time range (inclusive). Format: `YYYY-MM-DDTHH:MM:SS`",
-        examples=["2024-11-30T23:59:59"],
-    ),
+    camera_id: str | None = Query(default=None),
+    group_by: Literal["total", "camera", "year", "month", "day", "hour"] = Query(default="total"),
+    date_from: datetime | None = Query(default=None, examples=["2023-11-27T00:00:00"]),
+    date_to: datetime | None = Query(default=None, examples=["2024-11-30T23:59:59"]),
 ):
     cameras_by_id = {c.id: c.name for c in load_cameras()}
 
     if camera_id and camera_id not in cameras_by_id:
         raise HTTPException(status_code=404, detail=f"Camera '{camera_id}' not found.")
 
-    # Convert datetime to ISO string for SQLite comparison
     dt_from = date_from.isoformat() if date_from else None
     dt_to = date_to.isoformat() if date_to else None
 
@@ -137,7 +127,6 @@ def stats(
             totals_row = get_stats_total(conn, None, dt_from, dt_to)
             return {"cameras": items, "totals": _row_to_dict(totals_row)}
 
-        # year / month / day / hour
         rows = get_stats_grouped(conn, group_by, camera_id, dt_from, dt_to)
         return {
             "group_by": group_by,
@@ -146,6 +135,90 @@ def stats(
             "date_to": date_to,
             "periods": [{"period": r["period"], **_row_to_dict(r)} for r in rows],
         }
+
+
+# ---------------------------------------------------------------------------
+# /files — paginated chronological list for a period
+# ---------------------------------------------------------------------------
+
+@app.get("/files", summary="Paginated file list for a time range")
+def get_files(
+    camera_id: str | None = Query(default=None),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=500),
+):
+    dt_from = date_from.isoformat() if date_from else None
+    dt_to = date_to.isoformat() if date_to else None
+    with get_connection() as conn:
+        rows, total = get_files_paginated(conn, camera_id, dt_from, dt_to, page, page_size)
+        files = [
+            {
+                "id": r["id"],
+                "file_type": r["file_type"],
+                "timestamp": r["timestamp"],
+                "file_path": r["file_path"],
+            }
+            for r in rows
+        ]
+    return {"files": files, "total": total, "page": page, "page_size": page_size}
+
+
+# ---------------------------------------------------------------------------
+# /thumbnail/{file_id} — on-demand thumbnail generation
+# ---------------------------------------------------------------------------
+
+@app.get("/thumbnail/{file_id}", summary="Get or generate a thumbnail for a photo")
+def get_thumbnail(file_id: int):
+    with get_connection() as conn:
+        file_row = get_file_by_id(conn, file_id)
+        if file_row is None:
+            raise HTTPException(status_code=404, detail="File not found")
+        if file_row["file_type"] != "photo":
+            raise HTTPException(status_code=400, detail="Thumbnails only available for photos")
+        try:
+            thumb_path = get_or_create_thumbnail(conn, file_id, file_row["file_path"])
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(str(thumb_path), media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# /media/{file_id} — serve original file (photos and videos)
+# ---------------------------------------------------------------------------
+
+@app.get("/media/{file_id}", summary="Serve the original file")
+def get_media(file_id: int):
+    with get_connection() as conn:
+        file_row = get_file_by_id(conn, file_id)
+        if file_row is None:
+            raise HTTPException(status_code=404, detail="File not found")
+        from pathlib import Path
+        src = Path(file_row["file_path"])
+        if not src.exists():
+            raise HTTPException(status_code=404, detail="Source file not found on disk")
+    suffix = src.suffix.lower()
+    media_type = "video/mp4" if suffix in {".mp4", ".mov", ".avi", ".mkv"} else "application/octet-stream"
+    return FileResponse(str(src), media_type=media_type)
+
+
+# ---------------------------------------------------------------------------
+# /previews — uniformly sampled photo IDs for a period
+# ---------------------------------------------------------------------------
+
+@app.get("/previews", summary="Uniformly sampled photo IDs for a time range")
+def get_previews(
+    camera_id: str | None = Query(default=None),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    count: int = Query(default=3, ge=1, le=20),
+):
+    dt_from = date_from.isoformat() if date_from else None
+    dt_to = date_to.isoformat() if date_to else None
+    with get_connection() as conn:
+        file_ids = get_sampled_photo_ids(conn, camera_id, dt_from, dt_to, count)
+    return {"file_ids": file_ids}
 
 
 # ---------------------------------------------------------------------------
@@ -159,9 +232,17 @@ def clear_database():
     return {"deleted": True}
 
 
-@app.delete("/thumbnails", summary="Delete all cached thumbnail files (Stage 3 stub)")
+@app.delete("/thumbnails", summary="Delete all cached thumbnail files")
 def clear_thumbnails():
-    return {"deleted": 0, "message": "Thumbnails not yet implemented (Stage 3)"}
+    deleted_files = 0
+    if THUMB_DIR.exists():
+        for f in THUMB_DIR.iterdir():
+            if f.is_file():
+                f.unlink()
+                deleted_files += 1
+    with get_connection() as conn:
+        deleted_rows = delete_all_thumbnails(conn)
+    return {"deleted_files": deleted_files, "deleted_rows": deleted_rows}
 
 
 def _row_to_dict(row) -> dict:

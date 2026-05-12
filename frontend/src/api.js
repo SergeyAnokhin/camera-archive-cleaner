@@ -48,6 +48,33 @@ export function getStatsGrouped(groupBy, { cameraId = null, dateFrom = null, dat
   }))
 }
 
+export function getFiles(cameraId, dateFrom, dateTo, page, pageSize) {
+  return get('/files' + buildQuery({
+    camera_id: cameraId,
+    date_from: dateFrom,
+    date_to: dateTo,
+    page,
+    page_size: pageSize,
+  }))
+}
+
+export function getPreviews(cameraId, dateFrom, dateTo, count) {
+  return get('/previews' + buildQuery({
+    camera_id: cameraId,
+    date_from: dateFrom,
+    date_to: dateTo,
+    count,
+  }))
+}
+
+export function getThumbnailUrl(fileId) {
+  return `${BASE}/thumbnail/${fileId}`
+}
+
+export function getMediaUrl(fileId) {
+  return `${BASE}/media/${fileId}`
+}
+
 export function clearDatabase() {
   return del('/database')
 }

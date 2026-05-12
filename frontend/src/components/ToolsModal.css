@@ -185,6 +185,24 @@
   color: var(--text-primary);
 }
 
+/* Number input */
+.modal-number-input {
+  width: 80px;
+  background: var(--bg-input, #0f172a);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-base);
+  padding: 4px 8px;
+  text-align: center;
+}
+
+.modal-setting-hint {
+  margin-top: 8px;
+  font-size: calc(var(--font-base) * 0.78);
+  color: var(--text-dim);
+}
+
 /* Result messages */
 .modal-result {
   margin-top: 8px;

@@ -145,3 +145,4 @@ vite.config.ts.timestamp-*
 /backend/__pycache__/*
 /backend/snapshots.db
 /backend/snapshots.db*
+/backend/thumbnails_cache/*

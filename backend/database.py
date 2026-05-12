@@ -7,6 +7,7 @@ DB_PATH = Path(__file__).parent / "snapshots.db"
 def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -27,6 +28,13 @@ def init_db() -> None:
 
             CREATE INDEX IF NOT EXISTS idx_cam_type_ts
                 ON files (camera_id, file_type, timestamp);
+
+            CREATE TABLE IF NOT EXISTS thumbnails (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_id    INTEGER NOT NULL UNIQUE,
+                thumb_path TEXT    NOT NULL,
+                FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+            );
         """)
 
 
@@ -116,3 +124,87 @@ def get_stats_grouped(conn: sqlite3.Connection, group_by: str,
         """,
         params,
     ).fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Stage 3: files + thumbnails
+# ---------------------------------------------------------------------------
+
+def get_files_paginated(conn: sqlite3.Connection, camera_id: str | None,
+                        date_from: str | None, date_to: str | None,
+                        page: int, page_size: int) -> tuple:
+    where, params = _where(camera_id, date_from, date_to)
+    total = conn.execute(
+        f"SELECT COUNT(*) AS n FROM files {where}", params
+    ).fetchone()["n"]
+    offset = (page - 1) * page_size
+    rows = conn.execute(
+        f"""
+        SELECT id, file_type, file_path, timestamp
+        FROM files {where}
+        ORDER BY timestamp ASC
+        LIMIT ? OFFSET ?
+        """,
+        params + [page_size, offset],
+    ).fetchall()
+    return rows, total
+
+
+def get_file_by_id(conn: sqlite3.Connection, file_id: int):
+    return conn.execute(
+        "SELECT id, file_type, file_path, timestamp FROM files WHERE id = ?",
+        (file_id,),
+    ).fetchone()
+
+
+def get_sampled_photo_ids(conn: sqlite3.Connection, camera_id: str | None,
+                          date_from: str | None, date_to: str | None,
+                          count: int) -> list[int]:
+    conditions, params = [], []
+    conditions.append("file_type = 'photo'")
+    if camera_id:
+        conditions.append("camera_id = ?")
+        params.append(camera_id)
+    if date_from:
+        conditions.append("timestamp >= ?")
+        params.append(date_from)
+    if date_to:
+        conditions.append("timestamp <= ?")
+        params.append(date_to)
+    where = "WHERE " + " AND ".join(conditions)
+    rows = conn.execute(
+        f"SELECT id FROM files {where} ORDER BY timestamp ASC", params
+    ).fetchall()
+    ids = [r["id"] for r in rows]
+    return _uniform_sample(ids, count)
+
+
+def _uniform_sample(items: list, count: int) -> list:
+    total = len(items)
+    if total == 0:
+        return []
+    if total <= count:
+        return items
+    return [items[round(total * (2 * i + 1) / (2 * count))] for i in range(count)]
+
+
+def get_thumbnail_path(conn: sqlite3.Connection, file_id: int) -> str | None:
+    row = conn.execute(
+        "SELECT thumb_path FROM thumbnails WHERE file_id = ?", (file_id,)
+    ).fetchone()
+    return row["thumb_path"] if row else None
+
+
+def save_thumbnail_path(conn: sqlite3.Connection, file_id: int, path: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO thumbnails (file_id, thumb_path) VALUES (?, ?)
+        ON CONFLICT(file_id) DO UPDATE SET thumb_path = excluded.thumb_path
+        """,
+        (file_id, path),
+    )
+
+
+def delete_all_thumbnails(conn: sqlite3.Connection) -> int:
+    cursor = conn.execute("DELETE FROM thumbnails")
+    return cursor.rowcount

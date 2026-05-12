@@ -4,12 +4,15 @@ import Header from './components/Header.jsx'
 import CameraSelector from './components/CameraSelector.jsx'
 import DrilldownBreadcrumb from './components/DrilldownBreadcrumb.jsx'
 import HeatmapGrid from './components/HeatmapGrid.jsx'
+import HourViewer from './components/HourViewer.jsx'
 import StatsBar from './components/StatsBar.jsx'
 import ScanButton from './components/ScanButton.jsx'
 import ToolsButton from './components/ToolsButton.jsx'
 import { initFontSize } from './components/ToolsModal.jsx'
 
 const LEVELS = ['year', 'month', 'day', 'hour']
+const PREVIEWS_PER_CELL_KEY = 'previews_per_cell'
+const PREVIEWS_PER_CELL_DEFAULT = 3
 
 function dateRangeForPeriod(period, level) {
   if (level === 'year') {
@@ -37,33 +40,43 @@ function computeIntensity(periods) {
   }))
 }
 
+function getPreviewsPerCell() {
+  return Number(localStorage.getItem(PREVIEWS_PER_CELL_KEY)) || PREVIEWS_PER_CELL_DEFAULT
+}
+
 export default function App() {
-  const [cameras, setCameras]       = useState([])
-  const [cameraId, setCameraId]     = useState(null)
-  const [drillStack, setDrillStack] = useState([])
-  const [periods, setPeriods]       = useState([])
-  const [totals, setTotals]         = useState(null)
-  const [loading, setLoading]       = useState(false)
-  const [error, setError]           = useState(null)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [cameras, setCameras]           = useState([])
+  const [cameraId, setCameraId]         = useState(null)
+  const [drillStack, setDrillStack]     = useState([])
+  const [periods, setPeriods]           = useState([])
+  const [totals, setTotals]             = useState(null)
+  const [loading, setLoading]           = useState(false)
+  const [error, setError]               = useState(null)
+  const [refreshKey, setRefreshKey]     = useState(0)
+  const [selectedHour, setSelectedHour] = useState(null)
+  const [previewsPerCell, setPreviewsPerCell] = useState(getPreviewsPerCell)
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
 
-  // Restore persisted font size
   useEffect(() => { initFontSize() }, [])
 
-  // Load cameras once
+  // Sync previewsPerCell from localStorage changes dispatched by ToolsModal
+  useEffect(() => {
+    function onSettingChange() { setPreviewsPerCell(getPreviewsPerCell()) }
+    document.addEventListener('previews-per-cell-change', onSettingChange)
+    return () => document.removeEventListener('previews-per-cell-change', onSettingChange)
+  }, [])
+
   useEffect(() => {
     getCameras().then(setCameras).catch(() => {})
   }, [])
 
-  // Load header totals whenever camera selection or refresh changes
   useEffect(() => {
     getStatsTotal(cameraId).then(setTotals).catch(() => setTotals(null))
   }, [cameraId, refreshKey])
 
-  // Load heatmap data whenever drill position, camera, or refresh changes
   useEffect(() => {
+    if (selectedHour) return
     setLoading(true)
     setError(null)
     const top = drillStack[drillStack.length - 1]
@@ -75,16 +88,32 @@ export default function App() {
       .then(data => setPeriods(computeIntensity(data.periods ?? [])))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [drillStack, cameraId, currentLevel, refreshKey])
+  }, [drillStack, cameraId, currentLevel, refreshKey, selectedHour])
 
   function drillInto(cell) {
-    if (currentLevel === 'hour') return
+    if (currentLevel === 'hour') {
+      // Opening HourViewer for this specific hour
+      const dayContext = drillStack[drillStack.length - 1]
+      const date = dayContext?.dateFrom?.substring(0, 10) ?? cell.period
+      const h = cell.period.padStart(2, '0')
+      setSelectedHour({
+        dateFrom: `${date}T${h}:00:00`,
+        dateTo:   `${date}T${h}:59:59`,
+        label:    `${date}  ${h}:00`,
+      })
+      return
+    }
     const { dateFrom, dateTo } = dateRangeForPeriod(cell.period, currentLevel)
     setDrillStack(prev => [...prev, { level: currentLevel, label: cell.period, dateFrom, dateTo }])
   }
 
   function drillUpTo(index) {
     setDrillStack(prev => prev.slice(0, index + 1))
+    setSelectedHour(null)
+  }
+
+  function handleBackFromHour() {
+    setSelectedHour(null)
   }
 
   const handleScanComplete = useCallback(() => setRefreshKey(k => k + 1), [])
@@ -97,7 +126,7 @@ export default function App() {
 
         {/* Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--gap-sm)' }}>
-          <CameraSelector cameras={cameras} selectedId={cameraId} onSelect={id => { setCameraId(id); setDrillStack([]) }} />
+          <CameraSelector cameras={cameras} selectedId={cameraId} onSelect={id => { setCameraId(id); setDrillStack([]); setSelectedHour(null) }} />
           <div style={{ display: 'flex', gap: 'var(--gap-sm)' }}>
             <ToolsButton onDatabaseCleared={handleScanComplete} />
             <ScanButton cameraId={cameraId} onScanComplete={handleScanComplete} />
@@ -115,12 +144,29 @@ export default function App() {
           </div>
         )}
 
-        {/* Heatmap */}
-        <HeatmapGrid periods={periods} level={currentLevel} loading={loading} onDrillInto={drillInto} />
-
-        {/* Bar chart */}
-        {!loading && periods.length > 0 && (
-          <StatsBar periods={periods} level={currentLevel} />
+        {selectedHour ? (
+          <HourViewer
+            cameraId={cameraId}
+            dateFrom={selectedHour.dateFrom}
+            dateTo={selectedHour.dateTo}
+            label={selectedHour.label}
+            onBack={handleBackFromHour}
+          />
+        ) : (
+          <>
+            <HeatmapGrid
+              periods={periods}
+              level={currentLevel}
+              loading={loading}
+              onDrillInto={drillInto}
+              cameraId={cameraId}
+              previewsPerCell={previewsPerCell}
+              contextDateFrom={drillStack[drillStack.length - 1]?.dateFrom ?? null}
+            />
+            {!loading && periods.length > 0 && (
+              <StatsBar periods={periods} level={currentLevel} />
+            )}
+          </>
         )}
       </main>
     </div>
