@@ -16,13 +16,13 @@
   display: flex;
   align-items: center;
   gap: var(--gap-sm);
-  font-size: 16px;
+  font-size: calc(var(--font-base) * 1.07);
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .header-brand .mdi {
-  font-size: 22px;
+  font-size: calc(var(--font-base) * 1.47);
   color: var(--accent);
 }
 
@@ -39,12 +39,12 @@
   background: var(--bg-input);
   border-radius: 20px;
   padding: 4px 12px;
-  font-size: 13px;
+  font-size: var(--font-base);
 }
 
 .stat-chip .mdi {
   color: var(--accent);
-  font-size: 16px;
+  font-size: calc(var(--font-base) * 1.07);
 }
 
 .stat-chip-value {

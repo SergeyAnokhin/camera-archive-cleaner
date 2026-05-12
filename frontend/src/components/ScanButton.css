@@ -2,18 +2,20 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 16px;
+  padding: 9px 20px;
   background: var(--accent-dim);
   color: #fff;
   border-radius: var(--radius);
-  font-size: 13px;
+  font-size: var(--font-base);
   font-weight: 600;
-  transition: background 0.15s, opacity 0.15s;
+  transition: background 0.15s, opacity 0.15s, box-shadow 0.15s;
   white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25);
 }
 
 .scan-button:hover:not(:disabled) {
   background: var(--accent);
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.40);
 }
 
 .scan-button:disabled {
@@ -22,5 +24,5 @@
 }
 
 .scan-button .mdi {
-  font-size: 16px;
+  font-size: 18px;
 }

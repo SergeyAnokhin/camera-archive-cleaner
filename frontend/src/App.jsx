@@ -6,6 +6,8 @@ import DrilldownBreadcrumb from './components/DrilldownBreadcrumb.jsx'
 import HeatmapGrid from './components/HeatmapGrid.jsx'
 import StatsBar from './components/StatsBar.jsx'
 import ScanButton from './components/ScanButton.jsx'
+import ToolsButton from './components/ToolsButton.jsx'
+import { initFontSize } from './components/ToolsModal.jsx'
 
 const LEVELS = ['year', 'month', 'day', 'hour']
 
@@ -46,6 +48,9 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
+
+  // Restore persisted font size
+  useEffect(() => { initFontSize() }, [])
 
   // Load cameras once
   useEffect(() => {
@@ -93,7 +98,10 @@ export default function App() {
         {/* Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--gap-sm)' }}>
           <CameraSelector cameras={cameras} selectedId={cameraId} onSelect={id => { setCameraId(id); setDrillStack([]) }} />
-          <ScanButton cameraId={cameraId} onScanComplete={handleScanComplete} />
+          <div style={{ display: 'flex', gap: 'var(--gap-sm)' }}>
+            <ToolsButton onDatabaseCleared={handleScanComplete} />
+            <ScanButton cameraId={cameraId} onScanComplete={handleScanComplete} />
+          </div>
         </div>
 
         {/* Breadcrumb */}

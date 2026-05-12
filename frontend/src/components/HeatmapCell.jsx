@@ -23,9 +23,11 @@ export default function HeatmapCell({ cell, level, onDrillInto }) {
     ? `${cellLabel(cell.period, level)}: no data`
     : `${cellLabel(cell.period, level)}: ${formatSize(cell.total_size_gb)} · ${cell.photo_count.toLocaleString()} photos · ${cell.video_count.toLocaleString()} videos`
 
+  const isLight = cell.bucket >= 6
+
   return (
     <div
-      className={`heatmap-cell${isLeaf ? ' no-drill' : ''}${isEmpty ? ' empty' : ''}`}
+      className={`heatmap-cell${isLeaf ? ' no-drill' : ''}${isEmpty ? ' empty' : ''}${isLight ? ' light' : ''}`}
       style={{ backgroundColor: `var(--heat-${cell.bucket})` }}
       onClick={() => !isLeaf && onDrillInto(cell)}
       title={tooltip}

@@ -4,19 +4,22 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 8px 4px;
+  padding: 10px 6px;
   border-radius: var(--radius);
   cursor: pointer;
-  transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
-  min-height: 70px;
+  transition: transform 0.12s, box-shadow 0.12s, filter 0.12s, border-color 0.12s;
+  min-height: 80px;
   user-select: none;
   position: relative;
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .heatmap-cell:hover {
   transform: scale(1.06);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-  filter: brightness(1.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.18);
   z-index: 1;
 }
 
@@ -27,20 +30,32 @@
 .heatmap-cell.no-drill:hover {
   transform: none;
   filter: brightness(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .cell-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: calc(var(--font-base) * 1.07);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
   line-height: 1;
 }
 
 .cell-sublabel {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: calc(var(--font-base) * 0.8);
+  color: rgba(255, 255, 255, 0.65);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Dark text for light-colored cells (bucket 6-9) */
+.heatmap-cell.light .cell-label {
+  color: rgba(15, 23, 42, 0.90);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.25);
+}
+
+.heatmap-cell.light .cell-sublabel {
+  color: rgba(15, 23, 42, 0.70);
+  text-shadow: none;
 }
 
 .heatmap-cell.empty .cell-label,
@@ -51,5 +66,5 @@
 
 .heatmap-cell-skeleton {
   border-radius: var(--radius);
-  min-height: 70px;
+  min-height: 80px;
 }

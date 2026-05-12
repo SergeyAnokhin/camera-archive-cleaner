@@ -148,6 +148,22 @@ def stats(
         }
 
 
+# ---------------------------------------------------------------------------
+# /database  /thumbnails — maintenance actions
+# ---------------------------------------------------------------------------
+
+@app.delete("/database", summary="Delete all scanned file records")
+def clear_database():
+    with get_connection() as conn:
+        conn.execute("DELETE FROM files")
+    return {"deleted": True}
+
+
+@app.delete("/thumbnails", summary="Delete all cached thumbnail files (Stage 3 stub)")
+def clear_thumbnails():
+    return {"deleted": 0, "message": "Thumbnails not yet implemented (Stage 3)"}
+
+
 def _row_to_dict(row) -> dict:
     size = row["total_size_bytes"] or 0
     return {

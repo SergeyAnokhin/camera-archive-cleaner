@@ -12,6 +12,12 @@ async function post(path) {
   return res.json()
 }
 
+async function del(path) {
+  const res = await fetch(BASE + path, { method: 'DELETE' })
+  if (!res.ok) throw new Error(`API ${res.status}: ${path}`)
+  return res.json()
+}
+
 function buildQuery(params) {
   const q = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
@@ -40,4 +46,12 @@ export function getStatsGrouped(groupBy, { cameraId = null, dateFrom = null, dat
     date_from: dateFrom,
     date_to: dateTo,
   }))
+}
+
+export function clearDatabase() {
+  return del('/database')
+}
+
+export function clearThumbnails() {
+  return del('/thumbnails')
 }

@@ -19,12 +19,12 @@
   text-align: center;
   color: var(--text-muted);
   padding: var(--gap-lg);
-  font-size: 13px;
+  font-size: var(--font-base);
 }
 
 .heatmap-empty .mdi {
   display: block;
-  font-size: 32px;
+  font-size: calc(var(--font-base) * 2.13);
   color: var(--text-dim);
   margin-bottom: var(--gap-sm);
 }
