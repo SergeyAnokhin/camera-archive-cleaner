@@ -472,6 +472,11 @@
   box-shadow: 0 0 0 2px var(--accent);
 }
 
+.hv-card.hv-card-focused {
+  outline: 2px solid rgba(99, 179, 237, 0.8);
+  outline-offset: 2px;
+}
+
 .hv-delete-error {
   background: #450a0a;
   border: 1px solid #7f1d1d;

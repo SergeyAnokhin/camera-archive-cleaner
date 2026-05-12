@@ -94,10 +94,15 @@ function VideoModal({ file, onClose }) {
 // Cards
 // ---------------------------------------------------------------------------
 
-function PhotoCard({ file, hoverZoom, viewMode, pagePhotoIds, diffThreshold, selectionMode, selected, onToggle, index }) {
+function PhotoCard({ file, hoverZoom, viewMode, pagePhotoIds, diffThreshold, selectionMode, selected, onToggle, index, isFocused }) {
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
+  const cardRef = useRef(null)
+
+  useEffect(() => {
+    if (isFocused) cardRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [isFocused])
 
   useEffect(() => {
     if (!fullscreen) return
@@ -124,7 +129,8 @@ function PhotoCard({ file, hoverZoom, viewMode, pagePhotoIds, diffThreshold, sel
   return (
     <>
       <div
-        className={`hv-card hv-card-photo${selectionMode && selected ? ' hv-selected' : ''}`}
+        ref={cardRef}
+        className={`hv-card hv-card-photo${selectionMode && selected ? ' hv-selected' : ''}${isFocused ? ' hv-card-focused' : ''}`}
         style={{ '--hv-zoom': selectionMode ? 1 : hoverZoom }}
         title={selectionMode ? formatTime(file.timestamp) : `${formatTime(file.timestamp)} — click to enlarge`}
         onClick={handleClick}
@@ -157,8 +163,13 @@ function PhotoCard({ file, hoverZoom, viewMode, pagePhotoIds, diffThreshold, sel
   )
 }
 
-function VideoCard({ file, selectionMode, selected, onToggle, index }) {
+function VideoCard({ file, selectionMode, selected, onToggle, index, isFocused }) {
   const [modalOpen, setModalOpen] = useState(false)
+  const cardRef = useRef(null)
+
+  useEffect(() => {
+    if (isFocused) cardRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [isFocused])
 
   function handleClick(e) {
     if (selectionMode) { onToggle(file, index, e.shiftKey) } else { setModalOpen(true) }
@@ -167,7 +178,8 @@ function VideoCard({ file, selectionMode, selected, onToggle, index }) {
   return (
     <>
       <div
-        className={`hv-card hv-card-video${selectionMode && selected ? ' hv-selected' : ''}`}
+        ref={cardRef}
+        className={`hv-card hv-card-video${selectionMode && selected ? ' hv-selected' : ''}${isFocused ? ' hv-card-focused' : ''}`}
         onClick={handleClick}
         title={`${formatTime(file.timestamp)}${selectionMode ? '' : ' — click to play'}`}
       >
@@ -362,6 +374,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [deleteError, setDeleteError]         = useState(null)
   const [internalRefreshKey, setInternalRefreshKey] = useState(0)
 
+  const [focusedFileIndex, setFocusedFileIndex] = useState(null)
+  const gridRef = useRef(null)
   const anchorIdxRef = useRef(null)
   const anchorActionRef = useRef(null)  // true = selecting, false = deselecting
 
@@ -451,7 +465,6 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
 
   useEffect(() => {
     if (selectionMode) return
-    const VIEW_MODES = ['normal', 'motion_diff']
     function onKey(e) {
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'SELECT') return
@@ -460,21 +473,31 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         e.preventDefault()
         e.stopImmediatePropagation()
         onBack()
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      } else if (e.key === 'PageUp') {
         e.preventDefault(); setPage(p => Math.max(1, p - 1))
-      } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+      } else if (e.key === 'PageDown') {
         e.preventDefault(); setPage(p => Math.min(totalPages, p + 1))
       } else if (e.key === 'Home') {
         e.preventDefault(); setPage(1)
       } else if (e.key === 'End') {
         e.preventDefault(); setPage(totalPages)
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        if (files.length === 0) return
+        e.preventDefault()
+        const cols = getGridCols()
+        setFocusedFileIndex(prev => {
+          const cur = prev ?? 0
+          let next = cur
+          if (e.key === 'ArrowRight') next = cur + 1
+          else if (e.key === 'ArrowLeft') next = cur - 1
+          else if (e.key === 'ArrowDown') next = cur + cols
+          else if (e.key === 'ArrowUp') next = cur - cols
+          return Math.max(0, Math.min(files.length - 1, next))
+        })
+      } else if (e.key === 'Insert' || e.key === 'm' || e.key === 'M') {
         e.preventDefault()
         setViewMode(prev => {
-          const i = VIEW_MODES.indexOf(prev)
-          const next = e.key === 'ArrowDown'
-            ? VIEW_MODES[(i + 1) % VIEW_MODES.length]
-            : VIEW_MODES[(i - 1 + VIEW_MODES.length) % VIEW_MODES.length]
+          const next = prev === 'normal' ? 'motion_diff' : 'normal'
           localStorage.setItem(VIEW_MODE_KEY, next)
           return next
         })
@@ -566,6 +589,22 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     } finally {
       setDeleteLoading(false)
     }
+  }
+
+  // Reset focused file when page content changes
+  useEffect(() => { setFocusedFileIndex(null) }, [files])
+
+  function getGridCols() {
+    if (!gridRef.current) return 4
+    const cards = gridRef.current.querySelectorAll('.hv-card')
+    if (cards.length < 2) return 1
+    const firstTop = cards[0].getBoundingClientRect().top
+    let cols = 0
+    for (const card of cards) {
+      if (Math.round(card.getBoundingClientRect().top) !== Math.round(firstTop)) break
+      cols++
+    }
+    return Math.max(1, cols)
   }
 
   async function handleDeleteAll() {
@@ -671,7 +710,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           <i className="mdi mdi-folder-open-outline" /> No files in this hour.
         </div>
       ) : (
-        <div className="hv-grid" style={{ '--thumb-w': `${thumbWidth}px` }}>
+        <div ref={gridRef} className="hv-grid" style={{ '--thumb-w': `${thumbWidth}px` }}>
           {files.map((file, index) =>
             file.file_type === 'video'
               ? <VideoCard
@@ -681,6 +720,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
                   selectionMode={selectionMode}
                   selected={selectedIds.has(file.id)}
                   onToggle={toggleSelect}
+                  isFocused={index === focusedFileIndex}
                 />
               : <PhotoCard
                   key={file.id}
@@ -693,6 +733,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
                   selectionMode={selectionMode}
                   selected={selectedIds.has(file.id)}
                   onToggle={toggleSelect}
+                  isFocused={index === focusedFileIndex}
                 />
           )}
         </div>
@@ -731,10 +772,11 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           </>
         ) : (
           <>
-            <Kbd>← →</Kbd> / <Kbd>PgUp PgDn</Kbd> page &nbsp;·&nbsp;
-            <Kbd>↑ ↓</Kbd> view mode &nbsp;·&nbsp;
+            <Kbd>↑ ↓ ← →</Kbd> navigate &nbsp;·&nbsp;
+            <Kbd>PgUp PgDn</Kbd> page &nbsp;·&nbsp;
+            <Kbd>M</Kbd> / <Kbd>Ins</Kbd> view mode &nbsp;·&nbsp;
             <Kbd>Space</Kbd> select &nbsp;·&nbsp;
-            <Kbd>Delete</Kbd> delete &nbsp;·&nbsp;
+            <Kbd>Del</Kbd> delete &nbsp;·&nbsp;
             <Kbd>Esc</Kbd> / <Kbd>⌫</Kbd> back
           </>
         )}
