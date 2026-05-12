@@ -39,7 +39,7 @@ function VideoModal({ file, onClose }) {
   const mediaUrl = getMediaUrl(file.id)
 
   useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose() }
+    function onKey(e) { if (e.key === 'Escape' || e.key === 'Backspace') { e.stopImmediatePropagation(); onClose() } }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
@@ -98,6 +98,15 @@ function PhotoCard({ file, hoverZoom, viewMode, pagePhotoIds, diffThreshold, sel
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
+
+  useEffect(() => {
+    if (!fullscreen) return
+    function onKey(e) {
+      if (e.key === 'Escape' || e.key === 'Backspace') { e.stopImmediatePropagation(); setFullscreen(false) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
 
   const src = viewMode === 'motion_diff' && pagePhotoIds.length > 0
     ? getDiffThumbnailUrl(file.id, pagePhotoIds, diffThreshold)
@@ -332,7 +341,7 @@ function DistributionChart({ buckets, pageSize, page, total, onGoToPage, hourSta
 // HourViewer
 // ---------------------------------------------------------------------------
 
-export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack, onFilesDeleted }) {
+export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, onBack, onFilesDeleted }) {
   const [files, setFiles]               = useState([])
   const [total, setTotal]               = useState(0)
   const [page, setPage]                 = useState(1)
@@ -442,10 +451,16 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack, 
 
   useEffect(() => {
     if (selectionMode) return
+    const VIEW_MODES = ['normal', 'motion_diff']
     function onKey(e) {
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'SELECT') return
-      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        if (e.key === 'Backspace' && (tag === 'INPUT' || tag === 'TEXTAREA')) return
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        onBack()
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         e.preventDefault(); setPage(p => Math.max(1, p - 1))
       } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         e.preventDefault(); setPage(p => Math.min(totalPages, p + 1))
@@ -453,15 +468,49 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack, 
         e.preventDefault(); setPage(1)
       } else if (e.key === 'End') {
         e.preventDefault(); setPage(totalPages)
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault()
+        setViewMode(prev => {
+          const i = VIEW_MODES.indexOf(prev)
+          const next = e.key === 'ArrowDown'
+            ? VIEW_MODES[(i + 1) % VIEW_MODES.length]
+            : VIEW_MODES[(i - 1 + VIEW_MODES.length) % VIEW_MODES.length]
+          localStorage.setItem(VIEW_MODE_KEY, next)
+          return next
+        })
+      } else if (e.key === ' ') {
+        e.preventDefault()
+        setSelectionMode(true)
+        if (anchorIdxRef.current !== null && files[anchorIdxRef.current]) {
+          const f = files[anchorIdxRef.current]
+          setSelectedMap(new Map([[f.id, f]]))
+          anchorActionRef.current = true
+        }
+      } else if (e.key === 'Delete') {
+        e.preventDefault()
+        if (selectedIds.size > 0) handleDeletePreview()
+        else handleDeleteAll()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectionMode, totalPages])
+  }, [selectionMode, totalPages, files, selectedIds, onBack])
 
   useEffect(() => {
     if (!selectionMode) return
     function onKey(e) {
+      if (e.key === 'Escape' || e.key === 'Backspace' || e.key === ' ') {
+        if (e.key === 'Backspace' && (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA')) return
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        toggleSelectionMode()
+        return
+      }
+      if (e.key === 'Delete') {
+        e.preventDefault()
+        if (selectedIds.size > 0) handleDeletePreview()
+        return
+      }
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
       if (anchorIdxRef.current === null) return
       const nextIdx = e.key === 'ArrowLeft' ? anchorIdxRef.current - 1 : anchorIdxRef.current + 1
@@ -477,7 +526,7 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack, 
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectionMode, files])
+  }, [selectionMode, files, selectedIds])
 
   async function handleDeletePreview() {
     if (selectedIds.size === 0) return
@@ -516,6 +565,20 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack, 
       setDeleteError(e.message)
     } finally {
       setDeleteLoading(false)
+    }
+  }
+
+  async function handleDeleteAll() {
+    if (files.length === 0) return
+    setPreviewLoading(true)
+    setDeleteError(null)
+    try {
+      const data = await previewDelete(files.map(f => f.id))
+      setPreview(data)
+    } catch (e) {
+      setDeleteError(e.message)
+    } finally {
+      setPreviewLoading(false)
     }
   }
 
@@ -648,6 +711,7 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack, 
           onCancel={() => { setPreview(null); setDeleteError(null) }}
           busy={deleteLoading}
           error={deleteError}
+          camera={camera}
         />
       )}
 
@@ -661,13 +725,17 @@ export default function HourViewer({ cameraId, dateFrom, dateTo, label, onBack, 
         {selectionMode ? (
           <>
             <Kbd>Shift+click</Kbd> range &nbsp;·&nbsp;
-            <Kbd>← →</Kbd> extend selection &nbsp;·&nbsp;
-            <Kbd>Esc</Kbd> / Cancel to exit
+            <Kbd>← →</Kbd> extend &nbsp;·&nbsp;
+            <Kbd>Delete</Kbd> delete selected &nbsp;·&nbsp;
+            <Kbd>Space</Kbd> / <Kbd>Esc</Kbd> / <Kbd>⌫</Kbd> exit
           </>
         ) : (
           <>
             <Kbd>← →</Kbd> / <Kbd>PgUp PgDn</Kbd> page &nbsp;·&nbsp;
-            <Kbd>Home</Kbd> / <Kbd>End</Kbd> first / last page
+            <Kbd>↑ ↓</Kbd> view mode &nbsp;·&nbsp;
+            <Kbd>Space</Kbd> select &nbsp;·&nbsp;
+            <Kbd>Delete</Kbd> delete &nbsp;·&nbsp;
+            <Kbd>Esc</Kbd> / <Kbd>⌫</Kbd> back
           </>
         )}
       </div>

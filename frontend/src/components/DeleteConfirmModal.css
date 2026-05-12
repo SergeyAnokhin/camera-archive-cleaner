@@ -14,7 +14,7 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.10);
-  width: 600px;
+  width: 860px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 48px);
   overflow: hidden;
@@ -83,17 +83,19 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-dim);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .dcm-section-label-related {
-  margin-top: 20px;
+  margin-top: 18px;
 }
 
 .dcm-related-note {
-  font-size: calc(var(--font-base) * 0.82);
-  color: var(--text-dim);
-  margin: -4px 0 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  font-size: calc(var(--font-base) * 0.78);
 }
 
 .dcm-file-list {
@@ -102,53 +104,19 @@
 }
 
 .dcm-file-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 5px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-family: monospace;
+  font-size: calc(var(--font-base) * 0.9);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
 }
 
 .dcm-file-row:last-child {
   border-bottom: none;
-}
-
-.dcm-file-icon {
-  color: var(--text-dim);
-  font-size: 18px;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.dcm-file-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.dcm-file-name {
-  color: var(--text-primary);
-  font-size: var(--font-base);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dcm-file-path {
-  color: var(--text-dim);
-  font-size: calc(var(--font-base) * 0.78);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.dcm-file-time {
-  color: var(--text-muted);
-  font-size: calc(var(--font-base) * 0.82);
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
 }
 
 .dcm-error {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getPreviews, getThumbnailUrl } from '../api.js'
 import './HeatmapCell.css'
 
@@ -45,8 +45,13 @@ function dateRangeForCell(period, level, contextDateFrom) {
   return null
 }
 
-export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selected, onToggle }) {
+export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selected, onToggle, isFocused }) {
   const [previewIds, setPreviewIds] = useState([])
+  const cellRef = useRef(null)
+
+  useEffect(() => {
+    if (isFocused) cellRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [isFocused])
 
   const showPreviews = previewsPerCell > 0 && cell.photo_count > 0
 
@@ -70,7 +75,8 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
 
   return (
     <div
-      className={`heatmap-cell${isEmpty ? ' empty' : ''}${isLight ? ' light' : ''}${selected ? ' heatmap-cell-selected' : ''}`}
+      ref={cellRef}
+      className={`heatmap-cell${isEmpty ? ' empty' : ''}${isLight ? ' light' : ''}${selected ? ' heatmap-cell-selected' : ''}${isFocused ? ' heatmap-cell-focused' : ''}`}
       style={{ backgroundColor: `var(--heat-${cell.bucket})` }}
       onClick={() => selectionMode ? onToggle?.(cell) : onDrillInto(cell)}
       title={tooltip}

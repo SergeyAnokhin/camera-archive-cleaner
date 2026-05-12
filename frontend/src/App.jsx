@@ -14,6 +14,7 @@ const LEVELS = ['year', 'month', 'day', 'hour']
 const PREVIEWS_PER_CELL_KEY = 'previews_per_cell'
 const PREVIEWS_PER_CELL_DEFAULT = 3
 const NAV_STATE_KEY = 'nav_state'
+const GRID_COLS = { year: 4, month: 4, day: 7, hour: 6 }
 
 function loadNavState() {
   try { return JSON.parse(localStorage.getItem(NAV_STATE_KEY) || 'null') ?? {} } catch { return {} }
@@ -230,6 +231,7 @@ export default function App() {
   const [selectedHourPeriods, setSelectedHourPeriods] = useState(new Map())
   const [hourSelLoading, setHourSelLoading] = useState(false)
   const [hourSelError, setHourSelError]   = useState(null)
+  const [focusedPeriod, setFocusedPeriod] = useState(null)
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
 
@@ -313,6 +315,58 @@ export default function App() {
   }
 
   const handleScanComplete = useCallback(() => setRefreshKey(k => k + 1), [])
+
+  // Auto-focus first non-empty cell when heatmap data loads
+  useEffect(() => {
+    setFocusedPeriod(
+      periods.find(p => p.total_size_bytes > 0)?.period ?? periods[0]?.period ?? null
+    )
+  }, [periods])
+
+  // Heatmap keyboard navigation (only active when HourViewer is not open)
+  useEffect(() => {
+    if (selectedHour) return
+    function onKey(e) {
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'SELECT') return
+      const cols = GRID_COLS[currentLevel] ?? 4
+      const idx = Math.max(0, periods.findIndex(p => p.period === focusedPeriod))
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        setFocusedPeriod(periods[Math.min(periods.length - 1, idx + 1)]?.period ?? null)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        setFocusedPeriod(periods[Math.max(0, idx - 1)]?.period ?? null)
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setFocusedPeriod(periods[Math.min(periods.length - 1, idx + cols)]?.period ?? null)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setFocusedPeriod(periods[Math.max(0, idx - cols)]?.period ?? null)
+      } else if (e.key === 'Enter') {
+        e.preventDefault()
+        const cell = periods[idx]
+        if (cell) drillInto(cell)
+      } else if (e.key === 'Escape' || e.key === 'Backspace') {
+        if (e.key === 'Backspace' && (tag === 'INPUT' || tag === 'TEXTAREA')) return
+        e.preventDefault()
+        if (drillStack.length > 0) setDrillStack(prev => prev.slice(0, -1))
+      } else if (e.key === ' ' && currentLevel === 'hour') {
+        e.preventDefault()
+        const cell = periods[idx]
+        if (cell) {
+          setHourSelMode(true)
+          setSelectedHourPeriods(prev => {
+            const next = new Map(prev)
+            next.has(cell.period) ? next.delete(cell.period) : next.set(cell.period, cell)
+            return next
+          })
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedHour, periods, focusedPeriod, currentLevel, drillStack])
 
   function handleToggleHourPeriod(cell) {
     setSelectedHourPeriods(prev => {
@@ -405,6 +459,7 @@ export default function App() {
         {selectedHour ? (
           <HourViewer
             cameraId={cameraId}
+            camera={cameras.find(c => c.id === cameraId)}
             dateFrom={selectedHour.dateFrom}
             dateTo={selectedHour.dateTo}
             label={selectedHour.label}
@@ -424,6 +479,7 @@ export default function App() {
               selectionMode={hourSelMode}
               selectedPeriods={selectedHourPeriods}
               onTogglePeriod={handleToggleHourPeriod}
+              focusedPeriod={focusedPeriod}
             />
             {!loading && periods.length > 0 && (
               <StatsBar periods={periods} level={currentLevel} />
@@ -434,9 +490,16 @@ export default function App() {
       </main>
 
       <KeyboardHints hints={
-        !selectedHour && hourSelMode
-          ? [{ key: 'Click', label: 'toggle hour' }, { key: 'Esc / Cancel', label: 'exit' }]
-          : []
+        selectedHour
+          ? []
+          : hourSelMode
+            ? [{ key: 'Click', label: 'toggle hour' }, { key: 'Space', label: 'toggle focused hour' }, { key: 'Esc / Cancel', label: 'exit' }]
+            : [
+                { key: '↑ ↓ ← →', label: 'navigate' },
+                { key: 'Enter', label: 'open' },
+                ...(drillStack.length > 0 ? [{ key: 'Esc / ⌫', label: 'back' }] : []),
+                ...(currentLevel === 'hour' ? [{ key: 'Space', label: 'select hour' }] : []),
+              ]
       } />
     </div>
   )

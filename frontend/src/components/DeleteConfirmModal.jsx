@@ -1,29 +1,35 @@
 import { useEffect } from 'react'
 import './DeleteConfirmModal.css'
 
-function formatTime(ts) { return ts ? ts.substring(11, 19) : '' }
-
-function FileRow({ item }) {
-  const parts = (item.file_path || '').replace(/\\/g, '/').split('/')
-  const filename = parts.pop() || item.file_path
-  const dir = parts.length ? parts.join('/') + '/' : ''
-  return (
-    <div className="dcm-file-row">
-      <i className={`mdi mdi-${item.file_type === 'video' ? 'video' : 'image'} dcm-file-icon`} />
-      <div className="dcm-file-info">
-        <span className="dcm-file-name">{filename}</span>
-        {dir && <span className="dcm-file-path">{dir}</span>}
-      </div>
-      <span className="dcm-file-time">{formatTime(item.timestamp)}</span>
-    </div>
-  )
+function cameraRoot(camera) {
+  const a = (camera?.path_snapshots || '').replace(/\\/g, '/').replace(/\/$/, '')
+  const b = (camera?.path_videos   || '').replace(/\\/g, '/').replace(/\/$/, '')
+  if (!a && !b) return ''
+  const pa = a.split('/'), pb = b.split('/')
+  const common = []
+  for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
+    if (pa[i] === pb[i]) common.push(pa[i]); else break
+  }
+  return common.length ? common.join('/') + '/' : ''
 }
 
-export default function DeleteConfirmModal({ preview, onConfirm, onCancel, busy, error }) {
+function FileRow({ item, root }) {
+  const fp = (item.file_path || '').replace(/\\/g, '/')
+  const rel = root && fp.startsWith(root) ? fp.slice(root.length) : fp
+  return <div className="dcm-file-row">{rel}</div>
+}
+
+export default function DeleteConfirmModal({ preview, onConfirm, onCancel, busy, error, camera }) {
   const totalCount = preview.selected.length + preview.related_videos.length
+  const root = cameraRoot(camera)
 
   useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape' && !busy) onCancel() }
+    function onKey(e) {
+      if ((e.key === 'Escape' || e.key === 'Backspace') && !busy) {
+        e.stopImmediatePropagation()
+        onCancel()
+      }
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onCancel, busy])
@@ -41,12 +47,10 @@ export default function DeleteConfirmModal({ preview, onConfirm, onCancel, busy,
         </div>
 
         <div className="dcm-body">
-          <div className="dcm-section-label">
-            Selected ({preview.selected.length})
-          </div>
+          <div className="dcm-section-label">Selected ({preview.selected.length})</div>
           <div className="dcm-file-list">
             {preview.selected.map(item => (
-              <FileRow key={item.id} item={item} />
+              <FileRow key={item.id} item={item} root={root} />
             ))}
           </div>
 
@@ -54,11 +58,11 @@ export default function DeleteConfirmModal({ preview, onConfirm, onCancel, busy,
             <>
               <div className="dcm-section-label dcm-section-label-related">
                 Auto-added related videos ({preview.related_videos.length})
+                <span className="dcm-related-note"> — matched within ±5 s of a selected photo</span>
               </div>
-              <p className="dcm-related-note">matched within ±5 s of a selected photo</p>
               <div className="dcm-file-list">
                 {preview.related_videos.map(item => (
-                  <FileRow key={item.id} item={item} />
+                  <FileRow key={item.id} item={item} root={root} />
                 ))}
               </div>
             </>

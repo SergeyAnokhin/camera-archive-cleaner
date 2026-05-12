@@ -3,7 +3,7 @@ import HeatmapCell from './HeatmapCell.jsx'
 
 const SKELETON_COUNTS = { year: 8, month: 12, day: 28, hour: 24 }
 
-export default function HeatmapGrid({ periods, level, loading, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selectedPeriods, onTogglePeriod }) {
+export default function HeatmapGrid({ periods, level, loading, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selectedPeriods, onTogglePeriod, focusedPeriod }) {
   if (loading) {
     const count = SKELETON_COUNTS[level] ?? 12
     return (
@@ -43,6 +43,7 @@ export default function HeatmapGrid({ periods, level, loading, onDrillInto, came
             selectionMode={selectionMode}
             selected={selectedPeriods?.has(cell.period)}
             onToggle={onTogglePeriod}
+            isFocused={cell.period === focusedPeriod}
           />
         ))}
       </div>

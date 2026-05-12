@@ -54,7 +54,7 @@ def startup():
 @app.get("/cameras", summary="List all configured cameras")
 def list_cameras():
     cameras = load_cameras()
-    return [{"id": c.id, "name": c.name} for c in cameras]
+    return [{"id": c.id, "name": c.name, "path_snapshots": c.path_snapshots, "path_videos": c.path_videos} for c in cameras]
 
 
 # ---------------------------------------------------------------------------

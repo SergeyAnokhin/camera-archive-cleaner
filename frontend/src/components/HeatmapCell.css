@@ -68,6 +68,11 @@
   box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
+.heatmap-cell-focused {
+  outline: 2px solid rgba(99, 179, 237, 0.75);
+  outline-offset: 2px;
+}
+
 .cell-checkbox {
   position: absolute;
   bottom: 4px;
