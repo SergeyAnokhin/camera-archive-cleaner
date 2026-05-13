@@ -33,9 +33,17 @@ def init_db() -> None:
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_id    INTEGER NOT NULL UNIQUE,
                 thumb_path TEXT    NOT NULL,
+                created_at TEXT    NOT NULL DEFAULT (datetime('now')),
                 FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
             );
         """)
+        # Migration: add created_at for existing databases that predate this column
+        try:
+            conn.execute(
+                "ALTER TABLE thumbnails ADD COLUMN created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP"
+            )
+        except Exception:
+            pass
 
 
 def delete_camera_files(conn: sqlite3.Connection, camera_id: str) -> int:
@@ -198,11 +206,28 @@ def get_thumbnail_path(conn: sqlite3.Connection, file_id: int) -> str | None:
 def save_thumbnail_path(conn: sqlite3.Connection, file_id: int, path: str) -> None:
     conn.execute(
         """
-        INSERT INTO thumbnails (file_id, thumb_path) VALUES (?, ?)
-        ON CONFLICT(file_id) DO UPDATE SET thumb_path = excluded.thumb_path
+        INSERT INTO thumbnails (file_id, thumb_path, created_at) VALUES (?, ?, datetime('now'))
+        ON CONFLICT(file_id) DO UPDATE SET
+            thumb_path = excluded.thumb_path,
+            created_at = datetime('now')
         """,
         (file_id, path),
     )
+
+
+def pop_old_basic_thumbnails(conn: sqlite3.Connection, days: int = 30) -> list[str]:
+    """Remove thumbnail DB rows older than `days` days. Returns disk paths to delete."""
+    rows = conn.execute(
+        "SELECT thumb_path FROM thumbnails WHERE created_at < datetime('now', ?)",
+        (f"-{days} days",),
+    ).fetchall()
+    paths = [r["thumb_path"] for r in rows]
+    if paths:
+        conn.execute(
+            "DELETE FROM thumbnails WHERE created_at < datetime('now', ?)",
+            (f"-{days} days",),
+        )
+    return paths
 
 
 def get_hour_distribution(conn: sqlite3.Connection, camera_id: str | None,

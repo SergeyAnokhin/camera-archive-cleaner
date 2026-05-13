@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { clearDatabase, clearThumbnails, clearDiffThumbnails, clearErosionThumbnails, clearMotionThumbnails } from '../api.js'
+import { clearDatabase, clearAllThumbnails, getStorageInfo } from '../api.js'
 import './ToolsModal.css'
 
 const FONT_KEY = 'font-base'
@@ -33,6 +33,14 @@ const DIFF_THRESHOLD_MIN     = 0
 const DIFF_THRESHOLD_MAX     = 100
 const DIFF_THRESHOLD_DEFAULT = 20
 
+function fmtBytes(b) {
+  if (b == null) return null
+  if (b < 1024) return `${b} B`
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`
+  if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`
+  return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
 function applyFontSize(px) {
   document.documentElement.style.setProperty('--font-base', px + 'px')
 }
@@ -63,17 +71,12 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     const v = localStorage.getItem(DIFF_THRESHOLD_KEY)
     return v !== null ? Number(v) : DIFF_THRESHOLD_DEFAULT
   })
-  const [dbConfirm, setDbConfirm]           = useState(false)
-  const [dbBusy, setDbBusy]           = useState(false)
-  const [dbResult, setDbResult]       = useState(null)
-  const [thumbBusy, setThumbBusy]         = useState(false)
-  const [thumbResult, setThumbResult]     = useState(null)
-  const [diffThumbBusy, setDiffThumbBusy]         = useState(false)
-  const [diffThumbResult, setDiffThumbResult]     = useState(null)
-  const [erosionThumbBusy, setErosionThumbBusy]     = useState(false)
-  const [erosionThumbResult, setErosionThumbResult] = useState(null)
-  const [motionThumbBusy, setMotionThumbBusy]       = useState(false)
-  const [motionThumbResult, setMotionThumbResult]   = useState(null)
+  const [dbConfirm, setDbConfirm] = useState(false)
+  const [dbBusy, setDbBusy]       = useState(false)
+  const [dbResult, setDbResult]   = useState(null)
+  const [thumbBusy, setThumbBusy]     = useState(false)
+  const [thumbResult, setThumbResult] = useState(null)
+  const [storageInfo, setStorageInfo] = useState(null)
 
   function handleFontChange(e) {
     const px = Number(e.target.value)
@@ -139,8 +142,9 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     setThumbBusy(true)
     setThumbResult(null)
     try {
-      const res = await clearThumbnails()
-      setThumbResult({ ok: true, text: `Deleted ${res.deleted_files ?? 0} files.` })
+      const res = await clearAllThumbnails()
+      setThumbResult({ ok: true, res })
+      setStorageInfo(si => si ? { ...si, thumbnails_size_bytes: 0 } : si)
     } catch (e) {
       setThumbResult({ ok: false, text: e.message })
     } finally {
@@ -148,46 +152,12 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     }
   }
 
-  async function handleClearDiffThumbnails() {
-    setDiffThumbBusy(true)
-    setDiffThumbResult(null)
-    try {
-      const res = await clearDiffThumbnails()
-      setDiffThumbResult({ ok: true, text: `Deleted ${res.deleted_files ?? 0} files.` })
-    } catch (e) {
-      setDiffThumbResult({ ok: false, text: e.message })
-    } finally {
-      setDiffThumbBusy(false)
-    }
-  }
-
-  async function handleClearErosionThumbnails() {
-    setErosionThumbBusy(true)
-    setErosionThumbResult(null)
-    try {
-      const res = await clearErosionThumbnails()
-      setErosionThumbResult({ ok: true, text: `Deleted ${res.deleted_files ?? 0} files.` })
-    } catch (e) {
-      setErosionThumbResult({ ok: false, text: e.message })
-    } finally {
-      setErosionThumbBusy(false)
-    }
-  }
-
-  async function handleClearMotionThumbnails() {
-    setMotionThumbBusy(true)
-    setMotionThumbResult(null)
-    try {
-      const res = await clearMotionThumbnails()
-      setMotionThumbResult({ ok: true, text: `Deleted ${res.deleted_files ?? 0} files.` })
-    } catch (e) {
-      setMotionThumbResult({ ok: false, text: e.message })
-    } finally {
-      setMotionThumbBusy(false)
-    }
-  }
-
   const [activeTab, setActiveTab] = useState('general')
+
+  useEffect(() => {
+    if (activeTab !== 'maintenance') return
+    getStorageInfo().then(setStorageInfo).catch(() => {})
+  }, [activeTab])
 
   function handleBackdropClick(e) {
     if (e.target === e.currentTarget) onClose()
@@ -313,7 +283,12 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
               <div className="modal-action-row">
                 <div className="modal-action-info">
                   <span className="modal-action-name">Clear database</span>
-                  <span className="modal-action-desc">Remove all scanned file records</span>
+                  <span className="modal-action-desc">
+                    Remove all scanned file records
+                    {storageInfo && fmtBytes(storageInfo.db_size_bytes) &&
+                      <span className="modal-action-size"> · {fmtBytes(storageInfo.db_size_bytes)}</span>
+                    }
+                  </span>
                 </div>
                 {dbConfirm ? (
                   <div className="modal-confirm-group">
@@ -334,12 +309,17 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
               )}
             </div>
 
-            {/* Clear thumbnails */}
+            {/* Clear all thumbnails */}
             <div className="modal-section">
               <div className="modal-action-row">
                 <div className="modal-action-info">
-                  <span className="modal-action-name">Clear thumbnails</span>
-                  <span className="modal-action-desc">Delete all cached preview images</span>
+                  <span className="modal-action-name">Clear all thumbnails</span>
+                  <span className="modal-action-desc">
+                    Delete cached previews of all types (basic, diff, erosion, motion)
+                    {storageInfo && storageInfo.thumbnails_size_bytes > 0 &&
+                      <span className="modal-action-size"> · {fmtBytes(storageInfo.thumbnails_size_bytes)}</span>
+                    }
+                  </span>
                 </div>
                 <button className="modal-btn danger-outline" onClick={handleClearThumbnails} disabled={thumbBusy}>
                   {thumbBusy
@@ -348,66 +328,28 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
                   }
                 </button>
               </div>
-              {thumbResult && (
-                <div className={`modal-result ${thumbResult.ok ? 'ok' : 'err'}`}>{thumbResult.text}</div>
+              {thumbResult && !thumbResult.ok && (
+                <div className="modal-result err">{thumbResult.text}</div>
               )}
-            </div>
-
-            {/* Clear diff thumbnails */}
-            <div className="modal-section">
-              <div className="modal-action-row">
-                <div className="modal-action-info">
-                  <span className="modal-action-name">Clear diff thumbnails</span>
-                  <span className="modal-action-desc">Delete all cached Motion diff images</span>
-                </div>
-                <button className="modal-btn danger-outline" onClick={handleClearDiffThumbnails} disabled={diffThumbBusy}>
-                  {diffThumbBusy
-                    ? <i className="mdi mdi-loading mdi-spin" />
-                    : <><i className="mdi mdi-image-remove-outline" /> Clear</>
-                  }
-                </button>
-              </div>
-              {diffThumbResult && (
-                <div className={`modal-result ${diffThumbResult.ok ? 'ok' : 'err'}`}>{diffThumbResult.text}</div>
-              )}
-            </div>
-
-            {/* Clear erosion thumbnails */}
-            <div className="modal-section">
-              <div className="modal-action-row">
-                <div className="modal-action-info">
-                  <span className="modal-action-name">Clear erosion thumbnails</span>
-                  <span className="modal-action-desc">Delete all cached Erosion mode images</span>
-                </div>
-                <button className="modal-btn danger-outline" onClick={handleClearErosionThumbnails} disabled={erosionThumbBusy}>
-                  {erosionThumbBusy
-                    ? <i className="mdi mdi-loading mdi-spin" />
-                    : <><i className="mdi mdi-image-remove-outline" /> Clear</>
-                  }
-                </button>
-              </div>
-              {erosionThumbResult && (
-                <div className={`modal-result ${erosionThumbResult.ok ? 'ok' : 'err'}`}>{erosionThumbResult.text}</div>
-              )}
-            </div>
-
-            {/* Clear motion thumbnails (neon_mask / mhi / bounding_boxes / motion_stacking) */}
-            <div className="modal-section">
-              <div className="modal-action-row">
-                <div className="modal-action-info">
-                  <span className="modal-action-name">Clear motion thumbnails</span>
-                  <span className="modal-action-desc">Delete cached Neon mask, MHI trail, Bounding boxes, Motion stacking images</span>
-                </div>
-                <button className="modal-btn danger-outline" onClick={handleClearMotionThumbnails} disabled={motionThumbBusy}>
-                  {motionThumbBusy
-                    ? <i className="mdi mdi-loading mdi-spin" />
-                    : <><i className="mdi mdi-image-remove-outline" /> Clear</>
-                  }
-                </button>
-              </div>
-              {motionThumbResult && (
-                <div className={`modal-result ${motionThumbResult.ok ? 'ok' : 'err'}`}>{motionThumbResult.text}</div>
-              )}
+              {thumbResult?.ok && thumbResult.res && (() => {
+                const t = thumbResult.res.types
+                const total = thumbResult.res.total_files
+                const freed = thumbResult.res.freed_bytes
+                const parts = [
+                  t.basic.deleted_files    && `basic: ${t.basic.deleted_files}`,
+                  t.diff.deleted_files     && `diff: ${t.diff.deleted_files}`,
+                  t.diff_zoom.deleted_files && `diff-zoom: ${t.diff_zoom.deleted_files}`,
+                  t.erosion.deleted_files  && `erosion: ${t.erosion.deleted_files}`,
+                  t.motion.deleted_files   && `motion: ${t.motion.deleted_files}`,
+                ].filter(Boolean)
+                return (
+                  <div className="modal-result ok">
+                    Deleted {total} {total === 1 ? 'file' : 'files'}
+                    {parts.length > 0 && ` (${parts.join(', ')})`}
+                    {freed > 0 && ` · freed ${fmtBytes(freed)}`}
+                  </div>
+                )
+              })()}
             </div>
           </>}
 

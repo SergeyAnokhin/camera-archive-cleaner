@@ -95,6 +95,7 @@ from pydantic import BaseModel
 
 from config import load_cameras
 from database import (
+    DB_PATH,
     delete_all_thumbnails,
     get_connection,
     get_file_by_id,
@@ -105,6 +106,7 @@ from database import (
     get_stats_grouped,
     get_stats_total,
     init_db,
+    pop_old_basic_thumbnails,
 )
 from thumbnails import THUMB_DIR, get_or_create_thumbnail
 from diff_thumbnails import DIFF_THUMB_DIR, get_or_create_diff_thumbnail
@@ -114,6 +116,8 @@ from diff_zoom_thumbnails import DIFF_ZOOM_THUMB_DIR, get_or_create_diff_zoom_th
 from scanner import scan_camera
 
 app = FastAPI(title="Camera Snapshots Cleaner", version="1.0.0")
+
+_THUMB_CACHE_HEADERS = {"Cache-Control": "public, max-age=604800"}
 
 app.add_middleware(
     CORSMiddleware,
@@ -288,7 +292,7 @@ def get_thumbnail(file_id: int):
             thumb_path = get_or_create_thumbnail(conn, file_id, file_row["file_path"])
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
-    return FileResponse(str(thumb_path), media_type="image/jpeg")
+    return FileResponse(str(thumb_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
 
 # ---------------------------------------------------------------------------
@@ -322,7 +326,7 @@ def get_diff_thumbnail(
             diff_path = get_or_create_diff_thumbnail(conn, file_id, ids, threshold)
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
-    return FileResponse(str(diff_path), media_type="image/jpeg")
+    return FileResponse(str(diff_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
 
 # ---------------------------------------------------------------------------
@@ -356,7 +360,7 @@ def get_diff_zoom_thumbnail(
             zoom_path = get_or_create_diff_zoom_thumbnail(conn, file_id, ids, threshold)
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
-    return FileResponse(str(zoom_path), media_type="image/jpeg")
+    return FileResponse(str(zoom_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
 
 # ---------------------------------------------------------------------------
@@ -390,7 +394,7 @@ def get_erosion_thumbnail(
             erosion_path = get_or_create_erosion_thumbnail(conn, file_id, ids, threshold)
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
-    return FileResponse(str(erosion_path), media_type="image/jpeg")
+    return FileResponse(str(erosion_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
 
 # ---------------------------------------------------------------------------
@@ -427,7 +431,7 @@ def get_motion_thumbnail(
             motion_path = get_or_create_motion_thumbnail(conn, file_id, ids, threshold, mode)
         except (FileNotFoundError, ValueError) as e:
             raise HTTPException(status_code=404, detail=str(e))
-    return FileResponse(str(motion_path), media_type="image/jpeg")
+    return FileResponse(str(motion_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
 
 # ---------------------------------------------------------------------------
@@ -585,12 +589,16 @@ def delete_confirm(req: ConfirmRequest):
 
     deleted = []
     failed = []
+    photo_count = 0
+    video_count = 0
+    freed_bytes = 0
+    thumbnails_deleted = 0
 
     with get_connection() as conn:
         placeholders = ",".join("?" * len(req.file_ids))
         rows = conn.execute(
             f"""
-            SELECT f.id, f.file_path, t.thumb_path
+            SELECT f.id, f.file_type, f.file_size, f.file_path, t.thumb_path
             FROM files f
             LEFT JOIN thumbnails t ON t.file_id = f.id
             WHERE f.id IN ({placeholders})
@@ -610,16 +618,23 @@ def delete_confirm(req: ConfirmRequest):
             src = Path(row["file_path"])
             try:
                 if src.exists():
+                    freed_bytes += row["file_size"] or 0
                     src.unlink()
             except Exception as e:
                 failed.append({"id": file_id, "reason": str(e)})
                 continue
+
+            if row["file_type"] == "photo":
+                photo_count += 1
+            else:
+                video_count += 1
 
             if row["thumb_path"]:
                 thumb = Path(row["thumb_path"])
                 try:
                     if thumb.exists():
                         thumb.unlink()
+                        thumbnails_deleted += 1
                 except Exception:
                     pass
 
@@ -630,8 +645,27 @@ def delete_confirm(req: ConfirmRequest):
             db_ph = ",".join("?" * len(ids_to_delete_from_db))
             conn.execute(f"DELETE FROM files WHERE id IN ({db_ph})", ids_to_delete_from_db)
 
-    logger.info("   └─ удалено %d, ошибок %d", len(deleted), len(failed))
-    return {"deleted": deleted, "failed": failed}
+        # Opportunistic cleanup: evict basic thumbnails older than 30 days
+        old_paths = pop_old_basic_thumbnails(conn, days=30)
+        for p in old_paths:
+            try:
+                Path(p).unlink(missing_ok=True)
+                thumbnails_deleted += 1
+            except Exception:
+                pass
+
+    logger.info(
+        "   └─ удалено %d (фото %d, видео %d), ошибок %d, превьюшек %d, освобождено %d байт",
+        len(deleted), photo_count, video_count, len(failed), thumbnails_deleted, freed_bytes,
+    )
+    return {
+        "deleted": deleted,
+        "failed": failed,
+        "photo_count": photo_count,
+        "video_count": video_count,
+        "thumbnails_deleted": thumbnails_deleted,
+        "freed_bytes": freed_bytes,
+    }
 
 
 class RangeDeleteRequest(BaseModel):
@@ -762,6 +796,61 @@ def clear_motion_thumbnails():
                 deleted_files += 1
     logger.info("   └─ motion-миниатюры очищены → %d файлов", deleted_files)
     return {"deleted_files": deleted_files}
+
+
+@app.delete("/all_thumbnails", summary="Delete all cached thumbnail files (all types)")
+def clear_all_thumbnails():
+    logger.info("🧹 Очистка всех кэшей миниатюр")
+
+    def _clear_dir(d: Path) -> tuple[int, int]:
+        count, size = 0, 0
+        if d.exists():
+            for f in d.iterdir():
+                if f.is_file():
+                    size += f.stat().st_size
+                    f.unlink()
+                    count += 1
+        return count, size
+
+    basic_files, basic_bytes     = _clear_dir(THUMB_DIR)
+    diff_files, diff_bytes       = _clear_dir(DIFF_THUMB_DIR)
+    dzoom_files, dzoom_bytes     = _clear_dir(DIFF_ZOOM_THUMB_DIR)
+    erosion_files, erosion_bytes = _clear_dir(EROSION_THUMB_DIR)
+    motion_files, motion_bytes   = _clear_dir(MOTION_THUMB_DIR)
+
+    with get_connection() as conn:
+        delete_all_thumbnails(conn)
+
+    total_files = basic_files + diff_files + dzoom_files + erosion_files + motion_files
+    total_bytes = basic_bytes + diff_bytes + dzoom_bytes + erosion_bytes + motion_bytes
+
+    logger.info("   └─ все миниатюры очищены → %d файлов, %d байт", total_files, total_bytes)
+    return {
+        "types": {
+            "basic":    {"deleted_files": basic_files,   "freed_bytes": basic_bytes},
+            "diff":     {"deleted_files": diff_files,    "freed_bytes": diff_bytes},
+            "diff_zoom":{"deleted_files": dzoom_files,   "freed_bytes": dzoom_bytes},
+            "erosion":  {"deleted_files": erosion_files, "freed_bytes": erosion_bytes},
+            "motion":   {"deleted_files": motion_files,  "freed_bytes": motion_bytes},
+        },
+        "total_files": total_files,
+        "freed_bytes": total_bytes,
+    }
+
+
+@app.get("/storage_info", summary="Current storage usage: DB and thumbnail caches")
+def get_storage_info():
+    db_size = DB_PATH.stat().st_size if DB_PATH.exists() else 0
+
+    thumb_dirs = [THUMB_DIR, DIFF_THUMB_DIR, DIFF_ZOOM_THUMB_DIR, EROSION_THUMB_DIR, MOTION_THUMB_DIR]
+    thumb_size = 0
+    for d in thumb_dirs:
+        if d.exists():
+            for f in d.iterdir():
+                if f.is_file():
+                    thumb_size += f.stat().st_size
+
+    return {"db_size_bytes": db_size, "thumbnails_size_bytes": thumb_size}
 
 
 def _fmt_range(dt_from, dt_to) -> str:

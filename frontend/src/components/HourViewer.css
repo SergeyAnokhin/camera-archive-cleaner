@@ -486,6 +486,15 @@
   font-size: calc(var(--font-base) * 0.88);
 }
 
+.hv-delete-success {
+  background: #052e16;
+  border: 1px solid #166534;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: #86efac;
+  font-size: calc(var(--font-base) * 0.88);
+}
+
 /* ── Selection bar (horizontal) ── */
 .hv-select-bar {
   display: flex;

@@ -371,6 +371,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [previewLoading, setPreviewLoading]   = useState(false)
   const [deleteLoading, setDeleteLoading]     = useState(false)
   const [deleteError, setDeleteError]         = useState(null)
+  const [deleteSuccess, setDeleteSuccess]     = useState(null)
   const [internalRefreshKey, setInternalRefreshKey] = useState(0)
 
   const [focusedFileIndex, setFocusedFileIndex] = useState(null)
@@ -439,6 +440,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     anchorIdxRef.current = null
     anchorActionRef.current = null
     setDeleteError(null)
+    setDeleteSuccess(null)
   }
 
   function toggleSelect(file, idx, shiftKey) {
@@ -592,6 +594,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     if (selectedIds.size === 0) return
     setPreviewLoading(true)
     setDeleteError(null)
+    setDeleteSuccess(null)
     try {
       const data = await previewDelete([...selectedIds])
       setPreview(data)
@@ -609,6 +612,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     ]
     setDeleteLoading(true)
     setDeleteError(null)
+    setDeleteSuccess(null)
     try {
       const res = await confirmDelete(allIds)
       setPreview(null)
@@ -616,8 +620,18 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       setSelectedMap(new Map())
       anchorIdxRef.current = null
       anchorActionRef.current = null
+
+      const parts = []
+      if (res.photo_count) parts.push(`${res.photo_count} photo${res.photo_count !== 1 ? 's' : ''}`)
+      if (res.video_count) parts.push(`${res.video_count} video${res.video_count !== 1 ? 's' : ''}`)
+      const fileSummary = parts.length ? parts.join(' + ') : `${res.deleted.length} files`
+      const thumbPart = res.thumbnails_deleted ? ` · ${res.thumbnails_deleted} thumbnail${res.thumbnails_deleted !== 1 ? 's' : ''} removed` : ''
+      const freedPart = res.freed_bytes > 0 ? ` · freed ${formatBytes(res.freed_bytes)}` : ''
+
       if (res.failed?.length > 0) {
-        setDeleteError(`Deleted ${res.deleted.length} files. ${res.failed.length} could not be removed from disk.`)
+        setDeleteError(`Deleted ${fileSummary}${thumbPart}${freedPart}. ${res.failed.length} could not be removed from disk.`)
+      } else {
+        setDeleteSuccess(`Deleted ${fileSummary}${thumbPart}${freedPart}`)
       }
       setInternalRefreshKey(k => k + 1)
       onFilesDeleted?.()
@@ -648,6 +662,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     if (files.length === 0) return
     setPreviewLoading(true)
     setDeleteError(null)
+    setDeleteSuccess(null)
     try {
       const data = await previewDelete(files.map(f => f.id))
       setPreview(data)
@@ -780,12 +795,17 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           <i className="mdi mdi-alert-circle-outline" /> {deleteError}
         </div>
       )}
+      {deleteSuccess && !preview && (
+        <div className="hv-delete-success">
+          <i className="mdi mdi-check-circle-outline" /> {deleteSuccess}
+        </div>
+      )}
 
       {preview && (
         <DeleteConfirmModal
           preview={preview}
           onConfirm={handleDeleteConfirm}
-          onCancel={() => { setPreview(null); setDeleteError(null) }}
+          onCancel={() => { setPreview(null); setDeleteError(null); setDeleteSuccess(null) }}
           busy={deleteLoading}
           error={deleteError}
           camera={camera}

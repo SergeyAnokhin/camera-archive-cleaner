@@ -164,6 +164,11 @@
   color: var(--text-muted);
 }
 
+.modal-action-size {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
 .modal-confirm-group {
   display: flex;
   align-items: center;

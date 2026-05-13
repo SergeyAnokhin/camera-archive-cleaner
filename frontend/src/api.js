@@ -123,6 +123,14 @@ export function clearMotionThumbnails() {
   return del('/motion_thumbnails')
 }
 
+export function clearAllThumbnails() {
+  return del('/all_thumbnails')
+}
+
+export function getStorageInfo() {
+  return get('/storage_info')
+}
+
 async function postJson(path, body) {
   const res = await fetch(BASE + path, {
     method: 'POST',
