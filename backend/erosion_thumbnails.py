@@ -23,9 +23,11 @@ MIN_CONTOUR_AREA = 80
 NEON_GREEN = (0, 255, 0)
 
 
+_CACHE_VERSION = "v2"  # bump when algorithm changes to invalidate old cache
+
 def _cache_key(page_file_ids: list[int], threshold: int) -> str:
     ids_str = ",".join(str(i) for i in sorted(page_file_ids))
-    return hashlib.sha256(f"erosion:{ids_str}:{threshold}".encode()).hexdigest()[:16]
+    return hashlib.sha256(f"erosion:{_CACHE_VERSION}:{ids_str}:{threshold}".encode()).hexdigest()[:16]
 
 
 def get_or_create_erosion_thumbnail(
@@ -58,19 +60,26 @@ def get_or_create_erosion_thumbnail(
     if not frames:
         raise FileNotFoundError(f"No thumbnails found for page")
 
-    # MOG2: varThreshold driven by user threshold (higher = stricter foreground detection)
-    # detectShadows=False for speed
+    # Stable background: median of all page frames.
+    # Median naturally excludes transient objects (person in <50% of frames).
+    # Pre-warm MOG2 with this median so every frame — including the first —
+    # starts from a reliable background instead of cold-starting.
+    frame_stack = np.array([f for _, f in frames], dtype=np.float32)
+    bg_median = np.median(frame_stack, axis=0).astype(np.uint8)
+
     subtractor = cv2.createBackgroundSubtractorMOG2(
         history=500,
         varThreshold=max(4.0, float(threshold)),
         detectShadows=False,
     )
+    for _ in range(50):
+        subtractor.apply(bg_median)
 
-    # Feed frames in sorted order; capture mask when we hit the target frame
+    # Process actual frames with frozen background (learningRate=0)
     fg_mask: np.ndarray | None = None
     target_frame: np.ndarray | None = None
     for fid, frame in frames:
-        current_mask = subtractor.apply(frame)
+        current_mask = subtractor.apply(frame, learningRate=0.0)
         if fid == file_id:
             fg_mask = current_mask
             target_frame = frame

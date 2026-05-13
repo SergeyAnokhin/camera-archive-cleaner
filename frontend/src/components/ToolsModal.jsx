@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { clearDatabase, clearThumbnails, clearDiffThumbnails, clearErosionThumbnails } from '../api.js'
+import { clearDatabase, clearThumbnails, clearDiffThumbnails, clearErosionThumbnails, clearMotionThumbnails } from '../api.js'
 import './ToolsModal.css'
 
 const FONT_KEY = 'font-base'
@@ -70,8 +70,10 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
   const [thumbResult, setThumbResult]     = useState(null)
   const [diffThumbBusy, setDiffThumbBusy]         = useState(false)
   const [diffThumbResult, setDiffThumbResult]     = useState(null)
-  const [erosionThumbBusy, setErosionThumbBusy]   = useState(false)
+  const [erosionThumbBusy, setErosionThumbBusy]     = useState(false)
   const [erosionThumbResult, setErosionThumbResult] = useState(null)
+  const [motionThumbBusy, setMotionThumbBusy]       = useState(false)
+  const [motionThumbResult, setMotionThumbResult]   = useState(null)
 
   function handleFontChange(e) {
     const px = Number(e.target.value)
@@ -169,6 +171,19 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
       setErosionThumbResult({ ok: false, text: e.message })
     } finally {
       setErosionThumbBusy(false)
+    }
+  }
+
+  async function handleClearMotionThumbnails() {
+    setMotionThumbBusy(true)
+    setMotionThumbResult(null)
+    try {
+      const res = await clearMotionThumbnails()
+      setMotionThumbResult({ ok: true, text: `Deleted ${res.deleted_files ?? 0} files.` })
+    } catch (e) {
+      setMotionThumbResult({ ok: false, text: e.message })
+    } finally {
+      setMotionThumbBusy(false)
     }
   }
 
@@ -373,6 +388,25 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
               </div>
               {erosionThumbResult && (
                 <div className={`modal-result ${erosionThumbResult.ok ? 'ok' : 'err'}`}>{erosionThumbResult.text}</div>
+              )}
+            </div>
+
+            {/* Clear motion thumbnails (neon_mask / mhi / bounding_boxes / motion_stacking) */}
+            <div className="modal-section">
+              <div className="modal-action-row">
+                <div className="modal-action-info">
+                  <span className="modal-action-name">Clear motion thumbnails</span>
+                  <span className="modal-action-desc">Delete cached Neon mask, MHI trail, Bounding boxes, Motion stacking images</span>
+                </div>
+                <button className="modal-btn danger-outline" onClick={handleClearMotionThumbnails} disabled={motionThumbBusy}>
+                  {motionThumbBusy
+                    ? <i className="mdi mdi-loading mdi-spin" />
+                    : <><i className="mdi mdi-image-remove-outline" /> Clear</>
+                  }
+                </button>
+              </div>
+              {motionThumbResult && (
+                <div className={`modal-result ${motionThumbResult.ok ? 'ok' : 'err'}`}>{motionThumbResult.text}</div>
               )}
             </div>
           </>}

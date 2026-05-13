@@ -109,6 +109,8 @@ from database import (
 from thumbnails import THUMB_DIR, get_or_create_thumbnail
 from diff_thumbnails import DIFF_THUMB_DIR, get_or_create_diff_thumbnail
 from erosion_thumbnails import EROSION_THUMB_DIR, get_or_create_erosion_thumbnail
+from motion_thumbnails import MOTION_THUMB_DIR, get_or_create_motion_thumbnail, VALID_MODES as MOTION_VALID_MODES
+from diff_zoom_thumbnails import DIFF_ZOOM_THUMB_DIR, get_or_create_diff_zoom_thumbnail
 from scanner import scan_camera
 
 app = FastAPI(title="Camera Snapshots Cleaner", version="1.0.0")
@@ -324,6 +326,40 @@ def get_diff_thumbnail(
 
 
 # ---------------------------------------------------------------------------
+# /diff_zoom_thumbnail/{file_id} — motion-diff cropped to most-active 1/9 tile
+# ---------------------------------------------------------------------------
+
+@app.get("/diff_zoom_thumbnail/{file_id}", summary="Motion-diff zoom thumbnail (crop to hottest 1/9 tile)")
+def get_diff_zoom_thumbnail(
+    file_id: int,
+    page_ids: str = Query(description="Comma-separated photo file IDs on the current page"),
+    threshold: int = Query(default=20, ge=0, le=255),
+):
+    try:
+        ids = [int(x) for x in page_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid page_ids format")
+    if not ids:
+        raise HTTPException(status_code=400, detail="page_ids cannot be empty")
+
+    with get_connection() as conn:
+        file_row = get_file_by_id(conn, file_id)
+        if file_row is None:
+            raise HTTPException(status_code=404, detail="File not found")
+        if file_row["file_type"] != "photo":
+            raise HTTPException(status_code=400, detail="Diff zoom thumbnails only available for photos")
+        try:
+            get_or_create_thumbnail(conn, file_id, file_row["file_path"])
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        try:
+            zoom_path = get_or_create_diff_zoom_thumbnail(conn, file_id, ids, threshold)
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(str(zoom_path), media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
 # /erosion_thumbnail/{file_id} — MOG2 + morphological erosion thumbnail
 # ---------------------------------------------------------------------------
 
@@ -355,6 +391,43 @@ def get_erosion_thumbnail(
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
     return FileResponse(str(erosion_path), media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# /motion_thumbnail/{file_id} — neon_mask / mhi / bounding_boxes / motion_stacking
+# ---------------------------------------------------------------------------
+
+@app.get("/motion_thumbnail/{file_id}", summary="Motion visualization thumbnail (4 modes)")
+def get_motion_thumbnail(
+    file_id: int,
+    page_ids: str = Query(description="Comma-separated photo file IDs on the current page"),
+    threshold: int = Query(default=20, ge=0, le=255),
+    mode: str = Query(default="neon_mask", description=f"One of: {sorted(MOTION_VALID_MODES)}"),
+):
+    if mode not in MOTION_VALID_MODES:
+        raise HTTPException(status_code=400, detail=f"Invalid mode '{mode}'")
+    try:
+        ids = [int(x) for x in page_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid page_ids format")
+    if not ids:
+        raise HTTPException(status_code=400, detail="page_ids cannot be empty")
+
+    with get_connection() as conn:
+        file_row = get_file_by_id(conn, file_id)
+        if file_row is None:
+            raise HTTPException(status_code=404, detail="File not found")
+        if file_row["file_type"] != "photo":
+            raise HTTPException(status_code=400, detail="Motion thumbnails only available for photos")
+        try:
+            get_or_create_thumbnail(conn, file_id, file_row["file_path"])
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        try:
+            motion_path = get_or_create_motion_thumbnail(conn, file_id, ids, threshold, mode)
+        except (FileNotFoundError, ValueError) as e:
+            raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(str(motion_path), media_type="image/jpeg")
 
 
 # ---------------------------------------------------------------------------
@@ -662,6 +735,32 @@ def clear_erosion_thumbnails():
                 f.unlink()
                 deleted_files += 1
     logger.info("   └─ erosion-миниатюры очищены → %d файлов", deleted_files)
+    return {"deleted_files": deleted_files}
+
+
+@app.delete("/diff_zoom_thumbnails", summary="Delete all cached diff zoom thumbnail files")
+def clear_diff_zoom_thumbnails():
+    logger.info("🧹 Очистка кэша diff-zoom-миниатюр")
+    deleted_files = 0
+    if DIFF_ZOOM_THUMB_DIR.exists():
+        for f in DIFF_ZOOM_THUMB_DIR.iterdir():
+            if f.is_file():
+                f.unlink()
+                deleted_files += 1
+    logger.info("   └─ diff-zoom-миниатюры очищены → %d файлов", deleted_files)
+    return {"deleted_files": deleted_files}
+
+
+@app.delete("/motion_thumbnails", summary="Delete all cached motion thumbnail files")
+def clear_motion_thumbnails():
+    logger.info("🧹 Очистка кэша motion-миниатюр")
+    deleted_files = 0
+    if MOTION_THUMB_DIR.exists():
+        for f in MOTION_THUMB_DIR.iterdir():
+            if f.is_file():
+                f.unlink()
+                deleted_files += 1
+    logger.info("   └─ motion-миниатюры очищены → %d файлов", deleted_files)
     return {"deleted_files": deleted_files}
 
 

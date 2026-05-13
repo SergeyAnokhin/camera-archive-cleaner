@@ -99,12 +99,28 @@ export function clearDiffThumbnails() {
   return del('/diff_thumbnails')
 }
 
+export function getDiffZoomThumbnailUrl(fileId, pageIds, threshold) {
+  return `${BASE}/diff_zoom_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
+}
+
+export function clearDiffZoomThumbnails() {
+  return del('/diff_zoom_thumbnails')
+}
+
 export function getErosionThumbnailUrl(fileId, pageIds, threshold) {
   return `${BASE}/erosion_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
 }
 
 export function clearErosionThumbnails() {
   return del('/erosion_thumbnails')
+}
+
+export function getMotionThumbnailUrl(fileId, pageIds, threshold, mode) {
+  return `${BASE}/motion_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}&mode=${mode}`
+}
+
+export function clearMotionThumbnails() {
+  return del('/motion_thumbnails')
 }
 
 async function postJson(path, body) {
