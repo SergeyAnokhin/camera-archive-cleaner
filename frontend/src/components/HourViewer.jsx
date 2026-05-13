@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { getFiles, getDistribution, getStatsTotal, getMediaUrl, previewDelete, confirmDelete } from '../api.js'
+import { getFiles, getDistribution, getStatsTotal, getMediaUrl, previewDelete, confirmDelete, deleteByRange } from '../api.js'
 import DeleteConfirmModal from './DeleteConfirmModal.jsx'
 import { VIEW_MODES, DEFAULT_VIEW_MODE_KEY } from './viewModes/index.js'
 import './HourViewer.css'
@@ -70,9 +70,17 @@ function VideoModal({ file, onClose }) {
           <div className="hv-video-error">
             <i className="mdi mdi-alert-circle-outline hv-video-error-icon" />
             <p>This video format can't be played in the browser.</p>
-            <button className="hv-video-error-btn" onClick={openExternal}>
-              <i className="mdi mdi-open-in-new" /> Open with external app
-            </button>
+            <p className="hv-video-error-hint">Open with VLC:</p>
+            <div className="hv-video-cmd">
+              <code className="hv-video-cmd-text">vlc &quot;{file.file_path}&quot;</code>
+              <button
+                className="hv-video-cmd-copy"
+                title="Copy to clipboard"
+                onClick={() => navigator.clipboard.writeText(`vlc "${file.file_path}"`)}
+              >
+                <i className="mdi mdi-content-copy" />
+              </button>
+            </div>
           </div>
         ) : (
           <video
@@ -373,6 +381,9 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [deleteError, setDeleteError]         = useState(null)
   const [deleteSuccess, setDeleteSuccess]     = useState(null)
   const [internalRefreshKey, setInternalRefreshKey] = useState(0)
+  const [deleteHourConfirm, setDeleteHourConfirm] = useState(false)
+  const [deleteHourLoading, setDeleteHourLoading] = useState(false)
+  const [deleteHourError, setDeleteHourError] = useState(null)
 
   const [focusedFileIndex, setFocusedFileIndex] = useState(null)
   const gridRef = useRef(null)
@@ -614,6 +625,10 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     setDeleteError(null)
     setDeleteSuccess(null)
     try {
+      const allPreviewFiles = [...preview.selected, ...preview.related_videos]
+      const firstName = allPreviewFiles[0]?.file_path?.split(/[\\/]/).pop()
+      const extraCount = allPreviewFiles.length - 1
+
       const res = await confirmDelete(allIds)
       setPreview(null)
       setSelectionMode(false)
@@ -627,11 +642,12 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       const fileSummary = parts.length ? parts.join(' + ') : `${res.deleted.length} files`
       const thumbPart = res.thumbnails_deleted ? ` · ${res.thumbnails_deleted} thumbnail${res.thumbnails_deleted !== 1 ? 's' : ''} removed` : ''
       const freedPart = res.freed_bytes > 0 ? ` · freed ${formatBytes(res.freed_bytes)}` : ''
+      const fileHint = firstName ? ` — ${firstName}${extraCount > 0 ? ` +${extraCount}` : ''}` : ''
 
       if (res.failed?.length > 0) {
-        setDeleteError(`Deleted ${fileSummary}${thumbPart}${freedPart}. ${res.failed.length} could not be removed from disk.`)
+        setDeleteError(`Deleted ${fileSummary}${thumbPart}${freedPart}${fileHint}. ${res.failed.length} could not be removed from disk.`)
       } else {
-        setDeleteSuccess(`Deleted ${fileSummary}${thumbPart}${freedPart}`)
+        setDeleteSuccess(`Deleted ${fileSummary}${thumbPart}${freedPart}${fileHint}`)
       }
       setInternalRefreshKey(k => k + 1)
       onFilesDeleted?.()
@@ -670,6 +686,21 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       setDeleteError(e.message)
     } finally {
       setPreviewLoading(false)
+    }
+  }
+
+  async function handleDeleteHour() {
+    setDeleteHourLoading(true)
+    setDeleteHourError(null)
+    try {
+      await deleteByRange(cameraId, dateFrom, dateTo)
+      setDeleteHourConfirm(false)
+      onFilesDeleted?.()
+      onBack()
+    } catch (e) {
+      setDeleteHourError(e.message)
+    } finally {
+      setDeleteHourLoading(false)
     }
   }
 
@@ -712,6 +743,17 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           {VIEW_MODES.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
         </select>
 
+        {!selectionMode && total > 0 && (
+          <button
+            className="hv-select-btn"
+            style={{ color: '#f87171' }}
+            onClick={() => { setDeleteHourConfirm(v => !v); setDeleteHourError(null) }}
+            title="Delete all files in this hour"
+          >
+            <i className="mdi mdi-delete-sweep-outline" /> Delete hour
+          </button>
+        )}
+
         <button
           className={`hv-select-btn${selectionMode ? ' active' : ''}`}
           onClick={toggleSelectionMode}
@@ -733,6 +775,28 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           onGoToPage={setPage}
           hourStats={hourStats}
         />
+      )}
+
+      {/* Delete hour confirmation bar */}
+      {deleteHourConfirm && !selectionMode && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          background: '#450a0a', border: '1px solid #7f1d1d',
+          borderRadius: 'var(--radius)', padding: '8px 14px',
+        }}>
+          <i className="mdi mdi-alert-outline" style={{ color: '#f87171' }} />
+          <span style={{ color: '#fca5a5', fontSize: 'calc(var(--font-base) * 0.88)', flex: 1 }}>
+            Delete all {total.toLocaleString()} files for this hour?
+            {hourStats && ` · ${formatBytes(hourStats.total_size_bytes)}`}
+          </span>
+          {deleteHourError && <span style={{ color: '#fca5a5', fontSize: 'calc(var(--font-base) * 0.82)' }}>{deleteHourError}</span>}
+          <button className="modal-btn danger" disabled={deleteHourLoading} onClick={handleDeleteHour}>
+            {deleteHourLoading ? <i className="mdi mdi-loading mdi-spin" /> : <><i className="mdi mdi-delete-outline" /> Delete</>}
+          </button>
+          <button className="modal-btn neutral" disabled={deleteHourLoading} onClick={() => { setDeleteHourConfirm(false); setDeleteHourError(null) }}>
+            Cancel
+          </button>
+        </div>
       )}
 
       {/* Selection bar (horizontal, below chart) */}

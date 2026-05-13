@@ -148,8 +148,7 @@ function KeyboardHints({ hints }) {
   )
 }
 
-function HourSelBar({ periods, selectedMap, onSelectAll, onSelectNone, onClose, onDelete, loading, error }) {
-  const [confirm, setConfirm] = useState(false)
+function HourSelBar({ periods, selectedMap, onSelectAll, onSelectNone, onClose, onDelete, loading, error, confirmOpen, onSetConfirmOpen }) {
   const count = selectedMap.size
   const stats = [...selectedMap.values()].reduce(
     (acc, p) => ({
@@ -160,7 +159,7 @@ function HourSelBar({ periods, selectedMap, onSelectAll, onSelectNone, onClose, 
     { photos: 0, videos: 0, bytes: 0 }
   )
 
-  if (confirm) {
+  if (confirmOpen) {
     return (
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
@@ -176,7 +175,7 @@ function HourSelBar({ periods, selectedMap, onSelectAll, onSelectNone, onClose, 
         <button className="modal-btn danger" disabled={loading} onClick={onDelete} style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}>
           {loading ? <i className="mdi mdi-loading mdi-spin" /> : <><i className="mdi mdi-delete-outline" /> Delete</>}
         </button>
-        <button className="modal-btn neutral" disabled={loading} onClick={() => setConfirm(false)} style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}>
+        <button className="modal-btn neutral" disabled={loading} onClick={() => onSetConfirmOpen(false)} style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}>
           Cancel
         </button>
       </div>
@@ -205,7 +204,7 @@ function HourSelBar({ periods, selectedMap, onSelectAll, onSelectNone, onClose, 
         className="modal-btn danger-outline"
         style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}
         disabled={count === 0}
-        onClick={() => setConfirm(true)}
+        onClick={() => onSetConfirmOpen(true)}
       >
         <i className="mdi mdi-delete-outline" /> Delete selected
       </button>
@@ -231,6 +230,7 @@ export default function App() {
   const [selectedHourPeriods, setSelectedHourPeriods] = useState(new Map())
   const [hourSelLoading, setHourSelLoading] = useState(false)
   const [hourSelError, setHourSelError]   = useState(null)
+  const [hourSelConfirm, setHourSelConfirm] = useState(false)
   const [focusedPeriod, setFocusedPeriod] = useState(null)
   const restorePeriodRef = useRef(null)
 
@@ -249,6 +249,7 @@ export default function App() {
     setHourSelMode(false)
     setSelectedHourPeriods(new Map())
     setHourSelError(null)
+    setHourSelConfirm(false)
   }, [drillStack, cameraId])
 
   useEffect(() => {
@@ -375,11 +376,14 @@ export default function App() {
             return next
           })
         }
+      } else if (e.key === 'Delete' && hourSelMode && selectedHourPeriods.size > 0) {
+        e.preventDefault()
+        setHourSelConfirm(true)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedHour, periods, focusedPeriod, currentLevel, drillStack, hourSelMode])
+  }, [selectedHour, periods, focusedPeriod, currentLevel, drillStack, hourSelMode, selectedHourPeriods])
 
   function handleToggleHourPeriod(cell) {
     setSelectedHourPeriods(prev => {
@@ -400,6 +404,7 @@ export default function App() {
         await deleteByRange(cameraId, `${date}T${h}:00:00`, `${date}T${h}:59:59`)
       }
       setHourSelMode(false)
+      setHourSelConfirm(false)
       setSelectedHourPeriods(new Map())
       handleScanComplete()
     } catch (e) {
@@ -443,10 +448,12 @@ export default function App() {
                 selectedMap={selectedHourPeriods}
                 onSelectAll={() => setSelectedHourPeriods(new Map(periods.filter(p => p.total_size_bytes > 0).map(p => [p.period, p])))}
                 onSelectNone={() => setSelectedHourPeriods(new Map())}
-                onClose={() => { setHourSelMode(false); setSelectedHourPeriods(new Map()) }}
+                onClose={() => { setHourSelMode(false); setHourSelConfirm(false); setSelectedHourPeriods(new Map()) }}
                 onDelete={handleDeleteHours}
                 loading={hourSelLoading}
                 error={hourSelError}
+                confirmOpen={hourSelConfirm}
+                onSetConfirmOpen={setHourSelConfirm}
               />
             ) : (
               <div style={{ display: 'flex', gap: 'var(--gap-sm)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -506,7 +513,7 @@ export default function App() {
         selectedHour
           ? []
           : hourSelMode
-            ? [{ key: '↑ ↓ ← →', label: 'navigate' }, { key: 'Space', label: 'toggle focused' }, { key: 'Click', label: 'toggle hour' }, { key: 'Esc / Cancel', label: 'exit' }]
+            ? [{ key: '↑ ↓ ← →', label: 'navigate' }, { key: 'Space', label: 'toggle focused' }, { key: 'Click', label: 'toggle hour' }, { key: 'Del', label: 'delete selected' }, { key: 'Esc / Cancel', label: 'exit' }]
             : [
                 { key: '↑ ↓ ← →', label: 'navigate' },
                 { key: 'Enter', label: 'open' },

@@ -386,6 +386,41 @@
   transition: background 0.12s;
 }
 .hv-video-error-btn:hover { background: rgba(14, 165, 233, 0.25); }
+.hv-video-error-hint { margin-top: 12px !important; }
+
+.hv-video-cmd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  max-width: 100%;
+}
+.hv-video-cmd-text {
+  flex: 1;
+  font-family: monospace;
+  font-size: 0.82rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: text;
+}
+.hv-video-cmd-copy {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 1rem;
+  transition: background 0.12s, color 0.12s;
+}
+.hv-video-cmd-copy:hover { background: rgba(148,163,184,0.15); color: #e2e8f0; }
 
 /* ── Misc ── */
 .hv-empty {

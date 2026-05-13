@@ -609,6 +609,9 @@ def delete_confirm(req: ConfirmRequest):
         rows_by_id = {r["id"]: r for r in rows}
         ids_to_delete_from_db = []
 
+        for row in rows:
+            logger.info("   ├─ %s", row["file_path"])
+
         for file_id in req.file_ids:
             row = rows_by_id.get(file_id)
             if row is None:
