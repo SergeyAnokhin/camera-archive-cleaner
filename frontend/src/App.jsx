@@ -417,7 +417,7 @@ export default function App() {
         </div>
 
         {/* Breadcrumb */}
-        <DrilldownBreadcrumb drillStack={drillStack} currentLevel={currentLevel} onNavigate={drillUpTo} />
+        <DrilldownBreadcrumb drillStack={drillStack} currentLevel={currentLevel} onNavigate={drillUpTo} extraLabel={selectedHour?.label} />
 
         {/* Error banner */}
         {error && (

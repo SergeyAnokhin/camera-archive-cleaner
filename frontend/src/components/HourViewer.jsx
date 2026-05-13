@@ -40,8 +40,8 @@ function VideoModal({ file, onClose }) {
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape' || e.key === 'Backspace') { e.stopImmediatePropagation(); onClose() } }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose])
 
   function openExternal() { window.open(mediaUrl, '_blank') }
@@ -109,8 +109,8 @@ function PhotoCard({ file, hoverZoom, viewMode, pagePhotoIds, diffThreshold, sel
     function onKey(e) {
       if (e.key === 'Escape' || e.key === 'Backspace') { e.stopImmediatePropagation(); setFullscreen(false) }
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [fullscreen])
 
   const src = viewMode === 'motion_diff' && pagePhotoIds.length > 0
