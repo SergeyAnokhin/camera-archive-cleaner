@@ -9,6 +9,7 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-8s  %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )
+logger = logging.getLogger("api")
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,7 +55,9 @@ def startup():
 @app.get("/cameras", summary="List all configured cameras")
 def list_cameras():
     cameras = load_cameras()
-    return [{"id": c.id, "name": c.name, "path_snapshots": c.path_snapshots, "path_videos": c.path_videos} for c in cameras]
+    result = [{"id": c.id, "name": c.name, "path_snapshots": c.path_snapshots, "path_videos": c.path_videos} for c in cameras]
+    logger.info("Список камер → %d камер: %s", len(result), [c["id"] for c in result])
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -80,6 +83,7 @@ def scan(
         )
 
     targets = [cameras_by_id[camera_id]] if camera_id else cameras
+    logger.info("Сканирование: %s", camera_id or f"все камеры ({len(targets)} шт.)")
 
     start = time.monotonic()
     total_files = 0
@@ -87,10 +91,12 @@ def scan(
         for camera in targets:
             total_files += scan_camera(conn, camera)
 
+    duration = round(time.monotonic() - start, 2)
+    logger.info("Сканирование завершено → %d файлов за %.1f с", total_files, duration)
     return {
         "scanned_cameras": len(targets),
         "total_files_found": total_files,
-        "duration_seconds": round(time.monotonic() - start, 2),
+        "duration_seconds": duration,
     }
 
 
@@ -113,10 +119,15 @@ def stats(
     dt_from = date_from.isoformat() if date_from else None
     dt_to = date_to.isoformat() if date_to else None
 
+    cam_label = camera_id or "все"
+    logger.info("Статистика [%s] камера=%s %s", group_by, cam_label, _fmt_range(dt_from, dt_to))
+
     with get_connection() as conn:
         if group_by == "total":
             row = get_stats_total(conn, camera_id, dt_from, dt_to)
-            return _row_to_dict(row)
+            result = _row_to_dict(row)
+            logger.info("Статистика итог → фото=%d видео=%d размер=%.2f ГБ", result["photo_count"], result["video_count"], result["total_size_gb"])
+            return result
 
         if group_by == "camera":
             rows = get_stats_by_camera(conn, dt_from, dt_to)
@@ -129,15 +140,18 @@ def stats(
                 for r in rows
             ]
             totals_row = get_stats_total(conn, None, dt_from, dt_to)
+            logger.info("Статистика по камерам → %d камер", len(items))
             return {"cameras": items, "totals": _row_to_dict(totals_row)}
 
         rows = get_stats_grouped(conn, group_by, camera_id, dt_from, dt_to)
+        periods = [{"period": r["period"], **_row_to_dict(r)} for r in rows]
+        logger.info("Статистика по %s → %d периодов", group_by, len(periods))
         return {
             "group_by": group_by,
             "camera_id": camera_id,
             "date_from": date_from,
             "date_to": date_to,
-            "periods": [{"period": r["period"], **_row_to_dict(r)} for r in rows],
+            "periods": periods,
         }
 
 
@@ -155,6 +169,7 @@ def get_files(
 ):
     dt_from = date_from.isoformat() if date_from else None
     dt_to = date_to.isoformat() if date_to else None
+    logger.info("Файлы стр.%d (по %d) камера=%s %s", page, page_size, camera_id or "все", _fmt_range(dt_from, dt_to))
     with get_connection() as conn:
         rows, total = get_files_paginated(conn, camera_id, dt_from, dt_to, page, page_size)
         files = [
@@ -167,6 +182,7 @@ def get_files(
             }
             for r in rows
         ]
+    logger.info("Файлы → всего %d, показано %d на стр.%d", total, len(files), page)
     return {"files": files, "total": total, "page": page, "page_size": page_size}
 
 
@@ -260,6 +276,7 @@ def distribution(
 ):
     dt_from = date_from.isoformat() if date_from else None
     dt_to = date_to.isoformat() if date_to else None
+    logger.info("Распределение камера=%s %s", camera_id or "все", _fmt_range(dt_from, dt_to))
     with get_connection() as conn:
         rows = get_hour_distribution(conn, camera_id, dt_from, dt_to)
     by_bucket = {r["bucket"]: r for r in rows}
@@ -276,6 +293,9 @@ def distribution(
         }
         for i in range(60)
     ]
+    non_zero = sum(1 for b in buckets if b["total_count"] > 0)
+    total_files = sum(b["total_count"] for b in buckets)
+    logger.info("Распределение → %d файлов в %d ненулевых минутах из 60", total_files, non_zero)
     return {"buckets": buckets}
 
 
@@ -294,6 +314,7 @@ def get_previews(
     dt_to = date_to.isoformat() if date_to else None
     with get_connection() as conn:
         file_ids = get_sampled_photo_ids(conn, camera_id, dt_from, dt_to, count)
+    logger.info("Превью камера=%s %s → %d/%d ID", camera_id or "все", _fmt_range(dt_from, dt_to), len(file_ids), count)
     return {"file_ids": file_ids}
 
 
@@ -312,6 +333,7 @@ class ConfirmRequest(BaseModel):
 def delete_preview(req: PreviewRequest):
     if not req.file_ids:
         raise HTTPException(status_code=400, detail="file_ids cannot be empty")
+    logger.info("Превью удаления: %d файлов", len(req.file_ids))
 
     with get_connection() as conn:
         placeholders = ",".join("?" * len(req.file_ids))
@@ -360,6 +382,7 @@ def delete_preview(req: PreviewRequest):
                     })
                     seen_ids.add(vr["id"])
 
+    logger.info("Превью удаления → выбрано %d, связанных видео %d", len(selected), len(related_videos))
     return {"selected": selected, "related_videos": related_videos}
 
 
@@ -367,6 +390,7 @@ def delete_preview(req: PreviewRequest):
 def delete_confirm(req: ConfirmRequest):
     if not req.file_ids:
         raise HTTPException(status_code=400, detail="file_ids cannot be empty")
+    logger.info("Удаление: %d файлов", len(req.file_ids))
 
     deleted = []
     failed = []
@@ -415,6 +439,7 @@ def delete_confirm(req: ConfirmRequest):
             db_ph = ",".join("?" * len(ids_to_delete_from_db))
             conn.execute(f"DELETE FROM files WHERE id IN ({db_ph})", ids_to_delete_from_db)
 
+    logger.info("Удаление → удалено %d, ошибок %d", len(deleted), len(failed))
     return {"deleted": deleted, "failed": failed}
 
 
@@ -426,6 +451,7 @@ class RangeDeleteRequest(BaseModel):
 
 @app.post("/delete/by_range", summary="Delete all files in a date range")
 def delete_by_range(req: RangeDeleteRequest):
+    logger.info("Удаление по диапазону: камера=%s %s", req.camera_id or "все", _fmt_range(req.date_from, req.date_to))
     deleted_count = 0
     failed_count = 0
     with get_connection() as conn:
@@ -463,6 +489,7 @@ def delete_by_range(req: RangeDeleteRequest):
             ph = ",".join("?" * len(ids_ok))
             conn.execute(f"DELETE FROM files WHERE id IN ({ph})", ids_ok)
 
+    logger.info("Удаление по диапазону → удалено %d, ошибок %d", deleted_count, failed_count)
     return {"deleted_count": deleted_count, "failed_count": failed_count}
 
 
@@ -472,13 +499,16 @@ def delete_by_range(req: RangeDeleteRequest):
 
 @app.delete("/database", summary="Delete all scanned file records")
 def clear_database():
+    logger.info("Очистка базы данных (все записи файлов)")
     with get_connection() as conn:
         conn.execute("DELETE FROM files")
+    logger.info("База данных очищена")
     return {"deleted": True}
 
 
 @app.delete("/thumbnails", summary="Delete all cached thumbnail files")
 def clear_thumbnails():
+    logger.info("Очистка кэша миниатюр")
     deleted_files = 0
     if THUMB_DIR.exists():
         for f in THUMB_DIR.iterdir():
@@ -487,18 +517,30 @@ def clear_thumbnails():
                 deleted_files += 1
     with get_connection() as conn:
         deleted_rows = delete_all_thumbnails(conn)
+    logger.info("Кэш миниатюр очищен → %d файлов, %d записей в БД", deleted_files, deleted_rows)
     return {"deleted_files": deleted_files, "deleted_rows": deleted_rows}
 
 
 @app.delete("/diff_thumbnails", summary="Delete all cached diff thumbnail files")
 def clear_diff_thumbnails():
+    logger.info("Очистка кэша diff-миниатюр")
     deleted_files = 0
     if DIFF_THUMB_DIR.exists():
         for f in DIFF_THUMB_DIR.iterdir():
             if f.is_file():
                 f.unlink()
                 deleted_files += 1
+    logger.info("Кэш diff-миниатюр очищен → %d файлов", deleted_files)
     return {"deleted_files": deleted_files}
+
+
+def _fmt_range(dt_from, dt_to) -> str:
+    parts = []
+    if dt_from:
+        parts.append(f"с {dt_from[:16]}")
+    if dt_to:
+        parts.append(f"по {dt_to[:16]}")
+    return " ".join(parts) if parts else "всё время"
 
 
 def _row_to_dict(row) -> dict:

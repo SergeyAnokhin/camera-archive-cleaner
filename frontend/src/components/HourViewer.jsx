@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { getFiles, getDistribution, getStatsTotal, getThumbnailUrl, getDiffThumbnailUrl, getMediaUrl, previewDelete, confirmDelete } from '../api.js'
+import { getFiles, getDistribution, getStatsTotal, getMediaUrl, previewDelete, confirmDelete } from '../api.js'
 import DeleteConfirmModal from './DeleteConfirmModal.jsx'
+import { VIEW_MODES, DEFAULT_VIEW_MODE_KEY } from './viewModes/index.js'
 import './HourViewer.css'
 
 const PAGE_SIZE_KEY    = 'hour_page_size'
@@ -94,7 +95,7 @@ function VideoModal({ file, onClose }) {
 // Cards
 // ---------------------------------------------------------------------------
 
-function PhotoCard({ file, hoverZoom, viewMode, pagePhotoIds, diffThreshold, selectionMode, selected, onToggle, index, isFocused }) {
+function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, diffThreshold, selectionMode, selected, onToggle, index, isFocused }) {
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
@@ -113,9 +114,7 @@ function PhotoCard({ file, hoverZoom, viewMode, pagePhotoIds, diffThreshold, sel
     return () => window.removeEventListener('keydown', onKey, true)
   }, [fullscreen])
 
-  const src = viewMode === 'motion_diff' && pagePhotoIds.length > 0
-    ? getDiffThumbnailUrl(file.id, pagePhotoIds, diffThreshold)
-    : getThumbnailUrl(file.id)
+  const src = mode.getImageUrl(file, { pagePhotoIds, diffThreshold })
 
   useEffect(() => {
     setLoaded(false)
@@ -362,7 +361,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [hoverZoom, setHoverZoom]       = useState(getHoverZoom)
   const [thumbWidth, setThumbWidth]     = useState(getThumbWidth)
   const [diffThreshold, setDiffThreshold] = useState(getDiffThreshold)
-  const [viewMode, setViewMode]         = useState(() => localStorage.getItem(VIEW_MODE_KEY) || 'normal')
+  const [viewMode, setViewMode]         = useState(() => localStorage.getItem(VIEW_MODE_KEY) || DEFAULT_VIEW_MODE_KEY)
   const [distribution, setDistribution] = useState([])
   const [hourStats, setHourStats]       = useState(null)
 
@@ -502,7 +501,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       } else if (e.key === 'Insert' || e.key === 'm' || e.key === 'M') {
         e.preventDefault()
         setViewMode(prev => {
-          const next = prev === 'normal' ? 'motion_diff' : 'normal'
+          const idx = VIEW_MODES.findIndex(m => m.key === prev)
+          const next = VIEW_MODES[(idx + 1) % VIEW_MODES.length].key
           localStorage.setItem(VIEW_MODE_KEY, next)
           return next
         })
@@ -694,8 +694,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         )}
 
         <select className="hv-view-mode-select" value={viewMode} onChange={handleViewModeChange}>
-          <option value="normal">Normal</option>
-          <option value="motion_diff">Motion diff</option>
+          {VIEW_MODES.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
         </select>
 
         <button
@@ -764,7 +763,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
                   file={file}
                   index={index}
                   hoverZoom={hoverZoom}
-                  viewMode={viewMode}
+                  mode={VIEW_MODES.find(m => m.key === viewMode) ?? VIEW_MODES[0]}
                   pagePhotoIds={pagePhotoIds}
                   diffThreshold={diffThreshold}
                   selectionMode={selectionMode}
