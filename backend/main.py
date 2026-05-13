@@ -1,14 +1,91 @@
 import logging
+import re
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)-8s  %(name)s: %(message)s",
-    datefmt="%H:%M:%S",
+# ── ANSI codes ────────────────────────────────────────────────────────────────
+_R   = "\033[0m"
+_DIM = "\033[2m"
+_B   = "\033[1m"
+_CYAN          = "\033[36m"
+_BRIGHT_CYAN   = "\033[96m"
+_GREEN         = "\033[32m"
+_YELLOW        = "\033[33m"
+_BRIGHT_YELLOW = "\033[93m"
+_RED           = "\033[31m"
+_BRIGHT_BLUE   = "\033[94m"
+_GRAY          = "\033[90m"
+
+# Уровень TRACE — ниже DEBUG; используется для thumbnail-запросов
+TRACE = 5
+logging.addLevelName(TRACE, "TRACE")
+
+_HIGHLIGHT_RE = re.compile(
+    r"(камера=)(\S+)"         # camera=<name>
+    r"|\b(\d+(?:\.\d+)?)\b"  # numbers
 )
+_IP_RE = re.compile(r'^\d+\.\d+\.\d+\.\d+:\d+ - ')      # "127.0.0.1:12345 - "
+_THUMB_RE = re.compile(r'"(?:GET|HEAD) /(?:diff_)?thumbnail/')
+
+
+def _colorize_msg(msg: str) -> str:
+    def _sub(m: re.Match) -> str:
+        if m.group(1):
+            return f"{m.group(1)}{_BRIGHT_CYAN}{m.group(2)}{_R}"
+        return f"{_BRIGHT_YELLOW}{m.group(3)}{_R}"
+    return _HIGHLIGHT_RE.sub(_sub, msg)
+
+
+class _ColorFmt(logging.Formatter):
+    _LEVEL_STYLE = {
+        TRACE:            _DIM + _GRAY,
+        logging.DEBUG:    _DIM + _GRAY,
+        logging.INFO:     _GREEN,
+        logging.WARNING:  _YELLOW,
+        logging.ERROR:    _RED,
+        logging.CRITICAL: _B + _RED,
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        ts = self.formatTime(record, "%H:%M:%S")
+        lc = self._LEVEL_STYLE.get(record.levelno, "")
+        lv = f"{record.levelname:<8}"
+        msg = record.getMessage()
+
+        if record.name == "api":
+            msg = _colorize_msg(msg)
+            name_part = f"{_BRIGHT_BLUE}{_B}api{_R}"
+        elif record.name == "uvicorn.access":
+            msg = _IP_RE.sub("", msg)   # убираем IP
+            msg = f"{_DIM}{msg}{_R}"
+            name_part = f"{_DIM}http{_R}"
+        else:
+            name_part = f"{_DIM}{record.name}{_R}"
+            msg = f"{_DIM}{msg}{_R}"
+
+        return f"{_CYAN}{ts}{_R}  {lc}{lv}{_R}  {name_part}: {msg}"
+
+
+class _AccessFilter(logging.Filter):
+    """thumbnail → TRACE (скрыт при root=DEBUG); остальное → DEBUG."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        if _THUMB_RE.search(record.getMessage()):
+            record.levelno, record.levelname = TRACE, "TRACE"
+        else:
+            record.levelno, record.levelname = logging.DEBUG, "DEBUG"
+        return True
+
+
+_handler = logging.StreamHandler()
+_handler.setFormatter(_ColorFmt())
+_handler.setLevel(TRACE)  # хендлер принимает всё; уровень фильтрует root
+
+logging.root.handlers = [_handler]
+# ↓ главный рычаг: DEBUG — видны http-запросы; INFO — только наши логи
+logging.root.setLevel(logging.DEBUG)
+
 logger = logging.getLogger("api")
 
 from fastapi import FastAPI, HTTPException, Query
@@ -46,6 +123,12 @@ app.add_middleware(
 @app.on_event("startup")
 def startup():
     init_db()
+    # Убираем uvicorn-хендлеры (у них свой формат) — пускаем через наш root
+    for _n in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+        _lg = logging.getLogger(_n)
+        _lg.handlers.clear()
+        _lg.propagate = True
+    logging.getLogger("uvicorn.access").addFilter(_AccessFilter())
 
 
 # ---------------------------------------------------------------------------
@@ -56,7 +139,7 @@ def startup():
 def list_cameras():
     cameras = load_cameras()
     result = [{"id": c.id, "name": c.name, "path_snapshots": c.path_snapshots, "path_videos": c.path_videos} for c in cameras]
-    logger.info("Список камер → %d камер: %s", len(result), [c["id"] for c in result])
+    logger.info("📷 Список камер → %d камер: %s", len(result), [c["id"] for c in result])
     return result
 
 
@@ -83,7 +166,7 @@ def scan(
         )
 
     targets = [cameras_by_id[camera_id]] if camera_id else cameras
-    logger.info("Сканирование: %s", camera_id or f"все камеры ({len(targets)} шт.)")
+    logger.info("🔍 Сканирование: %s", camera_id or f"все камеры ({len(targets)} шт.)")
 
     start = time.monotonic()
     total_files = 0
@@ -92,7 +175,7 @@ def scan(
             total_files += scan_camera(conn, camera)
 
     duration = round(time.monotonic() - start, 2)
-    logger.info("Сканирование завершено → %d файлов за %.1f с", total_files, duration)
+    logger.info("✅ Сканирование завершено → %d файлов за %.1f с", total_files, duration)
     return {
         "scanned_cameras": len(targets),
         "total_files_found": total_files,
@@ -120,13 +203,13 @@ def stats(
     dt_to = date_to.isoformat() if date_to else None
 
     cam_label = camera_id or "все"
-    logger.info("Статистика [%s] камера=%s %s", group_by, cam_label, _fmt_range(dt_from, dt_to))
+    logger.info("📊 Статистика [%s] камера=%s %s", group_by, cam_label, _fmt_range(dt_from, dt_to))
 
     with get_connection() as conn:
         if group_by == "total":
             row = get_stats_total(conn, camera_id, dt_from, dt_to)
             result = _row_to_dict(row)
-            logger.info("Статистика итог → фото=%d видео=%d размер=%.2f ГБ", result["photo_count"], result["video_count"], result["total_size_gb"])
+            logger.info("   └─ итог → фото=%d видео=%d размер=%.2f ГБ", result["photo_count"], result["video_count"], result["total_size_gb"])
             return result
 
         if group_by == "camera":
@@ -140,12 +223,12 @@ def stats(
                 for r in rows
             ]
             totals_row = get_stats_total(conn, None, dt_from, dt_to)
-            logger.info("Статистика по камерам → %d камер", len(items))
+            logger.info("   └─ по камерам → %d камер", len(items))
             return {"cameras": items, "totals": _row_to_dict(totals_row)}
 
         rows = get_stats_grouped(conn, group_by, camera_id, dt_from, dt_to)
         periods = [{"period": r["period"], **_row_to_dict(r)} for r in rows]
-        logger.info("Статистика по %s → %d периодов", group_by, len(periods))
+        logger.info("   └─ по %s → %d периодов", group_by, len(periods))
         return {
             "group_by": group_by,
             "camera_id": camera_id,
@@ -169,7 +252,7 @@ def get_files(
 ):
     dt_from = date_from.isoformat() if date_from else None
     dt_to = date_to.isoformat() if date_to else None
-    logger.info("Файлы стр.%d (по %d) камера=%s %s", page, page_size, camera_id or "все", _fmt_range(dt_from, dt_to))
+    logger.info("📁 Файлы стр.%d (по %d) камера=%s %s", page, page_size, camera_id or "все", _fmt_range(dt_from, dt_to))
     with get_connection() as conn:
         rows, total = get_files_paginated(conn, camera_id, dt_from, dt_to, page, page_size)
         files = [
@@ -182,7 +265,7 @@ def get_files(
             }
             for r in rows
         ]
-    logger.info("Файлы → всего %d, показано %d на стр.%d", total, len(files), page)
+    logger.info("   └─ всего %d, показано %d на стр.%d", total, len(files), page)
     return {"files": files, "total": total, "page": page, "page_size": page_size}
 
 
@@ -276,7 +359,7 @@ def distribution(
 ):
     dt_from = date_from.isoformat() if date_from else None
     dt_to = date_to.isoformat() if date_to else None
-    logger.info("Распределение камера=%s %s", camera_id or "все", _fmt_range(dt_from, dt_to))
+    logger.info("📈 Распределение камера=%s %s", camera_id or "все", _fmt_range(dt_from, dt_to))
     with get_connection() as conn:
         rows = get_hour_distribution(conn, camera_id, dt_from, dt_to)
     by_bucket = {r["bucket"]: r for r in rows}
@@ -295,7 +378,7 @@ def distribution(
     ]
     non_zero = sum(1 for b in buckets if b["total_count"] > 0)
     total_files = sum(b["total_count"] for b in buckets)
-    logger.info("Распределение → %d файлов в %d ненулевых минутах из 60", total_files, non_zero)
+    logger.info("   └─ %d файлов в %d ненулевых минутах из 60", total_files, non_zero)
     return {"buckets": buckets}
 
 
@@ -314,7 +397,7 @@ def get_previews(
     dt_to = date_to.isoformat() if date_to else None
     with get_connection() as conn:
         file_ids = get_sampled_photo_ids(conn, camera_id, dt_from, dt_to, count)
-    logger.info("Превью камера=%s %s → %d/%d ID", camera_id or "все", _fmt_range(dt_from, dt_to), len(file_ids), count)
+    logger.info("🖼️  Превью камера=%s %s → %d/%d ID", camera_id or "все", _fmt_range(dt_from, dt_to), len(file_ids), count)
     return {"file_ids": file_ids}
 
 
@@ -333,7 +416,7 @@ class ConfirmRequest(BaseModel):
 def delete_preview(req: PreviewRequest):
     if not req.file_ids:
         raise HTTPException(status_code=400, detail="file_ids cannot be empty")
-    logger.info("Превью удаления: %d файлов", len(req.file_ids))
+    logger.info("🗑️  Превью удаления: %d файлов", len(req.file_ids))
 
     with get_connection() as conn:
         placeholders = ",".join("?" * len(req.file_ids))
@@ -382,7 +465,7 @@ def delete_preview(req: PreviewRequest):
                     })
                     seen_ids.add(vr["id"])
 
-    logger.info("Превью удаления → выбрано %d, связанных видео %d", len(selected), len(related_videos))
+    logger.info("   └─ выбрано %d, связанных видео %d", len(selected), len(related_videos))
     return {"selected": selected, "related_videos": related_videos}
 
 
@@ -390,7 +473,7 @@ def delete_preview(req: PreviewRequest):
 def delete_confirm(req: ConfirmRequest):
     if not req.file_ids:
         raise HTTPException(status_code=400, detail="file_ids cannot be empty")
-    logger.info("Удаление: %d файлов", len(req.file_ids))
+    logger.info("❌ Удаление: %d файлов", len(req.file_ids))
 
     deleted = []
     failed = []
@@ -439,7 +522,7 @@ def delete_confirm(req: ConfirmRequest):
             db_ph = ",".join("?" * len(ids_to_delete_from_db))
             conn.execute(f"DELETE FROM files WHERE id IN ({db_ph})", ids_to_delete_from_db)
 
-    logger.info("Удаление → удалено %d, ошибок %d", len(deleted), len(failed))
+    logger.info("   └─ удалено %d, ошибок %d", len(deleted), len(failed))
     return {"deleted": deleted, "failed": failed}
 
 
@@ -451,7 +534,7 @@ class RangeDeleteRequest(BaseModel):
 
 @app.post("/delete/by_range", summary="Delete all files in a date range")
 def delete_by_range(req: RangeDeleteRequest):
-    logger.info("Удаление по диапазону: камера=%s %s", req.camera_id or "все", _fmt_range(req.date_from, req.date_to))
+    logger.info("❌ Удаление диапазона: камера=%s %s", req.camera_id or "все", _fmt_range(req.date_from, req.date_to))
     deleted_count = 0
     failed_count = 0
     with get_connection() as conn:
@@ -489,7 +572,7 @@ def delete_by_range(req: RangeDeleteRequest):
             ph = ",".join("?" * len(ids_ok))
             conn.execute(f"DELETE FROM files WHERE id IN ({ph})", ids_ok)
 
-    logger.info("Удаление по диапазону → удалено %d, ошибок %d", deleted_count, failed_count)
+    logger.info("   └─ удалено %d, ошибок %d", deleted_count, failed_count)
     return {"deleted_count": deleted_count, "failed_count": failed_count}
 
 
@@ -499,16 +582,16 @@ def delete_by_range(req: RangeDeleteRequest):
 
 @app.delete("/database", summary="Delete all scanned file records")
 def clear_database():
-    logger.info("Очистка базы данных (все записи файлов)")
+    logger.info("🧹 Очистка базы данных (все записи файлов)")
     with get_connection() as conn:
         conn.execute("DELETE FROM files")
-    logger.info("База данных очищена")
+    logger.info("   └─ база данных очищена")
     return {"deleted": True}
 
 
 @app.delete("/thumbnails", summary="Delete all cached thumbnail files")
 def clear_thumbnails():
-    logger.info("Очистка кэша миниатюр")
+    logger.info("🧹 Очистка кэша миниатюр")
     deleted_files = 0
     if THUMB_DIR.exists():
         for f in THUMB_DIR.iterdir():
@@ -517,20 +600,20 @@ def clear_thumbnails():
                 deleted_files += 1
     with get_connection() as conn:
         deleted_rows = delete_all_thumbnails(conn)
-    logger.info("Кэш миниатюр очищен → %d файлов, %d записей в БД", deleted_files, deleted_rows)
+    logger.info("   └─ миниатюры очищены → %d файлов, %d записей в БД", deleted_files, deleted_rows)
     return {"deleted_files": deleted_files, "deleted_rows": deleted_rows}
 
 
 @app.delete("/diff_thumbnails", summary="Delete all cached diff thumbnail files")
 def clear_diff_thumbnails():
-    logger.info("Очистка кэша diff-миниатюр")
+    logger.info("🧹 Очистка кэша diff-миниатюр")
     deleted_files = 0
     if DIFF_THUMB_DIR.exists():
         for f in DIFF_THUMB_DIR.iterdir():
             if f.is_file():
                 f.unlink()
                 deleted_files += 1
-    logger.info("Кэш diff-миниатюр очищен → %d файлов", deleted_files)
+    logger.info("   └─ diff-миниатюры очищены → %d файлов", deleted_files)
     return {"deleted_files": deleted_files}
 
 

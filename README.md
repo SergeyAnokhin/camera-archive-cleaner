@@ -38,6 +38,14 @@ Swagger UI at **`http://localhost:8000/docs`**
 
 ---
 
+## Documentation
+
+| File | Description |
+|------|-------------|
+| [`docs/logging.md`](docs/logging.md) | Logging levels, format, colors, how to configure |
+
+---
+
 ## Stage 1 — Backend Foundation
 
 | File | Purpose |
