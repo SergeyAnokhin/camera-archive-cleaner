@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getCameras, getStatsTotal, getStatsGrouped, deleteByRange } from './api.js'
 import Header from './components/Header.jsx'
 import CameraSelector from './components/CameraSelector.jsx'
@@ -232,6 +232,7 @@ export default function App() {
   const [hourSelLoading, setHourSelLoading] = useState(false)
   const [hourSelError, setHourSelError]   = useState(null)
   const [focusedPeriod, setFocusedPeriod] = useState(null)
+  const restorePeriodRef = useRef(null)
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
 
@@ -294,6 +295,7 @@ export default function App() {
       const dayContext = drillStack[drillStack.length - 1]
       const date = dayContext?.dateFrom?.substring(0, 10) ?? cell.period
       const h = cell.period.padStart(2, '0')
+      restorePeriodRef.current = cell.period
       setSelectedHour({
         dateFrom: `${date}T${h}:00:00`,
         dateTo:   `${date}T${h}:59:59`,
@@ -316,11 +318,16 @@ export default function App() {
 
   const handleScanComplete = useCallback(() => setRefreshKey(k => k + 1), [])
 
-  // Auto-focus first non-empty cell when heatmap data loads
+  // Auto-focus: restore cursor to where we drilled from, or fall back to first non-empty cell
   useEffect(() => {
-    setFocusedPeriod(
-      periods.find(p => p.total_size_bytes > 0)?.period ?? periods[0]?.period ?? null
-    )
+    if (restorePeriodRef.current !== null) {
+      setFocusedPeriod(restorePeriodRef.current)
+      restorePeriodRef.current = null
+    } else {
+      setFocusedPeriod(
+        periods.find(p => p.total_size_bytes > 0)?.period ?? periods[0]?.period ?? null
+      )
+    }
   }, [periods])
 
   // Heatmap keyboard navigation (only active when HourViewer is not open)
@@ -354,6 +361,7 @@ export default function App() {
           setHourSelMode(false)
           setSelectedHourPeriods(new Map())
         } else if (drillStack.length > 0) {
+          restorePeriodRef.current = drillStack[drillStack.length - 1].label
           setDrillStack(prev => prev.slice(0, -1))
         }
       } else if (e.key === ' ' && currentLevel === 'hour') {

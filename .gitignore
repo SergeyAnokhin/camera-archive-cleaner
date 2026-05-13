@@ -148,3 +148,5 @@ vite.config.ts.timestamp-*
 /backend/thumbnails_cache/*
 /backend/diff_thumbnails_cache/*
 /backend/diff_zoom_thumbnails_cache/*
+/backend/erosion_thumbnails_cache/*
+/backend/motion_thumbnails_cache/*
