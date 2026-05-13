@@ -677,6 +677,31 @@ class RangeDeleteRequest(BaseModel):
     date_to: str
 
 
+@app.post("/delete/preview_range", summary="Preview files in a date range for deletion")
+def delete_preview_range(req: RangeDeleteRequest):
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, file_type, timestamp, file_path
+            FROM files
+            WHERE (? IS NULL OR camera_id = ?)
+              AND timestamp >= ?
+              AND timestamp <= ?
+            ORDER BY timestamp
+            """,
+            [req.camera_id, req.camera_id, req.date_from, req.date_to],
+        ).fetchall()
+    files = [
+        {"id": r["id"], "file_type": r["file_type"], "timestamp": r["timestamp"], "file_path": r["file_path"]}
+        for r in rows
+    ]
+    logger.info(
+        "🗑️  Превью диапазона: камера=%s %s → %d файлов",
+        req.camera_id or "все", _fmt_range(req.date_from, req.date_to), len(files),
+    )
+    return {"selected": files, "related_videos": []}
+
+
 @app.post("/delete/by_range", summary="Delete all files in a date range")
 def delete_by_range(req: RangeDeleteRequest):
     logger.info("❌ Удаление диапазона: камера=%s %s", req.camera_id or "все", _fmt_range(req.date_from, req.date_to))

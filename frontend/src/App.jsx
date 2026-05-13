@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getCameras, getStatsTotal, getStatsGrouped, deleteByRange } from './api.js'
+import { getCameras, getStatsTotal, getStatsGrouped, previewDeleteRange, confirmDelete, deleteByRange } from './api.js'
+import DeleteConfirmModal from './components/DeleteConfirmModal.jsx'
 import Header from './components/Header.jsx'
 import CameraSelector from './components/CameraSelector.jsx'
 import DrilldownBreadcrumb from './components/DrilldownBreadcrumb.jsx'
@@ -60,66 +61,19 @@ function formatBytes(b) {
   return `${(b / 1e3).toFixed(0)} KB`
 }
 
-function DayDeleteBar({ dayEntry, cameraId, periods, onDeleted, onDrillBack }) {
-  const [open, setOpen]       = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState(null)
-
-  const totals = periods.reduce(
-    (acc, p) => ({
-      photos: acc.photos + (p.photo_count || 0),
-      videos: acc.videos + (p.video_count || 0),
-      bytes:  acc.bytes  + (p.total_size_bytes || 0),
-    }),
-    { photos: 0, videos: 0, bytes: 0 }
-  )
-
-  async function handleConfirm() {
-    setLoading(true)
-    setError(null)
-    try {
-      await deleteByRange(cameraId, dayEntry.dateFrom, dayEntry.dateTo)
-      onDeleted()
-      onDrillBack()
-    } catch (e) {
-      setError(e.message)
-      setLoading(false)
-    }
-  }
-
-  if (!open) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button
-          className="modal-btn danger-outline"
-          style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}
-          onClick={() => setOpen(true)}
-        >
-          <i className="mdi mdi-delete-sweep-outline" /> Delete day {dayEntry.label}
-        </button>
-      </div>
-    )
-  }
-
+function DayDeleteBar({ label, onPreview, loading }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-      background: '#450a0a', border: '1px solid #7f1d1d',
-      borderRadius: 'var(--radius)', padding: '8px 14px',
-    }}>
-      <i className="mdi mdi-alert-outline" style={{ color: '#f87171' }} />
-      <span style={{ color: '#fca5a5', fontSize: 'calc(var(--font-base) * 0.88)', flex: 1 }}>
-        Delete all files for <strong>{dayEntry.label}</strong>?
-        &ensp;{totals.photos.toLocaleString()} photos · {totals.videos.toLocaleString()} videos · {formatBytes(totals.bytes)}
-      </span>
-      {error && <span style={{ color: '#fca5a5', fontSize: 'calc(var(--font-base) * 0.82)' }}>{error}</span>}
-      <button className="modal-btn danger" disabled={loading} onClick={handleConfirm} style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}>
-        {loading ? <i className="mdi mdi-loading mdi-spin" /> : <><i className="mdi mdi-delete-outline" /> Delete</>}
-      </button>
-      <button className="modal-btn neutral" disabled={loading} onClick={() => { setOpen(false); setError(null) }} style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}>
-        Cancel
-      </button>
-    </div>
+    <button
+      className="modal-btn danger-outline"
+      style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}
+      onClick={onPreview}
+      disabled={loading}
+    >
+      {loading
+        ? <i className="mdi mdi-loading mdi-spin" />
+        : <><i className="mdi mdi-delete-sweep-outline" /> Delete day {label}</>
+      }
+    </button>
   )
 }
 
@@ -231,6 +185,11 @@ export default function App() {
   const [hourSelLoading, setHourSelLoading] = useState(false)
   const [hourSelError, setHourSelError]   = useState(null)
   const [hourSelConfirm, setHourSelConfirm] = useState(false)
+  const [rangeDeletePreview, setRangeDeletePreview]           = useState(null)
+  const [rangeDeletePreviewLoading, setRangeDeletePreviewLoading] = useState(false)
+  const [rangeDeleteDeleteLoading, setRangeDeleteDeleteLoading]   = useState(false)
+  const [rangeDeleteError, setRangeDeleteError]               = useState(null)
+  const rangeDeleteDrillBack = useRef(null)
   const [focusedPeriod, setFocusedPeriod] = useState(null)
   const restorePeriodRef = useRef(null)
 
@@ -355,8 +314,7 @@ export default function App() {
         e.preventDefault()
         const cell = periods[idx]
         if (cell) drillInto(cell)
-      } else if (e.key === 'Escape' || e.key === 'Backspace') {
-        if (e.key === 'Backspace' && (tag === 'INPUT' || tag === 'TEXTAREA')) return
+      } else if (e.key === 'Escape') {
         e.preventDefault()
         if (hourSelMode) {
           setHourSelMode(false)
@@ -364,6 +322,12 @@ export default function App() {
         } else if (drillStack.length > 0) {
           restorePeriodRef.current = drillStack[drillStack.length - 1].label
           setDrillStack(prev => prev.slice(0, -1))
+        }
+      } else if (e.key === 'Backspace' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+        if (currentLevel === 'hour' && drillStack.length > 0 && !hourSelMode) {
+          e.preventDefault()
+          const dayEntry = drillStack[drillStack.length - 1]
+          handleRangeDeletePreview(dayEntry.dateFrom, dayEntry.dateTo, drillStack.length - 2)
         }
       } else if (e.key === ' ' && currentLevel === 'hour') {
         e.preventDefault()
@@ -414,6 +378,42 @@ export default function App() {
     }
   }
 
+  async function handleRangeDeletePreview(dateFrom, dateTo, afterConfirmDrillTo) {
+    setRangeDeletePreviewLoading(true)
+    setRangeDeleteError(null)
+    rangeDeleteDrillBack.current = afterConfirmDrillTo
+    try {
+      const data = await previewDeleteRange(cameraId, dateFrom, dateTo)
+      setRangeDeletePreview(data)
+    } catch (e) {
+      setRangeDeleteError(e.message)
+    } finally {
+      setRangeDeletePreviewLoading(false)
+    }
+  }
+
+  async function handleRangeDeleteConfirm() {
+    const allIds = [
+      ...rangeDeletePreview.selected.map(f => f.id),
+      ...rangeDeletePreview.related_videos.map(f => f.id),
+    ]
+    setRangeDeleteDeleteLoading(true)
+    setRangeDeleteError(null)
+    try {
+      await confirmDelete(allIds)
+      setRangeDeletePreview(null)
+      handleScanComplete()
+      if (rangeDeleteDrillBack.current !== null) {
+        drillUpTo(rangeDeleteDrillBack.current)
+        rangeDeleteDrillBack.current = null
+      }
+    } catch (e) {
+      setRangeDeleteError(e.message)
+    } finally {
+      setRangeDeleteDeleteLoading(false)
+    }
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Header totals={totals} />
@@ -458,11 +458,13 @@ export default function App() {
             ) : (
               <div style={{ display: 'flex', gap: 'var(--gap-sm)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <DayDeleteBar
-                  dayEntry={drillStack[drillStack.length - 1]}
-                  cameraId={cameraId}
-                  periods={periods}
-                  onDeleted={handleScanComplete}
-                  onDrillBack={() => drillUpTo(drillStack.length - 2)}
+                  label={drillStack[drillStack.length - 1].label}
+                  onPreview={() => handleRangeDeletePreview(
+                    drillStack[drillStack.length - 1].dateFrom,
+                    drillStack[drillStack.length - 1].dateTo,
+                    drillStack.length - 2,
+                  )}
+                  loading={rangeDeletePreviewLoading}
                 />
                 <button
                   className="modal-btn neutral"
@@ -518,9 +520,20 @@ export default function App() {
                 { key: '↑ ↓ ← →', label: 'navigate' },
                 { key: 'Enter', label: 'open' },
                 ...(drillStack.length > 0 ? [{ key: 'Esc / ⌫', label: 'back' }] : []),
-                ...(currentLevel === 'hour' ? [{ key: 'Space', label: 'select hour' }] : []),
+                ...(currentLevel === 'hour' ? [{ key: 'Space', label: 'select hour' }, { key: '⌫', label: 'delete day' }] : []),
               ]
       } />
+
+      {rangeDeletePreview && (
+        <DeleteConfirmModal
+          preview={rangeDeletePreview}
+          onConfirm={handleRangeDeleteConfirm}
+          onCancel={() => { setRangeDeletePreview(null); setRangeDeleteError(null) }}
+          busy={rangeDeleteDeleteLoading}
+          error={rangeDeleteError}
+          camera={cameras.find(c => c.id === cameraId)}
+        />
+      )}
     </div>
   )
 }

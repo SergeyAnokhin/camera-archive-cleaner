@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { getFiles, getDistribution, getStatsTotal, getMediaUrl, previewDelete, confirmDelete, deleteByRange } from '../api.js'
+import { getFiles, getDistribution, getStatsTotal, getMediaUrl, previewDelete, confirmDelete, previewDeleteRange } from '../api.js'
 import DeleteConfirmModal from './DeleteConfirmModal.jsx'
 import { VIEW_MODES, DEFAULT_VIEW_MODE_KEY } from './viewModes/index.js'
 import './HourViewer.css'
@@ -381,9 +381,10 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [deleteError, setDeleteError]         = useState(null)
   const [deleteSuccess, setDeleteSuccess]     = useState(null)
   const [internalRefreshKey, setInternalRefreshKey] = useState(0)
-  const [deleteHourConfirm, setDeleteHourConfirm] = useState(false)
-  const [deleteHourLoading, setDeleteHourLoading] = useState(false)
-  const [deleteHourError, setDeleteHourError] = useState(null)
+  const [hourPreview, setHourPreview]         = useState(null)
+  const [hourPreviewLoading, setHourPreviewLoading] = useState(false)
+  const [hourDeleteLoading, setHourDeleteLoading] = useState(false)
+  const [hourDeleteError, setHourDeleteError] = useState(null)
 
   const [focusedFileIndex, setFocusedFileIndex] = useState(null)
   const gridRef = useRef(null)
@@ -480,11 +481,13 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     function onKey(e) {
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'SELECT') return
-      if (e.key === 'Escape' || e.key === 'Backspace') {
-        if (e.key === 'Backspace' && (tag === 'INPUT' || tag === 'TEXTAREA')) return
+      if (e.key === 'Escape') {
         e.preventDefault()
         e.stopImmediatePropagation()
         onBack()
+      } else if (e.key === 'Backspace' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+        e.preventDefault()
+        handleDeleteHourPreview()
       } else if (e.key === 'PageUp') {
         e.preventDefault(); setPage(p => Math.max(1, p - 1))
       } else if (e.key === 'PageDown') {
@@ -546,11 +549,15 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'SELECT') return
 
-      if (e.key === 'Escape' || e.key === 'Backspace') {
-        if (e.key === 'Backspace' && (tag === 'INPUT' || tag === 'TEXTAREA')) return
+      if (e.key === 'Escape') {
         e.preventDefault()
         e.stopImmediatePropagation()
         toggleSelectionMode()
+        return
+      }
+      if (e.key === 'Backspace' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+        e.preventDefault()
+        handleDeleteHourPreview()
         return
       }
       if (e.key === 'Delete') {
@@ -689,18 +696,35 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     }
   }
 
-  async function handleDeleteHour() {
-    setDeleteHourLoading(true)
-    setDeleteHourError(null)
+  async function handleDeleteHourPreview() {
+    setHourPreviewLoading(true)
+    setHourDeleteError(null)
     try {
-      await deleteByRange(cameraId, dateFrom, dateTo)
-      setDeleteHourConfirm(false)
+      const data = await previewDeleteRange(cameraId, dateFrom, dateTo)
+      setHourPreview(data)
+    } catch (e) {
+      setHourDeleteError(e.message)
+    } finally {
+      setHourPreviewLoading(false)
+    }
+  }
+
+  async function handleDeleteHourConfirm() {
+    const allIds = [
+      ...hourPreview.selected.map(f => f.id),
+      ...hourPreview.related_videos.map(f => f.id),
+    ]
+    setHourDeleteLoading(true)
+    setHourDeleteError(null)
+    try {
+      await confirmDelete(allIds)
+      setHourPreview(null)
       onFilesDeleted?.()
       onBack()
     } catch (e) {
-      setDeleteHourError(e.message)
+      setHourDeleteError(e.message)
     } finally {
-      setDeleteHourLoading(false)
+      setHourDeleteLoading(false)
     }
   }
 
@@ -747,10 +771,14 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           <button
             className="hv-select-btn"
             style={{ color: '#f87171' }}
-            onClick={() => { setDeleteHourConfirm(v => !v); setDeleteHourError(null) }}
-            title="Delete all files in this hour"
+            onClick={handleDeleteHourPreview}
+            disabled={hourPreviewLoading}
+            title="Delete all files in this hour (Backspace)"
           >
-            <i className="mdi mdi-delete-sweep-outline" /> Delete hour
+            {hourPreviewLoading
+              ? <i className="mdi mdi-loading mdi-spin" />
+              : <><i className="mdi mdi-delete-sweep-outline" /> Delete hour</>
+            }
           </button>
         )}
 
@@ -775,28 +803,6 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           onGoToPage={setPage}
           hourStats={hourStats}
         />
-      )}
-
-      {/* Delete hour confirmation bar */}
-      {deleteHourConfirm && !selectionMode && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-          background: '#450a0a', border: '1px solid #7f1d1d',
-          borderRadius: 'var(--radius)', padding: '8px 14px',
-        }}>
-          <i className="mdi mdi-alert-outline" style={{ color: '#f87171' }} />
-          <span style={{ color: '#fca5a5', fontSize: 'calc(var(--font-base) * 0.88)', flex: 1 }}>
-            Delete all {total.toLocaleString()} files for this hour?
-            {hourStats && ` · ${formatBytes(hourStats.total_size_bytes)}`}
-          </span>
-          {deleteHourError && <span style={{ color: '#fca5a5', fontSize: 'calc(var(--font-base) * 0.82)' }}>{deleteHourError}</span>}
-          <button className="modal-btn danger" disabled={deleteHourLoading} onClick={handleDeleteHour}>
-            {deleteHourLoading ? <i className="mdi mdi-loading mdi-spin" /> : <><i className="mdi mdi-delete-outline" /> Delete</>}
-          </button>
-          <button className="modal-btn neutral" disabled={deleteHourLoading} onClick={() => { setDeleteHourConfirm(false); setDeleteHourError(null) }}>
-            Cancel
-          </button>
-        </div>
       )}
 
       {/* Selection bar (horizontal, below chart) */}
@@ -854,14 +860,19 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         </div>
       )}
 
-      {deleteError && !preview && (
+      {deleteError && !preview && !hourPreview && (
         <div className="hv-delete-error">
           <i className="mdi mdi-alert-circle-outline" /> {deleteError}
         </div>
       )}
-      {deleteSuccess && !preview && (
+      {deleteSuccess && !preview && !hourPreview && (
         <div className="hv-delete-success">
           <i className="mdi mdi-check-circle-outline" /> {deleteSuccess}
+        </div>
+      )}
+      {hourDeleteError && !hourPreview && (
+        <div className="hv-delete-error">
+          <i className="mdi mdi-alert-circle-outline" /> {hourDeleteError}
         </div>
       )}
 
@@ -872,6 +883,17 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           onCancel={() => { setPreview(null); setDeleteError(null); setDeleteSuccess(null) }}
           busy={deleteLoading}
           error={deleteError}
+          camera={camera}
+        />
+      )}
+
+      {hourPreview && (
+        <DeleteConfirmModal
+          preview={hourPreview}
+          onConfirm={handleDeleteHourConfirm}
+          onCancel={() => { setHourPreview(null); setHourDeleteError(null) }}
+          busy={hourDeleteLoading}
+          error={hourDeleteError}
           camera={camera}
         />
       )}
@@ -889,7 +911,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             <Kbd>Space</Kbd> toggle item &nbsp;·&nbsp;
             <Kbd>Shift+click</Kbd> range &nbsp;·&nbsp;
             <Kbd>Delete</Kbd> delete selected &nbsp;·&nbsp;
-            <Kbd>Esc</Kbd> / <Kbd>⌫</Kbd> exit
+            <Kbd>⌫</Kbd> delete hour &nbsp;·&nbsp;
+            <Kbd>Esc</Kbd> exit
           </>
         ) : (
           <>
@@ -899,7 +922,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             <Kbd>M</Kbd> / <Kbd>Ins</Kbd> view mode &nbsp;·&nbsp;
             <Kbd>Space</Kbd> select &nbsp;·&nbsp;
             <Kbd>Del</Kbd> delete &nbsp;·&nbsp;
-            <Kbd>Esc</Kbd> / <Kbd>⌫</Kbd> back
+            <Kbd>⌫</Kbd> delete hour &nbsp;·&nbsp;
+            <Kbd>Esc</Kbd> back
           </>
         )}
       </div>
