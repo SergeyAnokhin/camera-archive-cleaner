@@ -3,3 +3,4 @@ uvicorn[standard]
 pyyaml
 Pillow
 numpy
+opencv-python-headless

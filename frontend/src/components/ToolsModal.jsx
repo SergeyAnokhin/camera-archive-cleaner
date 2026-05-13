@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { clearDatabase, clearThumbnails, clearDiffThumbnails } from '../api.js'
+import { clearDatabase, clearThumbnails, clearDiffThumbnails, clearErosionThumbnails } from '../api.js'
 import './ToolsModal.css'
 
 const FONT_KEY = 'font-base'
@@ -68,8 +68,10 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
   const [dbResult, setDbResult]       = useState(null)
   const [thumbBusy, setThumbBusy]         = useState(false)
   const [thumbResult, setThumbResult]     = useState(null)
-  const [diffThumbBusy, setDiffThumbBusy]     = useState(false)
-  const [diffThumbResult, setDiffThumbResult] = useState(null)
+  const [diffThumbBusy, setDiffThumbBusy]         = useState(false)
+  const [diffThumbResult, setDiffThumbResult]     = useState(null)
+  const [erosionThumbBusy, setErosionThumbBusy]   = useState(false)
+  const [erosionThumbResult, setErosionThumbResult] = useState(null)
 
   function handleFontChange(e) {
     const px = Number(e.target.value)
@@ -154,6 +156,19 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
       setDiffThumbResult({ ok: false, text: e.message })
     } finally {
       setDiffThumbBusy(false)
+    }
+  }
+
+  async function handleClearErosionThumbnails() {
+    setErosionThumbBusy(true)
+    setErosionThumbResult(null)
+    try {
+      const res = await clearErosionThumbnails()
+      setErosionThumbResult({ ok: true, text: `Deleted ${res.deleted_files ?? 0} files.` })
+    } catch (e) {
+      setErosionThumbResult({ ok: false, text: e.message })
+    } finally {
+      setErosionThumbBusy(false)
     }
   }
 
@@ -339,6 +354,25 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
               </div>
               {diffThumbResult && (
                 <div className={`modal-result ${diffThumbResult.ok ? 'ok' : 'err'}`}>{diffThumbResult.text}</div>
+              )}
+            </div>
+
+            {/* Clear erosion thumbnails */}
+            <div className="modal-section">
+              <div className="modal-action-row">
+                <div className="modal-action-info">
+                  <span className="modal-action-name">Clear erosion thumbnails</span>
+                  <span className="modal-action-desc">Delete all cached Erosion mode images</span>
+                </div>
+                <button className="modal-btn danger-outline" onClick={handleClearErosionThumbnails} disabled={erosionThumbBusy}>
+                  {erosionThumbBusy
+                    ? <i className="mdi mdi-loading mdi-spin" />
+                    : <><i className="mdi mdi-image-remove-outline" /> Clear</>
+                  }
+                </button>
+              </div>
+              {erosionThumbResult && (
+                <div className={`modal-result ${erosionThumbResult.ok ? 'ok' : 'err'}`}>{erosionThumbResult.text}</div>
               )}
             </div>
           </>}

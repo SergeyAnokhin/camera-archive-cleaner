@@ -108,6 +108,7 @@ from database import (
 )
 from thumbnails import THUMB_DIR, get_or_create_thumbnail
 from diff_thumbnails import DIFF_THUMB_DIR, get_or_create_diff_thumbnail
+from erosion_thumbnails import EROSION_THUMB_DIR, get_or_create_erosion_thumbnail
 from scanner import scan_camera
 
 app = FastAPI(title="Camera Snapshots Cleaner", version="1.0.0")
@@ -320,6 +321,40 @@ def get_diff_thumbnail(
         except FileNotFoundError as e:
             raise HTTPException(status_code=404, detail=str(e))
     return FileResponse(str(diff_path), media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------
+# /erosion_thumbnail/{file_id} — MOG2 + morphological erosion thumbnail
+# ---------------------------------------------------------------------------
+
+@app.get("/erosion_thumbnail/{file_id}", summary="Erosion/MOG2 thumbnail for a photo")
+def get_erosion_thumbnail(
+    file_id: int,
+    page_ids: str = Query(description="Comma-separated photo file IDs on the current page"),
+    threshold: int = Query(default=20, ge=0, le=255),
+):
+    try:
+        ids = [int(x) for x in page_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid page_ids format")
+    if not ids:
+        raise HTTPException(status_code=400, detail="page_ids cannot be empty")
+
+    with get_connection() as conn:
+        file_row = get_file_by_id(conn, file_id)
+        if file_row is None:
+            raise HTTPException(status_code=404, detail="File not found")
+        if file_row["file_type"] != "photo":
+            raise HTTPException(status_code=400, detail="Erosion thumbnails only available for photos")
+        try:
+            get_or_create_thumbnail(conn, file_id, file_row["file_path"])
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        try:
+            erosion_path = get_or_create_erosion_thumbnail(conn, file_id, ids, threshold)
+        except FileNotFoundError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(str(erosion_path), media_type="image/jpeg")
 
 
 # ---------------------------------------------------------------------------
@@ -614,6 +649,19 @@ def clear_diff_thumbnails():
                 f.unlink()
                 deleted_files += 1
     logger.info("   └─ diff-миниатюры очищены → %d файлов", deleted_files)
+    return {"deleted_files": deleted_files}
+
+
+@app.delete("/erosion_thumbnails", summary="Delete all cached erosion thumbnail files")
+def clear_erosion_thumbnails():
+    logger.info("🧹 Очистка кэша erosion-миниатюр")
+    deleted_files = 0
+    if EROSION_THUMB_DIR.exists():
+        for f in EROSION_THUMB_DIR.iterdir():
+            if f.is_file():
+                f.unlink()
+                deleted_files += 1
+    logger.info("   └─ erosion-миниатюры очищены → %d файлов", deleted_files)
     return {"deleted_files": deleted_files}
 
 

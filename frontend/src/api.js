@@ -99,6 +99,14 @@ export function clearDiffThumbnails() {
   return del('/diff_thumbnails')
 }
 
+export function getErosionThumbnailUrl(fileId, pageIds, threshold) {
+  return `${BASE}/erosion_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
+}
+
+export function clearErosionThumbnails() {
+  return del('/erosion_thumbnails')
+}
+
 async function postJson(path, body) {
   const res = await fetch(BASE + path, {
     method: 'POST',
