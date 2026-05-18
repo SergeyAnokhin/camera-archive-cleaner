@@ -1203,7 +1203,7 @@ def get_ai_analysis(file_ids: str = Query(..., description="Comma-separated file
 
 @app.get("/ai_objects_summary", summary="Unique AI-detected objects for a date range")
 def ai_objects_summary(
-    camera_id: Optional[int] = None,
+    camera_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ):
