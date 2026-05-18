@@ -764,6 +764,15 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         e.preventDefault()
         if (selectedIds.size > 0) handleDeletePreview()
         else handleDeleteAll()
+      } else if (e.ctrlKey && (e.key === 'r' || e.key === 'R')) {
+        e.preventDefault()
+        setInternalRefreshKey(k => k + 1)
+      } else if (e.ctrlKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault()
+        setSelectionMode(true)
+        setSelectedMap(new Map(files.map(f => [f.id, f])))
+        anchorIdxRef.current = 0
+        anchorActionRef.current = true
       }
     }
     window.addEventListener('keydown', onKey)
@@ -806,6 +815,13 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             return next
           })
         }
+        return
+      }
+      if (e.ctrlKey && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault()
+        setSelectedMap(new Map(files.map(f => [f.id, f])))
+        anchorIdxRef.current = 0
+        anchorActionRef.current = true
         return
       }
       if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return
@@ -1226,6 +1242,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             <Kbd>↑ ↓ ← →</Kbd> navigate + extend &nbsp;·&nbsp;
             <Kbd>Space</Kbd> toggle item &nbsp;·&nbsp;
             <Kbd>Shift+click</Kbd> range &nbsp;·&nbsp;
+            <Kbd>Ctrl+A</Kbd> select all &nbsp;·&nbsp;
             <Kbd>Delete</Kbd> delete selected &nbsp;·&nbsp;
             <Kbd>⌫</Kbd> delete hour &nbsp;·&nbsp;
             <Kbd>Esc</Kbd> exit
@@ -1237,6 +1254,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             <Kbd>PgUp PgDn</Kbd> page &nbsp;·&nbsp;
             <Kbd>M</Kbd> / <Kbd>P</Kbd> mode ±1 &nbsp;·&nbsp;
             <Kbd>N</Kbd> peek original &nbsp;·&nbsp;
+            <Kbd>Ctrl+R</Kbd> refresh &nbsp;·&nbsp;
+            <Kbd>Ctrl+A</Kbd> select all &nbsp;·&nbsp;
             <Kbd>Space</Kbd> select &nbsp;·&nbsp;
             <Kbd>Del</Kbd> delete &nbsp;·&nbsp;
             <Kbd>⌫</Kbd> delete hour &nbsp;·&nbsp;

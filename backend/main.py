@@ -1225,13 +1225,15 @@ def ai_objects_summary(
         params.append(date_to)
     with get_connection() as conn:
         rows = conn.execute(q, params).fetchall()
-    seen: dict = {}
+    counts: dict = {}
     for row in rows:
         for obj in (row[0] or "").split():
             low = obj.lower()
-            if low not in seen:
-                seen[low] = obj
-    return {"objects": list(seen.values())}
+            if low not in counts:
+                counts[low] = [obj, 0]
+            counts[low][1] += 1
+    sorted_objs = sorted(counts.values(), key=lambda x: -x[1])
+    return {"objects": [o[0] for o in sorted_objs]}
 
 
 def _fmt_range(dt_from, dt_to) -> str:
