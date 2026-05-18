@@ -42,6 +42,8 @@ Swagger UI at **`http://localhost:8000/docs`**
 
 | File | Description |
 |------|-------------|
+| [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis system — Gemini & Claude integration, DB schema, prompt format, icon display |
+| [`docs/visualization-modes.md`](docs/visualization-modes.md) | All 9 view modes (Normal, Motion Diff, Erosion, etc.) — how each works, cache, controls |
 | [`docs/logging.md`](docs/logging.md) | Logging levels, format, colors, how to configure |
 
 ---

@@ -64,10 +64,55 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
 
-## 5. Project description
+## 5. Documentation workflow
+
+### Before starting any non-trivial task
+
+Check `README.md` → Documentation table for relevant docs, then read the doc before touching the area. Example: changing AI analysis → read [`docs/ai-analysis.md`](docs/ai-analysis.md) first.
+
+### When to create a doc
+
+Create a new `docs/<topic>.md` when a feature area is large enough that future work requires understanding its architecture before editing it. Good candidates:
+- New subsystem with 3+ files (e.g., AI analysis, delete flow, thumbnail pipeline)
+- A non-obvious data flow (e.g., how objects flow from prompt → DB → icon)
+- Any area the user says "document this"
+
+Do **not** create docs for: single-function fixes, UI tweaks, settings additions.
+
+### When to update a doc
+
+Update the relevant doc whenever you change the architecture of a documented area — new endpoints, DB schema changes, new display locations, new providers, changed localStorage keys. The user may also say **"обнови документацию"** — treat that as: update all docs affected by recent changes.
+
+### Doc format
+
+- Lead with a one-paragraph overview
+- Link to specific files with relative paths (`../frontend/src/...`)
+- Use tables for schema, config, and file maps
+- Use flow diagrams (ASCII) for request flows
+- Keep it factual — what exists now, not what was planned
+
+### Where docs live
+
+| Path | What goes there |
+|------|----------------|
+| `docs/` | Feature/subsystem architecture docs |
+| `README.md` | How to run + table of contents linking to `docs/` |
+| `CLAUDE.md` | AI assistant behavioral guidelines (this file) |
+
+After creating or updating a doc, add/update its entry in the `README.md` Documentation table.
+
+---
+
+## 6. Project description
 
 Read for more details technical specifications:
 
 - [Часть 1 из 3](technical-specifications/part1.md)
 - [Часть 2 из 3](technical-specifications/part2.md)
 - [Часть 3 из 3](technical-specifications/part3.md)
+
+Docs index (architecture references):
+
+- [AI Analysis](docs/ai-analysis.md) — Gemini/Claude integration, DB schema, icons, prompt
+- [Visualization Modes](docs/visualization-modes.md) — All 9 view modes
+- [Logging](docs/logging.md) — Log levels and format
