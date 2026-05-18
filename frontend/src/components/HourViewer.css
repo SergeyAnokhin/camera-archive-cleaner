@@ -654,3 +654,138 @@
   opacity: 0.5;
   line-height: 1;
 }
+
+/* ── AI Analysis mode panel ── */
+.hv-ai-panel {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.hv-ai-panel-info {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--text-muted);
+}
+
+.hv-ai-model-select {
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: calc(var(--font-base) * 0.82);
+  padding: 3px 7px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.hv-ai-model-select:focus { outline: none; border-color: var(--accent); }
+
+.hv-ai-run-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: calc(var(--font-base) * 0.87);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+.hv-ai-run-btn:hover { background: rgba(14, 165, 233, 0.25); border-color: var(--accent); }
+
+.hv-ai-scene {
+  width: 100%;
+  font-size: calc(var(--font-base) * 0.78);
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 4px 0 2px;
+  cursor: default;
+}
+.hv-ai-scene .mdi { color: var(--accent); margin-right: 4px; }
+
+/* ── AI icons on photo cards ── */
+.hv-card-ai-icons {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  max-width: 80%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.hv-card-ai-icons .mdi {
+  font-size: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 3px;
+  padding: 1px 2px;
+  line-height: 1;
+}
+
+.hv-card-ai-more {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 3px;
+  padding: 1px 4px;
+  line-height: 14px;
+}
+
+/* ── AI description tooltip (shown on card hover) ── */
+.hv-card-ai-desc {
+  position: absolute;
+  bottom: 22px; /* above hv-card-time */
+  left: 0;
+  right: 0;
+  background: rgba(8, 15, 26, 0.90);
+  backdrop-filter: blur(4px);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: calc(var(--font-base) * 0.68);
+  padding: 4px 6px;
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  z-index: 4;
+  max-height: 90px;
+  overflow: hidden;
+}
+
+.hv-card:hover .hv-card-ai-desc {
+  display: flex;
+}
+
+.hv-card-ai-desc-text {
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hv-card-ai-desc-objects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.hv-card-ai-tag {
+  font-size: calc(var(--font-base) * 0.68);
+  padding: 1px 5px;
+  background: rgba(14, 165, 233, 0.20);
+  border-radius: 8px;
+  color: #7dd3fc;
+}
+
+.hv-card-ai-desc-model {
+  font-size: calc(var(--font-base) * 0.65);
+  color: rgba(255, 255, 255, 0.35);
+  align-self: flex-end;
+}

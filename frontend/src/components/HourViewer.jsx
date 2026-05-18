@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { getFiles, getDistribution, getStatsTotal, getMediaUrl, previewDelete, confirmDelete, previewDeleteRange } from '../api.js'
+import { getFiles, getDistribution, getStatsTotal, getMediaUrl, previewDelete, confirmDelete, previewDeleteRange, getAiAnalysis } from '../api.js'
 import DeleteConfirmModal from './DeleteConfirmModal.jsx'
+import GeminiAnalysisModal from './GeminiAnalysisModal.jsx'
 import { VIEW_MODES, DEFAULT_VIEW_MODE_KEY } from './viewModes/index.js'
 import './HourViewer.css'
 
@@ -145,7 +146,7 @@ function ModeSettingsPanel({ mode, params, onChange }) {
   )
 }
 
-function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused }) {
+function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused, aiData }) {
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
@@ -202,6 +203,35 @@ function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode,
             />
         }
         <span className="hv-card-time">{formatTime(file.timestamp)}</span>
+
+        {/* AI analysis icons — top-left corner */}
+        {aiData?.objects && (() => {
+          const icons = resolveAiIcons(aiData.objects)
+          if (!icons.length) return null
+          return (
+            <div className="hv-card-ai-icons">
+              {icons.slice(0, 4).map((ic, i) => (
+                <i key={i} className={`mdi ${ic.mdi}`} style={{ color: ic.color }} title={ic.label} />
+              ))}
+              {icons.length > 4 && <span className="hv-card-ai-more">+{icons.length - 4}</span>}
+            </div>
+          )
+        })()}
+
+        {/* AI description tooltip on hover — only in Gemini Analysis mode */}
+        {aiData?.image_description && !selectionMode && mode.isAiMode && (
+          <div className="hv-card-ai-desc">
+            <div className="hv-card-ai-desc-text">{aiData.image_description}</div>
+            {aiData.objects && (
+              <div className="hv-card-ai-desc-objects">
+                {aiData.objects.split(/\s+/).filter(Boolean).map((o, i) => (
+                  <span key={i} className="hv-card-ai-tag">{o}</span>
+                ))}
+              </div>
+            )}
+            <div className="hv-card-ai-desc-model">{aiData.model}</div>
+          </div>
+        )}
       </div>
       {!selectionMode && fullscreen && (
         <div className="hv-lightbox" onClick={() => setFullscreen(false)}>
@@ -399,6 +429,121 @@ function DistributionChart({ buckets, pageSize, page, total, onGoToPage, hourSta
 }
 
 // ---------------------------------------------------------------------------
+// AI analysis helpers
+// ---------------------------------------------------------------------------
+
+const AI_ICON_MAP = {
+  'человек': { mdi: 'mdi-account',           color: '#60a5fa' },
+  'люди':    { mdi: 'mdi-account-multiple',   color: '#60a5fa' },
+  'мужчина': { mdi: 'mdi-account',            color: '#60a5fa' },
+  'женщина': { mdi: 'mdi-account',            color: '#60a5fa' },
+  'ребёнок': { mdi: 'mdi-human-child',        color: '#60a5fa' },
+  'ребенок': { mdi: 'mdi-human-child',        color: '#60a5fa' },
+  'машина':  { mdi: 'mdi-car',               color: '#fbbf24' },
+  'автомобиль': { mdi: 'mdi-car',            color: '#fbbf24' },
+  'грузовик':{ mdi: 'mdi-truck',             color: '#fbbf24' },
+  'мотоцикл':{ mdi: 'mdi-motorbike',         color: '#fbbf24' },
+  'велосипед':{ mdi: 'mdi-bicycle',          color: '#fbbf24' },
+  'кошка':   { mdi: 'mdi-cat',              color: '#c084fc' },
+  'кот':     { mdi: 'mdi-cat',              color: '#c084fc' },
+  'собака':  { mdi: 'mdi-dog',              color: '#c084fc' },
+  'птица':   { mdi: 'mdi-bird',             color: '#34d399' },
+  'кролик':  { mdi: 'mdi-rabbit',           color: '#c084fc' },
+  'лиса':    { mdi: 'mdi-paw',              color: '#fb923c' },
+  'животное':{ mdi: 'mdi-paw',             color: '#fb923c' },
+  'дождь':   { mdi: 'mdi-weather-rainy',    color: '#93c5fd' },
+  'снег':    { mdi: 'mdi-weather-snowy',    color: '#bfdbfe' },
+  'паук':    { mdi: 'mdi-spider',           color: '#f87171' },
+  'паутина': { mdi: 'mdi-spider',           color: '#f87171' },
+  'насекомое':{ mdi: 'mdi-bug',            color: '#f87171' },
+  'пакет':   { mdi: 'mdi-package-variant',  color: '#fb923c' },
+  'посылка': { mdi: 'mdi-package-variant',  color: '#fb923c' },
+  'person':  { mdi: 'mdi-account',          color: '#60a5fa' },
+  'people':  { mdi: 'mdi-account-multiple', color: '#60a5fa' },
+  'car':     { mdi: 'mdi-car',             color: '#fbbf24' },
+  'truck':   { mdi: 'mdi-truck',           color: '#fbbf24' },
+  'motorcycle': { mdi: 'mdi-motorbike',    color: '#fbbf24' },
+  'bicycle': { mdi: 'mdi-bicycle',         color: '#fbbf24' },
+  'cat':     { mdi: 'mdi-cat',            color: '#c084fc' },
+  'dog':     { mdi: 'mdi-dog',            color: '#c084fc' },
+  'bird':    { mdi: 'mdi-bird',           color: '#34d399' },
+  'rain':    { mdi: 'mdi-weather-rainy',  color: '#93c5fd' },
+  'snow':    { mdi: 'mdi-weather-snowy',  color: '#bfdbfe' },
+  'spider':  { mdi: 'mdi-spider',         color: '#f87171' },
+}
+
+function resolveAiIcons(objectsStr) {
+  if (!objectsStr) return []
+  return objectsStr.split(/\s+/).filter(Boolean).map(o => {
+    const key = o.toLowerCase()
+    return AI_ICON_MAP[key] || { mdi: 'mdi-circle-small', color: '#94a3b8', label: o }
+  })
+}
+
+const GEMINI_MODEL_KEY = 'gemini_model'
+const GEMINI_DEFAULT_MODEL = 'gemini-3.1-flash-lite'
+const GEMINI_PANEL_MODELS = [
+  { value: 'gemini-3.1-flash-lite',    label: '🟢 gemini-3.1-flash-lite' },
+  { value: 'gemini-2.5-flash-lite',    label: '🟢 gemini-2.5-flash-lite' },
+  { value: 'gemini-2.5-flash',         label: '🟡 gemini-2.5-flash' },
+  { value: 'gemini-3.1-flash-preview', label: '🟡 gemini-3.1-flash-preview' },
+  { value: 'gemini-2.5-pro',           label: '🔴 gemini-2.5-pro' },
+  { value: 'gemini-3.1-pro-preview',   label: '🔴 gemini-3.1-pro-preview' },
+]
+
+function AiModePanel({ files, selectedIds, aiAnalysisMap, onRun }) {
+  const [model, setModel] = useState(() =>
+    localStorage.getItem(GEMINI_MODEL_KEY) || GEMINI_DEFAULT_MODEL
+  )
+
+  const photoFiles = files.filter(f => f.file_type === 'photo')
+  const targetCount = selectedIds.size > 0
+    ? photoFiles.filter(f => selectedIds.has(f.id)).length
+    : photoFiles.length
+  const analyzedCount = photoFiles.filter(f => aiAnalysisMap.has(f.id)).length
+  const sceneEntry = [...aiAnalysisMap.values()][0]
+
+  function handleModelChange(e) {
+    setModel(e.target.value)
+    localStorage.setItem(GEMINI_MODEL_KEY, e.target.value)
+  }
+
+  return (
+    <div className="hv-mode-settings hv-ai-panel">
+      <span className="hv-mode-settings-label">
+        <i className="mdi mdi-google" /> Gemini Analysis
+      </span>
+      <div className="hv-ai-panel-info">
+        {analyzedCount > 0
+          ? <><i className="mdi mdi-check-circle-outline" style={{color:'#86efac'}} /> {analyzedCount}/{photoFiles.length} проанализировано</>
+          : <><i className="mdi mdi-circle-outline" style={{color:'var(--text-dim)'}} /> не проанализировано</>
+        }
+      </div>
+      <select className="hv-ai-model-select" value={model} onChange={handleModelChange}>
+        {GEMINI_PANEL_MODELS.map(m => (
+          <option key={m.value} value={m.value}>{m.label}</option>
+        ))}
+      </select>
+      <button className="hv-ai-run-btn" onClick={onRun}>
+        <i className="mdi mdi-play" />
+        {selectedIds.size > 0
+          ? `Анализ выбранных (${targetCount})`
+          : `Анализ страницы (${photoFiles.length})`
+        }
+      </button>
+      {sceneEntry?.scene_description && (
+        <div className="hv-ai-scene" title={sceneEntry.scene_description}>
+          <i className="mdi mdi-image-filter-hdr-outline" />
+          {sceneEntry.scene_description.length > 120
+            ? sceneEntry.scene_description.slice(0, 120) + '…'
+            : sceneEntry.scene_description}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // HourViewer
 // ---------------------------------------------------------------------------
 
@@ -428,6 +573,10 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [hourPreviewLoading, setHourPreviewLoading] = useState(false)
   const [hourDeleteLoading, setHourDeleteLoading] = useState(false)
   const [hourDeleteError, setHourDeleteError] = useState(null)
+
+  const [geminiOpen, setGeminiOpen]         = useState(false)
+  const [geminiStructured, setGeminiStructured] = useState(false)
+  const [aiAnalysisMap, setAiAnalysisMap]   = useState(new Map())
 
   const [focusedFileIndex, setFocusedFileIndex] = useState(null)
   const gridRef = useRef(null)
@@ -734,6 +883,23 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   // Reset focused file when page content changes
   useEffect(() => { setFocusedFileIndex(null) }, [files])
 
+  // Load AI analysis for current page photos
+  useEffect(() => {
+    const ids = files.filter(f => f.file_type === 'photo').map(f => f.id)
+    if (!ids.length) { setAiAnalysisMap(new Map()); return }
+    getAiAnalysis(ids)
+      .then(rows => setAiAnalysisMap(new Map(rows.map(r => [r.file_id, r]))))
+      .catch(() => {})
+  }, [files])
+
+  function reloadAiAnalysis() {
+    const ids = files.filter(f => f.file_type === 'photo').map(f => f.id)
+    if (!ids.length) return
+    getAiAnalysis(ids)
+      .then(rows => setAiAnalysisMap(new Map(rows.map(r => [r.file_id, r]))))
+      .catch(() => {})
+  }
+
   function getGridCols() {
     if (!gridRef.current) return 4
     const cards = gridRef.current.querySelectorAll('.hv-card')
@@ -871,7 +1037,15 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       </div>
 
       {/* Mode settings panel */}
-      {activeMode.params?.length > 0 && !peekOriginal && (
+      {!peekOriginal && activeMode.isAiMode && (
+        <AiModePanel
+          files={files}
+          selectedIds={selectedIds}
+          aiAnalysisMap={aiAnalysisMap}
+          onRun={() => { setGeminiStructured(true); setGeminiOpen(true) }}
+        />
+      )}
+      {!peekOriginal && !activeMode.isAiMode && activeMode.params?.length > 0 && (
         <ModeSettingsPanel
           mode={activeMode}
           params={activeModeParams}
@@ -946,6 +1120,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
                   selected={selectedIds.has(file.id)}
                   onToggle={toggleSelect}
                   isFocused={index === focusedFileIndex}
+                  aiData={aiAnalysisMap.get(file.id) ?? null}
                 />
           )}
         </div>
@@ -988,6 +1163,21 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           camera={camera}
         />
       )}
+
+      {geminiOpen && (() => {
+        const photoFiles = files.filter(f => f.file_type === 'photo')
+        const ids = selectedIds.size > 0
+          ? photoFiles.filter(f => selectedIds.has(f.id)).map(f => f.id)
+          : photoFiles.map(f => f.id)
+        return (
+          <GeminiAnalysisModal
+            fileIds={ids}
+            structured={geminiStructured}
+            onClose={() => { setGeminiOpen(false); setGeminiStructured(false) }}
+            onComplete={reloadAiAnalysis}
+          />
+        )
+      })()}
 
       <div style={{
         fontSize: 'calc(var(--font-base) * 0.72)',

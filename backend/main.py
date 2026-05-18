@@ -97,6 +97,7 @@ from config import load_cameras
 from database import (
     DB_PATH,
     delete_all_thumbnails,
+    get_ai_analysis_by_file_ids,
     get_connection,
     get_file_by_id,
     get_files_paginated,
@@ -107,6 +108,7 @@ from database import (
     get_stats_total,
     init_db,
     pop_old_basic_thumbnails,
+    save_ai_analysis,
 )
 from thumbnails import THUMB_DIR, get_or_create_thumbnail
 from diff_thumbnails import DIFF_THUMB_DIR, get_or_create_diff_thumbnail
@@ -879,6 +881,207 @@ def get_storage_info():
                     thumb_size += f.stat().st_size
 
     return {"db_size_bytes": db_size, "thumbnails_size_bytes": thumb_size}
+
+
+# ---------------------------------------------------------------------------
+# /gemini_analyze — Google AI image analysis
+# ---------------------------------------------------------------------------
+
+GEMINI_PRICING = {
+    'gemini-3.1-flash-lite':    {'input': 0.25,  'output': 1.50},
+    'gemini-2.5-flash-lite':    {'input': 0.10,  'output': 0.40},
+    'gemini-2.5-flash':         {'input': 0.30,  'output': 2.50},
+    'gemini-3.1-flash-preview': {'input': 0.50,  'output': 3.00},
+    'gemini-2.5-pro':           {'input': 1.25,  'output': 10.00},
+    'gemini-3.1-pro-preview':   {'input': 2.00,  'output': 12.00},
+}
+
+
+class GeminiAnalyzeRequest(BaseModel):
+    file_ids: list[int]
+    prompt: str
+    model: str
+    api_key: str
+
+
+@app.post("/gemini_analyze", summary="Analyze images with Google Gemini AI")
+def gemini_analyze(req: GeminiAnalyzeRequest):
+    try:
+        from google import genai
+    except ImportError:
+        raise HTTPException(status_code=500, detail="google-genai not installed. Run: pip install google-genai")
+
+    from PIL import Image as PILImage
+
+    with get_connection() as conn:
+        file_rows = [get_file_by_id(conn, fid) for fid in req.file_ids]
+
+    images = []
+    filenames = []
+    for row in file_rows:
+        if row is None or row["file_type"] != "photo":
+            continue
+        try:
+            img = PILImage.open(row["file_path"])
+            img.thumbnail((1024, 1024), PILImage.LANCZOS)
+            images.append(img)
+            filenames.append(Path(row["file_path"]).name)
+        except Exception as e:
+            logger.warning("Gemini: не удалось открыть %s: %s", row["file_path"], e)
+
+    if not images:
+        raise HTTPException(status_code=400, detail="No valid photo files found")
+
+    logger.info("🤖 Gemini %s: %d изображений, prompt=%d символов", req.model, len(images), len(req.prompt))
+
+    try:
+        client = genai.Client(api_key=req.api_key)
+        t0 = time.time()
+        response = client.models.generate_content(
+            model=req.model,
+            contents=[req.prompt] + images,
+        )
+        elapsed_ms = int((time.time() - t0) * 1000)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    in_tok  = (response.usage_metadata.prompt_token_count     or 0) if response.usage_metadata else 0
+    out_tok = (response.usage_metadata.candidates_token_count or 0) if response.usage_metadata else 0
+    tot_tok = (response.usage_metadata.total_token_count      or 0) if response.usage_metadata else 0
+
+    cost = 0.0
+    if req.model in GEMINI_PRICING:
+        p = GEMINI_PRICING[req.model]
+        cost = (in_tok / 1_000_000) * p["input"] + (out_tok / 1_000_000) * p["output"]
+
+    logger.info("   └─ %d токенов (in:%d out:%d), %.0f мс, $%.6f", tot_tok, in_tok, out_tok, elapsed_ms, cost)
+
+    return {
+        "text": response.text,
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "total_tokens": tot_tok,
+        "cost_usd": cost,
+        "elapsed_ms": elapsed_ms,
+        "images_used": len(images),
+        "filenames": filenames,
+    }
+
+
+@app.post("/gemini_analyze_batch", summary="Structured analysis + save to DB")
+def gemini_analyze_batch(req: GeminiAnalyzeRequest):
+    """Like /gemini_analyze but expects a JSON response, saves results per-file to DB."""
+    try:
+        from google import genai
+    except ImportError:
+        raise HTTPException(status_code=500, detail="google-genai not installed. Run: pip install google-genai")
+
+    import json
+    from PIL import Image as PILImage
+
+    with get_connection() as conn:
+        file_rows = [get_file_by_id(conn, fid) for fid in req.file_ids]
+
+    images, file_ids_used = [], []
+    for row in file_rows:
+        if row is None or row["file_type"] != "photo":
+            continue
+        try:
+            img = PILImage.open(row["file_path"])
+            img.thumbnail((1024, 1024), PILImage.LANCZOS)
+            images.append(img)
+            file_ids_used.append(row["id"])
+        except Exception as e:
+            logger.warning("Gemini batch: не удалось открыть %s: %s", row.get("file_path", "?"), e)
+
+    if not images:
+        raise HTTPException(status_code=400, detail="No valid photo files found")
+
+    logger.info("🤖 Gemini batch %s: %d изображений", req.model, len(images))
+
+    try:
+        client = genai.Client(api_key=req.api_key)
+        t0 = time.time()
+        response = client.models.generate_content(
+            model=req.model,
+            contents=[req.prompt] + images,
+        )
+        elapsed_ms = int((time.time() - t0) * 1000)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    raw_text = response.text or ""
+
+    # Strip optional markdown code fences
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = "\n".join(cleaned.split("\n")[1:])
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3].strip()
+
+    parsed = None
+    try:
+        parsed = json.loads(cleaned)
+    except Exception:
+        pass
+
+    in_tok  = (response.usage_metadata.prompt_token_count     or 0) if response.usage_metadata else 0
+    out_tok = (response.usage_metadata.candidates_token_count or 0) if response.usage_metadata else 0
+    tot_tok = (response.usage_metadata.total_token_count      or 0) if response.usage_metadata else 0
+
+    cost = 0.0
+    if req.model in GEMINI_PRICING:
+        p = GEMINI_PRICING[req.model]
+        cost = (in_tok / 1_000_000) * p["input"] + (out_tok / 1_000_000) * p["output"]
+
+    saved_count = 0
+    if parsed and "scene" in parsed and "images" in parsed:
+        scene = parsed.get("scene", "")
+        img_data = parsed.get("images", [])
+        with get_connection() as conn:
+            for i, fid in enumerate(file_ids_used):
+                img_entry = img_data[i] if i < len(img_data) else {}
+                description = img_entry.get("description", "")
+                objects = img_entry.get("objects", [])
+                objects_str = " ".join(str(o) for o in objects if o)
+                save_ai_analysis(conn, fid, "gemini", req.model, scene, description, objects_str)
+                saved_count += 1
+
+    logger.info("   └─ %d токенов, %.0f мс, $%.6f, сохранено %d записей", tot_tok, elapsed_ms, cost, saved_count)
+
+    return {
+        "raw_text": raw_text,
+        "parsed": parsed,
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "total_tokens": tot_tok,
+        "cost_usd": cost,
+        "elapsed_ms": elapsed_ms,
+        "images_used": len(images),
+        "saved_count": saved_count,
+    }
+
+
+@app.get("/ai_analysis", summary="Fetch saved AI analysis for given file IDs")
+def get_ai_analysis(file_ids: str = Query(..., description="Comma-separated file IDs")):
+    try:
+        ids = [int(x) for x in file_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file_ids")
+    with get_connection() as conn:
+        rows = get_ai_analysis_by_file_ids(conn, ids)
+    return [
+        {
+            "file_id": r["file_id"],
+            "provider": r["provider"],
+            "model": r["model"],
+            "analyzed_at": r["analyzed_at"],
+            "scene_description": r["scene_description"],
+            "image_description": r["image_description"],
+            "objects": r["objects"],
+        }
+        for r in rows
+    ]
 
 
 def _fmt_range(dt_from, dt_to) -> str:

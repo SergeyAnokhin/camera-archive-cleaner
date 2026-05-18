@@ -33,6 +33,30 @@ const DIFF_THRESHOLD_MIN     = 0
 const DIFF_THRESHOLD_MAX     = 100
 const DIFF_THRESHOLD_DEFAULT = 20
 
+const GEMINI_API_KEY_KEY = 'gemini_api_key'
+const GEMINI_MODEL_KEY   = 'gemini_model'
+const GEMINI_PROMPT_KEY  = 'gemini_prompt'
+const GEMINI_DEFAULT_MODEL  = 'gemini-3.1-flash-lite'
+const GEMINI_DEFAULT_PROMPT = 'Детально опиши, что происходит на этих снимках с камеры видеонаблюдения. Перечисли все заметные объекты, людей, транспортные средства и события.'
+
+const GEMINI_MODELS = [
+  { value: 'gemini-3.1-flash-lite',    label: 'gemini-3.1-flash-lite',    tier: '🟢 lite' },
+  { value: 'gemini-2.5-flash-lite',    label: 'gemini-2.5-flash-lite',    tier: '🟢 lite' },
+  { value: 'gemini-2.5-flash',         label: 'gemini-2.5-flash',         tier: '🟡 base' },
+  { value: 'gemini-3.1-flash-preview', label: 'gemini-3.1-flash-preview', tier: '🟡 base' },
+  { value: 'gemini-2.5-pro',           label: 'gemini-2.5-pro',           tier: '🔴 pro'  },
+  { value: 'gemini-3.1-pro-preview',   label: 'gemini-3.1-pro-preview',   tier: '🔴 pro'  },
+]
+
+const GEMINI_PRICING = {
+  'gemini-3.1-flash-lite':    { input: 0.25,  output: 1.50  },
+  'gemini-2.5-flash-lite':    { input: 0.10,  output: 0.40  },
+  'gemini-2.5-flash':         { input: 0.30,  output: 2.50  },
+  'gemini-3.1-flash-preview': { input: 0.50,  output: 3.00  },
+  'gemini-2.5-pro':           { input: 1.25,  output: 10.00 },
+  'gemini-3.1-pro-preview':   { input: 2.00,  output: 12.00 },
+}
+
 function fmtBytes(b) {
   if (b == null) return null
   if (b < 1024) return `${b} B`
@@ -71,6 +95,10 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     const v = localStorage.getItem(DIFF_THRESHOLD_KEY)
     return v !== null ? Number(v) : DIFF_THRESHOLD_DEFAULT
   })
+  const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem(GEMINI_API_KEY_KEY) || '')
+  const [geminiModel, setGeminiModel]   = useState(() => localStorage.getItem(GEMINI_MODEL_KEY) || GEMINI_DEFAULT_MODEL)
+  const [geminiPrompt, setGeminiPrompt] = useState(() => localStorage.getItem(GEMINI_PROMPT_KEY) || GEMINI_DEFAULT_PROMPT)
+
   const [dbConfirm, setDbConfirm] = useState(false)
   const [dbBusy, setDbBusy]       = useState(false)
   const [dbResult, setDbResult]   = useState(null)
@@ -169,9 +197,25 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  function handleGeminiApiKeyChange(e) {
+    setGeminiApiKey(e.target.value)
+    localStorage.setItem(GEMINI_API_KEY_KEY, e.target.value)
+  }
+  function handleGeminiModelChange(e) {
+    setGeminiModel(e.target.value)
+    localStorage.setItem(GEMINI_MODEL_KEY, e.target.value)
+  }
+  function handleGeminiPromptChange(e) {
+    setGeminiPrompt(e.target.value)
+    localStorage.setItem(GEMINI_PROMPT_KEY, e.target.value)
+  }
+
+  const selectedModelPricing = GEMINI_PRICING[geminiModel]
+
   const TABS = [
     { id: 'general',     label: 'General' },
     { id: 'hour_view',   label: 'Hour view' },
+    { id: 'google_ai',   label: 'Google AI' },
     { id: 'maintenance', label: 'Maintenance' },
   ]
 
@@ -273,6 +317,51 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
                 <span className="font-size-value">{diffThreshold}</span>
               </div>
               <div className="modal-setting-hint">Pixels with a channel delta below this value are darkened in Motion diff mode. Higher = only significant changes shown.</div>
+            </div>
+          </>}
+
+          {activeTab === 'google_ai' && <>
+            {/* API key */}
+            <div className="modal-section">
+              <div className="modal-section-title">API Key</div>
+              <input
+                type="password"
+                className="modal-text-input"
+                placeholder="AIza..."
+                value={geminiApiKey}
+                onChange={handleGeminiApiKeyChange}
+                autoComplete="off"
+              />
+              <div className="modal-setting-hint">
+                Google AI Studio key. Get it at <span className="modal-link">aistudio.google.com</span>
+              </div>
+            </div>
+
+            {/* Model */}
+            <div className="modal-section">
+              <div className="modal-section-title">Model</div>
+              <select className="modal-select" value={geminiModel} onChange={handleGeminiModelChange}>
+                {GEMINI_MODELS.map(m => (
+                  <option key={m.value} value={m.value}>{m.tier}  {m.label}</option>
+                ))}
+              </select>
+              {selectedModelPricing && (
+                <div className="modal-setting-hint">
+                  Pricing: input ${selectedModelPricing.input.toFixed(2)} / output ${selectedModelPricing.output.toFixed(2)} per 1M tokens
+                </div>
+              )}
+            </div>
+
+            {/* Prompt */}
+            <div className="modal-section">
+              <div className="modal-section-title">Default prompt</div>
+              <textarea
+                className="modal-textarea"
+                rows={5}
+                value={geminiPrompt}
+                onChange={handleGeminiPromptChange}
+              />
+              <div className="modal-setting-hint">Sent together with selected images. Can be edited before each run in the analysis modal.</div>
             </div>
           </>}
 

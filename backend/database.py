@@ -13,6 +13,7 @@ def get_connection() -> sqlite3.Connection:
 
 def init_db() -> None:
     with get_connection() as conn:
+        init_ai_analysis_table(conn)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS files (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -264,3 +265,53 @@ def get_hour_distribution(conn: sqlite3.Connection, camera_id: str | None,
 def delete_all_thumbnails(conn: sqlite3.Connection) -> int:
     cursor = conn.execute("DELETE FROM thumbnails")
     return cursor.rowcount
+
+
+# ---------------------------------------------------------------------------
+# ai_analysis — per-file Gemini analysis results
+# ---------------------------------------------------------------------------
+
+def init_ai_analysis_table(conn: sqlite3.Connection) -> None:
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS ai_analysis (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id           INTEGER NOT NULL UNIQUE,
+            provider          TEXT    NOT NULL DEFAULT 'gemini',
+            model             TEXT    NOT NULL,
+            analyzed_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+            scene_description TEXT,
+            image_description TEXT,
+            objects           TEXT,
+            FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_ai_analysis_file ON ai_analysis(file_id);
+    """)
+
+
+def save_ai_analysis(conn: sqlite3.Connection, file_id: int, provider: str, model: str,
+                     scene_description: str, image_description: str, objects: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO ai_analysis (file_id, provider, model, analyzed_at, scene_description, image_description, objects)
+        VALUES (?, ?, ?, datetime('now'), ?, ?, ?)
+        ON CONFLICT(file_id) DO UPDATE SET
+            provider          = excluded.provider,
+            model             = excluded.model,
+            analyzed_at       = excluded.analyzed_at,
+            scene_description = excluded.scene_description,
+            image_description = excluded.image_description,
+            objects           = excluded.objects
+        """,
+        (file_id, provider, model, scene_description, image_description, objects),
+    )
+
+
+def get_ai_analysis_by_file_ids(conn: sqlite3.Connection, file_ids: list[int]) -> list:
+    if not file_ids:
+        return []
+    ph = ",".join("?" * len(file_ids))
+    return conn.execute(
+        f"SELECT file_id, provider, model, analyzed_at, scene_description, image_description, objects "
+        f"FROM ai_analysis WHERE file_id IN ({ph})",
+        file_ids,
+    ).fetchall()

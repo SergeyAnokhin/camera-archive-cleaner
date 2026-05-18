@@ -156,3 +156,16 @@ export function previewDeleteRange(cameraId, dateFrom, dateTo) {
 export function deleteByRange(cameraId, dateFrom, dateTo) {
   return postJson('/delete/by_range', { camera_id: cameraId, date_from: dateFrom, date_to: dateTo })
 }
+
+export function geminiAnalyze({ fileIds, prompt, model, apiKey }) {
+  return postJson('/gemini_analyze', { file_ids: fileIds, prompt, model, api_key: apiKey })
+}
+
+export function geminiAnalyzeBatch({ fileIds, prompt, model, apiKey }) {
+  return postJson('/gemini_analyze_batch', { file_ids: fileIds, prompt, model, api_key: apiKey })
+}
+
+export function getAiAnalysis(fileIds) {
+  if (!fileIds.length) return Promise.resolve([])
+  return get('/ai_analysis?file_ids=' + fileIds.join(','))
+}

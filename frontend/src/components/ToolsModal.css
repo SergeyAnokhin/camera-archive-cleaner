@@ -246,6 +246,51 @@
   color: var(--text-dim);
 }
 
+.modal-text-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-input, #0f172a);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-base);
+  padding: 6px 10px;
+}
+.modal-text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.modal-select {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-input, #0f172a);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-base);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.modal-select:focus { outline: none; border-color: var(--accent); }
+
+.modal-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-input, #0f172a);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: calc(var(--font-base) * 0.9);
+  padding: 8px 10px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+.modal-textarea:focus { outline: none; border-color: var(--accent); }
+
+.modal-link { color: var(--accent); }
+
 /* Result messages */
 .modal-result {
   margin-top: 8px;
