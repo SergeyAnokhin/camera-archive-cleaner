@@ -151,6 +151,7 @@ function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode,
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
+  const [descExpanded, setDescExpanded] = useState(false)
   const cardRef = useRef(null)
 
   useEffect(() => {
@@ -219,9 +220,13 @@ function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode,
           )
         })()}
 
-        {/* AI description tooltip on hover — only in Gemini Analysis mode */}
+        {/* AI description tooltip on hover — only in AI mode */}
         {aiData?.image_description && !selectionMode && mode.isAiMode && (
-          <div className="hv-card-ai-desc">
+          <div
+            className={`hv-card-ai-desc${descExpanded ? ' expanded' : ''}`}
+            onClick={e => { e.stopPropagation(); setDescExpanded(v => !v) }}
+            title={descExpanded ? 'Нажмите чтобы свернуть' : 'Нажмите чтобы развернуть'}
+          >
             <div className="hv-card-ai-desc-text">{aiData.image_description}</div>
             {aiData.objects && (
               <div className="hv-card-ai-desc-objects">

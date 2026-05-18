@@ -772,12 +772,27 @@
   display: flex;
 }
 
+.hv-card-ai-desc.expanded {
+  display: flex;
+  max-height: 200px;
+  overflow-y: auto;
+  cursor: zoom-out;
+  background: rgba(8, 15, 26, 0.97);
+  z-index: 10;
+}
+
 .hv-card-ai-desc-text {
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.hv-card-ai-desc.expanded .hv-card-ai-desc-text {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 
 .hv-card-ai-desc-objects {
