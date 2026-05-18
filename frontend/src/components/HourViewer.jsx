@@ -13,13 +13,33 @@ const THUMB_WIDTH_DEFAULT = 140
 const DIFF_THRESHOLD_KEY  = 'diff_threshold'
 const DIFF_THRESHOLD_DEFAULT = 20
 const VIEW_MODE_KEY    = 'hour_view_mode'
+const MODE_PARAMS_PREFIX = 'mode_params_'
 
-function getPageSize()     { return Number(localStorage.getItem(PAGE_SIZE_KEY)) || PAGE_SIZE_DEFAULT }
-function getHoverZoom()    { return Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT }
-function getThumbWidth()   { return Number(localStorage.getItem(THUMB_WIDTH_KEY)) || THUMB_WIDTH_DEFAULT }
-function getDiffThreshold() {
-  const v = localStorage.getItem(DIFF_THRESHOLD_KEY)
-  return v !== null ? Number(v) : DIFF_THRESHOLD_DEFAULT
+function getPageSize()   { return Number(localStorage.getItem(PAGE_SIZE_KEY)) || PAGE_SIZE_DEFAULT }
+function getHoverZoom()  { return Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT }
+function getThumbWidth() { return Number(localStorage.getItem(THUMB_WIDTH_KEY)) || THUMB_WIDTH_DEFAULT }
+
+function loadModeParams(modeKey, defaults) {
+  try {
+    const raw = localStorage.getItem(MODE_PARAMS_PREFIX + modeKey)
+    if (raw) return { ...defaults, ...JSON.parse(raw) }
+  } catch {}
+  return defaults
+}
+
+function saveModeParams(modeKey, params) {
+  localStorage.setItem(MODE_PARAMS_PREFIX + modeKey, JSON.stringify(params))
+}
+
+function buildInitialModeParams() {
+  const globalDefault = Number(localStorage.getItem(DIFF_THRESHOLD_KEY)) || DIFF_THRESHOLD_DEFAULT
+  const result = {}
+  for (const m of VIEW_MODES) {
+    if (!m.params?.length) continue
+    const defaults = Object.fromEntries(m.params.map(p => [p.key, p.key === 'threshold' ? globalDefault : p.default]))
+    result[m.key] = loadModeParams(m.key, defaults)
+  }
+  return result
 }
 
 function formatTime(ts) { return ts ? ts.substring(11, 19) : '' }
@@ -103,7 +123,29 @@ function VideoModal({ file, onClose }) {
 // Cards
 // ---------------------------------------------------------------------------
 
-function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, diffThreshold, selectionMode, selected, onToggle, index, isFocused }) {
+function ModeSettingsPanel({ mode, params, onChange }) {
+  if (!mode.params?.length) return null
+  return (
+    <div className="hv-mode-settings">
+      <span className="hv-mode-settings-label">{mode.label}</span>
+      {mode.params.map(p => (
+        <div key={p.key} className="hv-mode-param">
+          <span className="hv-mode-param-name">{p.label}</span>
+          <input
+            type="range"
+            min={p.min} max={p.max} step={p.step}
+            value={params[p.key] ?? p.default}
+            onChange={e => onChange(p.key, Number(e.target.value))}
+            className="hv-mode-param-slider"
+          />
+          <span className="hv-mode-param-value">{params[p.key] ?? p.default}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused }) {
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
@@ -122,7 +164,7 @@ function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, diffThreshold, selecti
     return () => window.removeEventListener('keydown', onKey, true)
   }, [fullscreen])
 
-  const src = mode.getImageUrl(file, { pagePhotoIds, diffThreshold })
+  const src = mode.getImageUrl(file, { pagePhotoIds, params })
 
   useEffect(() => {
     setLoaded(false)
@@ -368,8 +410,9 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [pageSize, setPageSize]         = useState(getPageSize)
   const [hoverZoom, setHoverZoom]       = useState(getHoverZoom)
   const [thumbWidth, setThumbWidth]     = useState(getThumbWidth)
-  const [diffThreshold, setDiffThreshold] = useState(getDiffThreshold)
   const [viewMode, setViewMode]         = useState(() => localStorage.getItem(VIEW_MODE_KEY) || DEFAULT_VIEW_MODE_KEY)
+  const [modeParams, setModeParams]     = useState(buildInitialModeParams)
+  const [peekOriginal, setPeekOriginal] = useState(false)
   const [distribution, setDistribution] = useState([])
   const [hourStats, setHourStats]       = useState(null)
 
@@ -403,19 +446,34 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   }, [selectedMap])
 
   useEffect(() => {
-    function onPageSize()      { setPageSize(getPageSize()); setPage(1) }
-    function onZoom()          { setHoverZoom(getHoverZoom()) }
-    function onThumbWidth()    { setThumbWidth(getThumbWidth()) }
-    function onDiffThreshold() { setDiffThreshold(getDiffThreshold()) }
+    function onPageSize()   { setPageSize(getPageSize()); setPage(1) }
+    function onZoom()       { setHoverZoom(getHoverZoom()) }
+    function onThumbWidth() { setThumbWidth(getThumbWidth()) }
     document.addEventListener('hour-page-size-change', onPageSize)
     document.addEventListener('hover-zoom-change', onZoom)
     document.addEventListener('thumb-width-change', onThumbWidth)
-    document.addEventListener('diff-threshold-change', onDiffThreshold)
     return () => {
       document.removeEventListener('hour-page-size-change', onPageSize)
       document.removeEventListener('hover-zoom-change', onZoom)
       document.removeEventListener('thumb-width-change', onThumbWidth)
-      document.removeEventListener('diff-threshold-change', onDiffThreshold)
+    }
+  }, [])
+
+  useEffect(() => {
+    function onDown(e) {
+      if (e.key !== 'n' && e.key !== 'N') return
+      const tag = document.activeElement?.tagName
+      if (tag === 'INPUT' || tag === 'SELECT') return
+      setPeekOriginal(true)
+    }
+    function onUp(e) {
+      if (e.key === 'n' || e.key === 'N') setPeekOriginal(false)
+    }
+    window.addEventListener('keydown', onDown)
+    window.addEventListener('keyup', onUp)
+    return () => {
+      window.removeEventListener('keydown', onDown)
+      window.removeEventListener('keyup', onUp)
     }
   }, [])
 
@@ -519,6 +577,14 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         setViewMode(prev => {
           const idx = VIEW_MODES.findIndex(m => m.key === prev)
           const next = VIEW_MODES[(idx + 1) % VIEW_MODES.length].key
+          localStorage.setItem(VIEW_MODE_KEY, next)
+          return next
+        })
+      } else if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault()
+        setViewMode(prev => {
+          const idx = VIEW_MODES.findIndex(m => m.key === prev)
+          const next = VIEW_MODES[(idx - 1 + VIEW_MODES.length) % VIEW_MODES.length].key
           localStorage.setItem(VIEW_MODE_KEY, next)
           return next
         })
@@ -734,6 +800,17 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     localStorage.setItem(VIEW_MODE_KEY, v)
   }
 
+  function handleModeParamChange(modeKey, paramKey, value) {
+    setModeParams(prev => {
+      const next = { ...prev, [modeKey]: { ...prev[modeKey], [paramKey]: value } }
+      saveModeParams(modeKey, next[modeKey])
+      return next
+    })
+  }
+
+  const activeMode = VIEW_MODES.find(m => m.key === viewMode) ?? VIEW_MODES[0]
+  const activeModeParams = modeParams[viewMode] ?? {}
+
   return (
     <div className="hv-root">
       {/* Header with inline pagination */}
@@ -793,6 +870,20 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         <span className="hv-count">{total.toLocaleString()} files</span>
       </div>
 
+      {/* Mode settings panel */}
+      {activeMode.params?.length > 0 && !peekOriginal && (
+        <ModeSettingsPanel
+          mode={activeMode}
+          params={activeModeParams}
+          onChange={(paramKey, value) => handleModeParamChange(viewMode, paramKey, value)}
+        />
+      )}
+      {peekOriginal && (
+        <div className="hv-peek-banner">
+          <i className="mdi mdi-eye-outline" /> Просмотр оригиналов — удерживайте N
+        </div>
+      )}
+
       {/* Distribution chart */}
       {distribution.length > 0 && (
         <DistributionChart
@@ -848,9 +939,9 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
                   file={file}
                   index={index}
                   hoverZoom={hoverZoom}
-                  mode={VIEW_MODES.find(m => m.key === viewMode) ?? VIEW_MODES[0]}
+                  mode={peekOriginal ? VIEW_MODES[0] : activeMode}
                   pagePhotoIds={pagePhotoIds}
-                  diffThreshold={diffThreshold}
+                  params={peekOriginal ? {} : activeModeParams}
                   selectionMode={selectionMode}
                   selected={selectedIds.has(file.id)}
                   onToggle={toggleSelect}
@@ -919,7 +1010,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             <Kbd>↑ ↓ ← →</Kbd> navigate &nbsp;·&nbsp;
             <Kbd>Enter</Kbd> open &nbsp;·&nbsp;
             <Kbd>PgUp PgDn</Kbd> page &nbsp;·&nbsp;
-            <Kbd>M</Kbd> / <Kbd>Ins</Kbd> view mode &nbsp;·&nbsp;
+            <Kbd>M</Kbd> / <Kbd>P</Kbd> mode ±1 &nbsp;·&nbsp;
+            <Kbd>N</Kbd> peek original &nbsp;·&nbsp;
             <Kbd>Space</Kbd> select &nbsp;·&nbsp;
             <Kbd>Del</Kbd> delete &nbsp;·&nbsp;
             <Kbd>⌫</Kbd> delete hour &nbsp;·&nbsp;

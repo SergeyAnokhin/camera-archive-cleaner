@@ -65,6 +65,67 @@
 }
 .hv-view-mode-select:focus { outline: none; border-color: var(--accent); }
 
+/* ── Mode settings panel ── */
+.hv-mode-settings {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-md);
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  flex-wrap: wrap;
+}
+
+.hv-mode-settings-label {
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--accent);
+  font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.hv-mode-param {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.hv-mode-param-name {
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.hv-mode-param-slider {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+  min-width: 80px;
+}
+
+.hv-mode-param-value {
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--text-primary);
+  min-width: 24px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.hv-peek-banner {
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: var(--radius);
+  color: #fbbf24;
+  font-size: calc(var(--font-base) * 0.88);
+  padding: 5px 12px;
+  text-align: center;
+  user-select: none;
+}
+
 /* ── Distribution chart ── */
 .hv-dist-root {
   background: var(--bg-surface);

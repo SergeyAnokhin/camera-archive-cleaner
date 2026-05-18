@@ -34,6 +34,7 @@ export default function DeleteConfirmModal({ preview, onConfirm, onCancel, busy,
     return () => window.removeEventListener('keydown', onKey, true)
   }, [onCancel, busy])
 
+
   return (
     <div className="dcm-backdrop" onClick={() => { if (!busy) onCancel() }}>
       <div className="dcm-card" onClick={e => e.stopPropagation()}>
@@ -79,7 +80,7 @@ export default function DeleteConfirmModal({ preview, onConfirm, onCancel, busy,
           <button className="modal-btn neutral" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
-          <button className="modal-btn danger" onClick={onConfirm} disabled={busy}>
+          <button className="modal-btn danger" onClick={onConfirm} disabled={busy} autoFocus>
             {busy
               ? <><i className="mdi mdi-loading mdi-spin" /> Deleting…</>
               : <><i className="mdi mdi-delete-outline" /> Delete {totalCount} {totalCount === 1 ? 'file' : 'files'}</>
