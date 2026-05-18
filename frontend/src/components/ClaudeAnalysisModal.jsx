@@ -36,9 +36,9 @@ export default function ClaudeAnalysisModal({ fileIds, onClose, onComplete }) {
   const [error, setError]       = useState(null)
 
   useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    function onKey(e) { if (e.key === 'Escape') { e.stopImmediatePropagation(); onClose() } }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose])
 
   async function handleRun() {
