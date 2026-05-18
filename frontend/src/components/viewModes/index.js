@@ -7,6 +7,7 @@ import mhiMode from './mhiMode.js'
 import boundingBoxesMode from './boundingBoxesMode.js'
 import motionStackingMode from './motionStackingMode.js'
 import geminiMode from './geminiMode.js'
+import claudeMode from './claudeMode.js'
 
 export const VIEW_MODES = [
   normalMode,
@@ -18,5 +19,6 @@ export const VIEW_MODES = [
   boundingBoxesMode,
   motionStackingMode,
   geminiMode,
+  claudeMode,
 ]
 export const DEFAULT_VIEW_MODE_KEY = normalMode.key

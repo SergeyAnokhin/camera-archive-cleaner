@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { getFiles, getDistribution, getStatsTotal, getMediaUrl, previewDelete, confirmDelete, previewDeleteRange, getAiAnalysis } from '../api.js'
 import DeleteConfirmModal from './DeleteConfirmModal.jsx'
 import GeminiAnalysisModal from './GeminiAnalysisModal.jsx'
+import ClaudeAnalysisModal from './ClaudeAnalysisModal.jsx'
 import { VIEW_MODES, DEFAULT_VIEW_MODE_KEY } from './viewModes/index.js'
 import './HourViewer.css'
 
@@ -480,21 +481,44 @@ function resolveAiIcons(objectsStr) {
   })
 }
 
-const GEMINI_MODEL_KEY = 'gemini_model'
-const GEMINI_DEFAULT_MODEL = 'gemini-3.1-flash-lite'
-const GEMINI_PANEL_MODELS = [
-  { value: 'gemini-3.1-flash-lite',    label: '🟢 gemini-3.1-flash-lite' },
-  { value: 'gemini-2.5-flash-lite',    label: '🟢 gemini-2.5-flash-lite' },
-  { value: 'gemini-2.5-flash',         label: '🟡 gemini-2.5-flash' },
-  { value: 'gemini-3.1-flash-preview', label: '🟡 gemini-3.1-flash-preview' },
-  { value: 'gemini-2.5-pro',           label: '🔴 gemini-2.5-pro' },
-  { value: 'gemini-3.1-pro-preview',   label: '🔴 gemini-3.1-pro-preview' },
-]
+const AI_PROVIDER_CONFIG = {
+  gemini: {
+    modelKey: 'gemini_model',
+    defaultModel: 'gemini-3.1-flash-lite',
+    models: [
+      { value: 'gemini-3.1-flash-lite',    label: '🟢 gemini-3.1-flash-lite' },
+      { value: 'gemini-2.5-flash-lite',    label: '🟢 gemini-2.5-flash-lite' },
+      { value: 'gemini-2.5-flash',         label: '🟡 gemini-2.5-flash' },
+      { value: 'gemini-3.1-flash-preview', label: '🟡 gemini-3.1-flash-preview' },
+      { value: 'gemini-2.5-pro',           label: '🔴 gemini-2.5-pro' },
+      { value: 'gemini-3.1-pro-preview',   label: '🔴 gemini-3.1-pro-preview' },
+    ],
+    icon: 'mdi-google',
+    label: 'Gemini Analysis',
+  },
+  claude: {
+    modelKey: 'claude_model',
+    defaultModel: 'claude-haiku-4-5-20251001',
+    models: [
+      { value: 'claude-haiku-4-5-20251001', label: '🟢 claude-haiku-4-5' },
+      { value: 'claude-sonnet-4-6',         label: '🟡 claude-sonnet-4-6' },
+      { value: 'claude-opus-4-7',           label: '🔴 claude-opus-4-7' },
+    ],
+    icon: 'mdi-robot',
+    label: 'Claude Analysis',
+  },
+}
 
-function AiModePanel({ files, selectedIds, aiAnalysisMap, onRun }) {
+function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun }) {
+  const cfg = AI_PROVIDER_CONFIG[provider] ?? AI_PROVIDER_CONFIG.gemini
   const [model, setModel] = useState(() =>
-    localStorage.getItem(GEMINI_MODEL_KEY) || GEMINI_DEFAULT_MODEL
+    localStorage.getItem(cfg.modelKey) || cfg.defaultModel
   )
+
+  // Re-sync model when provider changes
+  useEffect(() => {
+    setModel(localStorage.getItem(cfg.modelKey) || cfg.defaultModel)
+  }, [provider])
 
   const photoFiles = files.filter(f => f.file_type === 'photo')
   const targetCount = selectedIds.size > 0
@@ -505,13 +529,13 @@ function AiModePanel({ files, selectedIds, aiAnalysisMap, onRun }) {
 
   function handleModelChange(e) {
     setModel(e.target.value)
-    localStorage.setItem(GEMINI_MODEL_KEY, e.target.value)
+    localStorage.setItem(cfg.modelKey, e.target.value)
   }
 
   return (
     <div className="hv-mode-settings hv-ai-panel">
       <span className="hv-mode-settings-label">
-        <i className="mdi mdi-google" /> Gemini Analysis
+        <i className={`mdi ${cfg.icon}`} /> {cfg.label}
       </span>
       <div className="hv-ai-panel-info">
         {analyzedCount > 0
@@ -520,7 +544,7 @@ function AiModePanel({ files, selectedIds, aiAnalysisMap, onRun }) {
         }
       </div>
       <select className="hv-ai-model-select" value={model} onChange={handleModelChange}>
-        {GEMINI_PANEL_MODELS.map(m => (
+        {cfg.models.map(m => (
           <option key={m.value} value={m.value}>{m.label}</option>
         ))}
       </select>
@@ -576,6 +600,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
 
   const [geminiOpen, setGeminiOpen]         = useState(false)
   const [geminiStructured, setGeminiStructured] = useState(false)
+  const [claudeOpen, setClaudeOpen]         = useState(false)
   const [aiAnalysisMap, setAiAnalysisMap]   = useState(new Map())
 
   const [focusedFileIndex, setFocusedFileIndex] = useState(null)
@@ -1039,10 +1064,18 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       {/* Mode settings panel */}
       {!peekOriginal && activeMode.isAiMode && (
         <AiModePanel
+          provider={activeMode.aiProvider}
           files={files}
           selectedIds={selectedIds}
           aiAnalysisMap={aiAnalysisMap}
-          onRun={() => { setGeminiStructured(true); setGeminiOpen(true) }}
+          onRun={() => {
+            if (activeMode.aiProvider === 'claude') {
+              setClaudeOpen(true)
+            } else {
+              setGeminiStructured(true)
+              setGeminiOpen(true)
+            }
+          }}
         />
       )}
       {!peekOriginal && !activeMode.isAiMode && activeMode.params?.length > 0 && (
@@ -1174,6 +1207,20 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             fileIds={ids}
             structured={geminiStructured}
             onClose={() => { setGeminiOpen(false); setGeminiStructured(false) }}
+            onComplete={reloadAiAnalysis}
+          />
+        )
+      })()}
+
+      {claudeOpen && (() => {
+        const photoFiles = files.filter(f => f.file_type === 'photo')
+        const ids = selectedIds.size > 0
+          ? photoFiles.filter(f => selectedIds.has(f.id)).map(f => f.id)
+          : photoFiles.map(f => f.id)
+        return (
+          <ClaudeAnalysisModal
+            fileIds={ids}
+            onClose={() => setClaudeOpen(false)}
             onComplete={reloadAiAnalysis}
           />
         )

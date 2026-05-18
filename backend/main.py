@@ -1062,6 +1062,123 @@ def gemini_analyze_batch(req: GeminiAnalyzeRequest):
     }
 
 
+CLAUDE_PRICING = {
+    'claude-opus-4-7':            {'input': 15.00, 'output': 75.00},
+    'claude-sonnet-4-6':          {'input':  3.00, 'output': 15.00},
+    'claude-haiku-4-5-20251001':  {'input':  0.80, 'output':  4.00},
+    'claude-3-5-sonnet-20241022': {'input':  3.00, 'output': 15.00},
+    'claude-3-5-haiku-20241022':  {'input':  0.80, 'output':  4.00},
+    'claude-3-opus-20240229':     {'input': 15.00, 'output': 75.00},
+}
+
+
+class ClaudeAnalyzeRequest(BaseModel):
+    file_ids: list[int]
+    prompt: str
+    model: str
+    api_key: str
+
+
+@app.post("/claude_analyze_batch", summary="Structured analysis via Anthropic Claude + save to DB")
+def claude_analyze_batch(req: ClaudeAnalyzeRequest):
+    try:
+        from anthropic import Anthropic
+    except ImportError:
+        raise HTTPException(status_code=500, detail="anthropic not installed. Run: pip install anthropic")
+
+    import base64, io, json
+    from PIL import Image as PILImage
+
+    with get_connection() as conn:
+        file_rows = [get_file_by_id(conn, fid) for fid in req.file_ids]
+
+    images_b64, file_ids_used = [], []
+    for row in file_rows:
+        if row is None or row["file_type"] != "photo":
+            continue
+        try:
+            img = PILImage.open(row["file_path"])
+            img.thumbnail((1024, 1024), PILImage.LANCZOS)
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG", quality=85)
+            images_b64.append(base64.b64encode(buf.getvalue()).decode())
+            file_ids_used.append(row["id"])
+        except Exception as e:
+            logger.warning("Claude batch: не удалось открыть %s: %s", row.get("file_path", "?"), e)
+
+    if not images_b64:
+        raise HTTPException(status_code=400, detail="No valid photo files found")
+
+    logger.info("🤖 Claude batch %s: %d изображений", req.model, len(images_b64))
+
+    content = []
+    for b64 in images_b64:
+        content.append({"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}})
+    content.append({"type": "text", "text": req.prompt})
+
+    try:
+        client = Anthropic(api_key=req.api_key)
+        t0 = time.time()
+        response = client.messages.create(
+            model=req.model,
+            max_tokens=4096,
+            messages=[{"role": "user", "content": content}],
+        )
+        elapsed_ms = int((time.time() - t0) * 1000)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    raw_text = response.content[0].text if response.content else ""
+
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = "\n".join(cleaned.split("\n")[1:])
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3].strip()
+
+    parsed = None
+    try:
+        parsed = json.loads(cleaned)
+    except Exception:
+        pass
+
+    in_tok  = response.usage.input_tokens
+    out_tok = response.usage.output_tokens
+    tot_tok = in_tok + out_tok
+
+    cost = 0.0
+    if req.model in CLAUDE_PRICING:
+        p = CLAUDE_PRICING[req.model]
+        cost = (in_tok / 1_000_000) * p["input"] + (out_tok / 1_000_000) * p["output"]
+
+    saved_count = 0
+    if parsed and "scene" in parsed and "images" in parsed:
+        scene    = parsed.get("scene", "")
+        img_data = parsed.get("images", [])
+        with get_connection() as conn:
+            for i, fid in enumerate(file_ids_used):
+                entry        = img_data[i] if i < len(img_data) else {}
+                description  = entry.get("description", "")
+                objects_list = entry.get("objects", [])
+                objects_str  = " ".join(str(o) for o in objects_list if o)
+                save_ai_analysis(conn, fid, "claude", req.model, scene, description, objects_str)
+                saved_count += 1
+
+    logger.info("   └─ %d токенов (in:%d out:%d), %.0f мс, $%.6f, сохранено %d", tot_tok, in_tok, out_tok, elapsed_ms, cost, saved_count)
+
+    return {
+        "raw_text": raw_text,
+        "parsed": parsed,
+        "input_tokens": in_tok,
+        "output_tokens": out_tok,
+        "total_tokens": tot_tok,
+        "cost_usd": cost,
+        "elapsed_ms": elapsed_ms,
+        "images_used": len(images_b64),
+        "saved_count": saved_count,
+    }
+
+
 @app.get("/ai_analysis", summary="Fetch saved AI analysis for given file IDs")
 def get_ai_analysis(file_ids: str = Query(..., description="Comma-separated file IDs")):
     try:

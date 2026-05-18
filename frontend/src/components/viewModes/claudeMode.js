@@ -1,11 +1,11 @@
 import { getThumbnailUrl } from '../../api.js'
 
 export default {
-  key: 'gemini_analysis',
-  label: 'Gemini Analysis',
+  key: 'claude_analysis',
+  label: 'Claude Analysis',
   params: [],
   isAiMode: true,
-  aiProvider: 'gemini',
+  aiProvider: 'claude',
   getImageUrl(file) {
     return getThumbnailUrl(file.id)
   },

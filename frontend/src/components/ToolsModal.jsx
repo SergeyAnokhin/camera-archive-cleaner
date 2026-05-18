@@ -39,6 +39,22 @@ const GEMINI_PROMPT_KEY  = 'gemini_prompt'
 const GEMINI_DEFAULT_MODEL  = 'gemini-3.1-flash-lite'
 const GEMINI_DEFAULT_PROMPT = 'Детально опиши, что происходит на этих снимках с камеры видеонаблюдения. Перечисли все заметные объекты, людей, транспортные средства и события.'
 
+const CLAUDE_API_KEY_KEY   = 'claude_api_key'
+const CLAUDE_MODEL_KEY     = 'claude_model'
+const CLAUDE_DEFAULT_MODEL = 'claude-haiku-4-5-20251001'
+
+const CLAUDE_MODELS = [
+  { value: 'claude-haiku-4-5-20251001', label: 'claude-haiku-4-5',   tier: '🟢 lite' },
+  { value: 'claude-sonnet-4-6',         label: 'claude-sonnet-4-6',  tier: '🟡 base' },
+  { value: 'claude-opus-4-7',           label: 'claude-opus-4-7',    tier: '🔴 pro'  },
+]
+
+const CLAUDE_PRICING = {
+  'claude-haiku-4-5-20251001': { input: 0.80,  output: 4.00  },
+  'claude-sonnet-4-6':         { input: 3.00,  output: 15.00 },
+  'claude-opus-4-7':           { input: 15.00, output: 75.00 },
+}
+
 const GEMINI_MODELS = [
   { value: 'gemini-3.1-flash-lite',    label: 'gemini-3.1-flash-lite',    tier: '🟢 lite' },
   { value: 'gemini-2.5-flash-lite',    label: 'gemini-2.5-flash-lite',    tier: '🟢 lite' },
@@ -98,6 +114,8 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
   const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem(GEMINI_API_KEY_KEY) || '')
   const [geminiModel, setGeminiModel]   = useState(() => localStorage.getItem(GEMINI_MODEL_KEY) || GEMINI_DEFAULT_MODEL)
   const [geminiPrompt, setGeminiPrompt] = useState(() => localStorage.getItem(GEMINI_PROMPT_KEY) || GEMINI_DEFAULT_PROMPT)
+  const [claudeApiKey, setClaudeApiKey] = useState(() => localStorage.getItem(CLAUDE_API_KEY_KEY) || '')
+  const [claudeModel, setClaudeModel]   = useState(() => localStorage.getItem(CLAUDE_MODEL_KEY) || CLAUDE_DEFAULT_MODEL)
 
   const [dbConfirm, setDbConfirm] = useState(false)
   const [dbBusy, setDbBusy]       = useState(false)
@@ -209,13 +227,23 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     setGeminiPrompt(e.target.value)
     localStorage.setItem(GEMINI_PROMPT_KEY, e.target.value)
   }
+  function handleClaudeApiKeyChange(e) {
+    setClaudeApiKey(e.target.value)
+    localStorage.setItem(CLAUDE_API_KEY_KEY, e.target.value)
+  }
+  function handleClaudeModelChange(e) {
+    setClaudeModel(e.target.value)
+    localStorage.setItem(CLAUDE_MODEL_KEY, e.target.value)
+  }
 
   const selectedModelPricing = GEMINI_PRICING[geminiModel]
+  const selectedClaudePricing = CLAUDE_PRICING[claudeModel]
 
   const TABS = [
     { id: 'general',     label: 'General' },
     { id: 'hour_view',   label: 'Hour view' },
     { id: 'google_ai',   label: 'Google AI' },
+    { id: 'claude_ai',   label: 'Claude AI' },
     { id: 'maintenance', label: 'Maintenance' },
   ]
 
@@ -362,6 +390,39 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
                 onChange={handleGeminiPromptChange}
               />
               <div className="modal-setting-hint">Sent together with selected images. Can be edited before each run in the analysis modal.</div>
+            </div>
+          </>}
+
+          {activeTab === 'claude_ai' && <>
+            {/* API key */}
+            <div className="modal-section">
+              <div className="modal-section-title">API Key</div>
+              <input
+                type="password"
+                className="modal-text-input"
+                placeholder="sk-ant-..."
+                value={claudeApiKey}
+                onChange={handleClaudeApiKeyChange}
+                autoComplete="off"
+              />
+              <div className="modal-setting-hint">
+                Anthropic API key. Get it at <span className="modal-link">console.anthropic.com</span>
+              </div>
+            </div>
+
+            {/* Model */}
+            <div className="modal-section">
+              <div className="modal-section-title">Model</div>
+              <select className="modal-select" value={claudeModel} onChange={handleClaudeModelChange}>
+                {CLAUDE_MODELS.map(m => (
+                  <option key={m.value} value={m.value}>{m.tier}  {m.label}</option>
+                ))}
+              </select>
+              {selectedClaudePricing && (
+                <div className="modal-setting-hint">
+                  Pricing: input ${selectedClaudePricing.input.toFixed(2)} / output ${selectedClaudePricing.output.toFixed(2)} per 1M tokens
+                </div>
+              )}
             </div>
           </>}
 
