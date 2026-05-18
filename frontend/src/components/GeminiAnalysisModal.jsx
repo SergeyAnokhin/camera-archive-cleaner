@@ -4,27 +4,24 @@ import './GeminiAnalysisModal.css'
 
 const GEMINI_API_KEY_KEY = 'gemini_api_key'
 const GEMINI_MODEL_KEY   = 'gemini_model'
-const GEMINI_PROMPT_KEY  = 'gemini_prompt'
+const GEMINI_PROMPT_KEY  = 'gemini_structured_prompt'
 const GEMINI_DEFAULT_MODEL  = 'gemini-3.1-flash-lite'
 const GEMINI_DEFAULT_PROMPT = 'Детально опиши, что происходит на этих снимках с камеры видеонаблюдения. Перечисли все заметные объекты, людей, транспортные средства и события.'
 
+const FALLBACK_STRUCTURED_TEMPLATE = `Ты анализируешь {n} снимков с камеры видеонаблюдения.
+
+Для каждого снимка:
+- description: 1-2 предложения. Опиши ДИНАМИЧЕСКИЕ объекты и их взаимодействие или положение. Если очевидно, что объект что-то делает — укажи, но только при высокой уверенности. Фон и декорации не описывай.
+- objects: массив коротких слов для динамических объектов: "человек", "кошка", "собака", "птица", "машина", "грузовик", "велосипед", "мотоцикл", "дождь", "снег", "паук", "лиса", "пакет". Если ничего — [].
+
+scene: 1 предложение — что в целом происходит на этих {n} снимках (общая активность, не описание места).
+
+Ответь СТРОГО JSON (без markdown, без пояснений):
+{"scene": "...", "images": [{"description": "...", "objects": [...]}, ...]}`
+
 function buildStructuredPrompt(n) {
-  return `Ты анализируешь ${n} снимк${n === 1 ? '' : n < 5 ? 'а' : 'ов'} с камеры видеонаблюдения.
-
-Шаг 1 — ОБЩАЯ СЦЕНА: Опиши в 1-2 предложениях СТАТИЧНЫЙ фон, который присутствует на всех снимках постоянно (здания, ограждения, ландшафт, постоянные объекты).
-
-Шаг 2 — ДЛЯ КАЖДОГО ИЗ ${n} СНИМКОВ предоставь:
-  - description: 2-3 предложения о том, что конкретно происходит на ЭТОМ снимке (не повторяй фон, фокусируйся на изменениях и событиях).
-  - objects: массив обнаруженных ДИНАМИЧЕСКИХ объектов. Используй короткие слова: "человек", "кошка", "собака", "птица", "машина", "грузовик", "велосипед", "мотоцикл", "дождь", "снег", "паук", "лиса", "пакет". Исключи статичный фон. Если ничего динамического нет — [].
-
-Ответь СТРОГО в формате JSON (без markdown, без пояснений):
-{
-  "scene": "...",
-  "images": [
-    {"description": "...", "objects": ["человек", "машина"]},
-    ...
-  ]
-}`
+  const template = localStorage.getItem(GEMINI_PROMPT_KEY) || FALLBACK_STRUCTURED_TEMPLATE
+  return template.replace(/\{n\}/g, n)
 }
 
 // structured=true → structured prompt + JSON response + onComplete callback
@@ -36,7 +33,7 @@ export default function GeminiAnalysisModal({ fileIds, onClose, structured = fal
   const [prompt, setPrompt] = useState(() =>
     structured
       ? buildStructuredPrompt(fileIds.length)
-      : (localStorage.getItem(GEMINI_PROMPT_KEY) || GEMINI_DEFAULT_PROMPT)
+      : (localStorage.getItem('gemini_prompt') || GEMINI_DEFAULT_PROMPT)
   )
   const [running, setRunning]   = useState(false)
   const [result, setResult]     = useState(null)

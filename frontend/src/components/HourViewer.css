@@ -698,6 +698,16 @@
 }
 .hv-ai-run-btn:hover { background: rgba(14, 165, 233, 0.25); border-color: var(--accent); }
 
+.hv-ai-stats {
+  font-size: calc(var(--font-base) * 0.75);
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.hv-ai-stats .mdi { color: var(--accent); }
+
 .hv-ai-scene {
   width: 100%;
   font-size: calc(var(--font-base) * 0.78);
@@ -748,13 +758,13 @@
   background: rgba(8, 15, 26, 0.90);
   backdrop-filter: blur(4px);
   color: rgba(255, 255, 255, 0.88);
-  font-size: calc(var(--font-base) * 0.68);
-  padding: 4px 6px;
+  font-size: calc(var(--font-base) * 0.58);
+  padding: 3px 5px;
   display: none;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   z-index: 4;
-  max-height: 90px;
+  max-height: 70px;
   overflow: hidden;
 }
 

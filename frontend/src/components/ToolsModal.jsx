@@ -35,9 +35,18 @@ const DIFF_THRESHOLD_DEFAULT = 20
 
 const GEMINI_API_KEY_KEY = 'gemini_api_key'
 const GEMINI_MODEL_KEY   = 'gemini_model'
-const GEMINI_PROMPT_KEY  = 'gemini_prompt'
+const GEMINI_PROMPT_KEY  = 'gemini_structured_prompt'
 const GEMINI_DEFAULT_MODEL  = 'gemini-3.1-flash-lite'
-const GEMINI_DEFAULT_PROMPT = 'Детально опиши, что происходит на этих снимках с камеры видеонаблюдения. Перечисли все заметные объекты, людей, транспортные средства и события.'
+const GEMINI_DEFAULT_PROMPT = `Ты анализируешь {n} снимков с камеры видеонаблюдения.
+
+Для каждого снимка:
+- description: 1-2 предложения. Опиши ДИНАМИЧЕСКИЕ объекты и их взаимодействие или положение. Если очевидно, что объект что-то делает — укажи, но только при высокой уверенности. Фон и декорации не описывай.
+- objects: массив коротких слов для динамических объектов: "человек", "кошка", "собака", "птица", "машина", "грузовик", "велосипед", "мотоцикл", "дождь", "снег", "паук", "лиса", "пакет". Если ничего — [].
+
+scene: 1 предложение — что в целом происходит на этих {n} снимках (общая активность, не описание места).
+
+Ответь СТРОГО JSON (без markdown, без пояснений):
+{"scene": "...", "images": [{"description": "...", "objects": [...]}, ...]}`
 
 const CLAUDE_API_KEY_KEY   = 'claude_api_key'
 const CLAUDE_MODEL_KEY     = 'claude_model'
@@ -382,14 +391,14 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
 
             {/* Prompt */}
             <div className="modal-section">
-              <div className="modal-section-title">Default prompt</div>
+              <div className="modal-section-title">Structured prompt template</div>
               <textarea
                 className="modal-textarea"
-                rows={5}
+                rows={10}
                 value={geminiPrompt}
                 onChange={handleGeminiPromptChange}
               />
-              <div className="modal-setting-hint">Sent together with selected images. Can be edited before each run in the analysis modal.</div>
+              <div className="modal-setting-hint"><code style={{fontFamily:'monospace'}}>{'{n}'}</code> заменяется на количество снимков при запуске. Промт редактируется перед каждым запуском в окне анализа.</div>
             </div>
           </>}
 

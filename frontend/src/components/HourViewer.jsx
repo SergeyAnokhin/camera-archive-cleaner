@@ -473,6 +473,25 @@ const AI_ICON_MAP = {
   'spider':  { mdi: 'mdi-spider',         color: '#f87171' },
 }
 
+function recordAiRequest(provider) {
+  const key = `ai_requests_${provider}`
+  const now = Date.now()
+  const arr = JSON.parse(localStorage.getItem(key) || '[]')
+  arr.push(now)
+  const cutoff = now - 25 * 60 * 60 * 1000  // keep 25h to be safe
+  localStorage.setItem(key, JSON.stringify(arr.filter(t => t > cutoff)))
+}
+
+function getAiRequestStats(provider) {
+  const key = `ai_requests_${provider}`
+  const now = Date.now()
+  const arr = JSON.parse(localStorage.getItem(key) || '[]')
+  return {
+    lastMinute: arr.filter(t => t > now - 60_000).length,
+    last24h:    arr.filter(t => t > now - 86_400_000).length,
+  }
+}
+
 function resolveAiIcons(objectsStr) {
   if (!objectsStr) return []
   return objectsStr.split(/\s+/).filter(Boolean).map(o => {
@@ -486,12 +505,12 @@ const AI_PROVIDER_CONFIG = {
     modelKey: 'gemini_model',
     defaultModel: 'gemini-3.1-flash-lite',
     models: [
-      { value: 'gemini-3.1-flash-lite',    label: '🟢 gemini-3.1-flash-lite' },
-      { value: 'gemini-2.5-flash-lite',    label: '🟢 gemini-2.5-flash-lite' },
-      { value: 'gemini-2.5-flash',         label: '🟡 gemini-2.5-flash' },
-      { value: 'gemini-3.1-flash-preview', label: '🟡 gemini-3.1-flash-preview' },
-      { value: 'gemini-2.5-pro',           label: '🔴 gemini-2.5-pro' },
-      { value: 'gemini-3.1-pro-preview',   label: '🔴 gemini-3.1-pro-preview' },
+      { value: 'gemini-3.1-flash-lite',    label: '🟢 gemini-3.1-flash-lite ($0.25/$1.50)' },
+      { value: 'gemini-2.5-flash-lite',    label: '🟢 gemini-2.5-flash-lite ($0.10/$0.40)' },
+      { value: 'gemini-2.5-flash',         label: '🟡 gemini-2.5-flash ($0.30/$2.50)' },
+      { value: 'gemini-3.1-flash-preview', label: '🟡 gemini-3.1-flash-preview ($0.50/$3.00)' },
+      { value: 'gemini-2.5-pro',           label: '🔴 gemini-2.5-pro ($1.25/$10.00)' },
+      { value: 'gemini-3.1-pro-preview',   label: '🔴 gemini-3.1-pro-preview ($2.00/$12.00)' },
     ],
     icon: 'mdi-google',
     label: 'Gemini Analysis',
@@ -500,16 +519,16 @@ const AI_PROVIDER_CONFIG = {
     modelKey: 'claude_model',
     defaultModel: 'claude-haiku-4-5-20251001',
     models: [
-      { value: 'claude-haiku-4-5-20251001', label: '🟢 claude-haiku-4-5' },
-      { value: 'claude-sonnet-4-6',         label: '🟡 claude-sonnet-4-6' },
-      { value: 'claude-opus-4-7',           label: '🔴 claude-opus-4-7' },
+      { value: 'claude-haiku-4-5-20251001', label: '🟢 claude-haiku-4-5 ($0.80/$4.00)' },
+      { value: 'claude-sonnet-4-6',         label: '🟡 claude-sonnet-4-6 ($3.00/$15.00)' },
+      { value: 'claude-opus-4-7',           label: '🔴 claude-opus-4-7 ($15.00/$75.00)' },
     ],
     icon: 'mdi-robot',
     label: 'Claude Analysis',
   },
 }
 
-function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun }) {
+function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun, statsKey }) {
   const cfg = AI_PROVIDER_CONFIG[provider] ?? AI_PROVIDER_CONFIG.gemini
   const [model, setModel] = useState(() =>
     localStorage.getItem(cfg.modelKey) || cfg.defaultModel
@@ -519,6 +538,8 @@ function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun }) {
   useEffect(() => {
     setModel(localStorage.getItem(cfg.modelKey) || cfg.defaultModel)
   }, [provider])
+
+  const stats = getAiRequestStats(provider)
 
   const photoFiles = files.filter(f => f.file_type === 'photo')
   const targetCount = selectedIds.size > 0
@@ -555,6 +576,13 @@ function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun }) {
           : `Анализ страницы (${photoFiles.length})`
         }
       </button>
+      {(stats.lastMinute > 0 || stats.last24h > 0) && (
+        <div className="hv-ai-stats">
+          <i className="mdi mdi-chart-timeline-variant" />
+          {stats.lastMinute > 0 && <span>{stats.lastMinute}/мин</span>}
+          <span>{stats.last24h}/24ч</span>
+        </div>
+      )}
       {sceneEntry?.scene_description && (
         <div className="hv-ai-scene" title={sceneEntry.scene_description}>
           <i className="mdi mdi-image-filter-hdr-outline" />
@@ -602,6 +630,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [geminiStructured, setGeminiStructured] = useState(false)
   const [claudeOpen, setClaudeOpen]         = useState(false)
   const [aiAnalysisMap, setAiAnalysisMap]   = useState(new Map())
+  const [aiStatsKey, setAiStatsKey]         = useState(0)
 
   const [focusedFileIndex, setFocusedFileIndex] = useState(null)
   const gridRef = useRef(null)
@@ -1068,6 +1097,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           files={files}
           selectedIds={selectedIds}
           aiAnalysisMap={aiAnalysisMap}
+          statsKey={aiStatsKey}
           onRun={() => {
             if (activeMode.aiProvider === 'claude') {
               setClaudeOpen(true)
@@ -1207,7 +1237,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             fileIds={ids}
             structured={geminiStructured}
             onClose={() => { setGeminiOpen(false); setGeminiStructured(false) }}
-            onComplete={reloadAiAnalysis}
+            onComplete={() => { recordAiRequest('gemini'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}
           />
         )
       })()}
@@ -1221,7 +1251,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           <ClaudeAnalysisModal
             fileIds={ids}
             onClose={() => setClaudeOpen(false)}
-            onComplete={reloadAiAnalysis}
+            onComplete={() => { recordAiRequest('claude'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}
           />
         )
       })()}
