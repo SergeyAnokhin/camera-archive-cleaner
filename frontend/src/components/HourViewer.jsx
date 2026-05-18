@@ -154,6 +154,7 @@ function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode,
   const [fullscreen, setFullscreen] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
   const cardRef = useRef(null)
+  const imgRef  = useRef(null)
 
   useEffect(() => {
     if (isFocused) cardRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
@@ -173,6 +174,13 @@ function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode,
   useEffect(() => {
     setLoaded(false)
     setError(false)
+    // If image was already in browser cache, `load` fires before React attaches
+    // onLoad, leaving the image hidden forever. Check `complete` as a fallback.
+    const img = imgRef.current
+    if (img?.complete) {
+      if (img.naturalWidth > 0) setLoaded(true)
+      else setError(true)
+    }
   }, [src])
 
   function handleClick(e) {
@@ -197,6 +205,7 @@ function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode,
         {error
           ? <div className="hv-img-error"><i className="mdi mdi-image-broken-variant" /></div>
           : <img
+              ref={imgRef}
               src={src}
               alt={formatTime(file.timestamp)}
               className="hv-photo-img"
