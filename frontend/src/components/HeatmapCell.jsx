@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { getPreviews, getThumbnailUrl } from '../api.js'
+import { getPreviews, getThumbnailUrl, getAiObjectsSummary } from '../api.js'
+import { resolveAiIcons } from '../aiHelpers.js'
 import './HeatmapCell.css'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -47,6 +48,7 @@ function dateRangeForCell(period, level, contextDateFrom) {
 
 export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selected, onToggle, isFocused }) {
   const [previewIds, setPreviewIds] = useState([])
+  const [aiObjects, setAiObjects]   = useState([])
   const cellRef = useRef(null)
 
   useEffect(() => {
@@ -54,6 +56,17 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
   }, [isFocused])
 
   const showPreviews = previewsPerCell > 0 && cell.photo_count > 0
+
+  useEffect(() => {
+    if (cell.bucket === 0) { setAiObjects([]); return }
+    const range = dateRangeForCell(cell.period, level, contextDateFrom)
+    if (!range) return
+    let cancelled = false
+    getAiObjectsSummary(cameraId, range.dateFrom, range.dateTo)
+      .then(data => { if (!cancelled) setAiObjects(data.objects ?? []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [cell.period, level, cameraId, contextDateFrom, cell.bucket])
 
   useEffect(() => {
     if (!showPreviews) { setPreviewIds([]); return }
@@ -113,6 +126,18 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
           ))}
         </div>
       )}
+      {aiObjects.length > 0 && (() => {
+        const allIcons = resolveAiIcons(aiObjects.join(' '))
+        const shown = allIcons.slice(0, 5)
+        return (
+          <div className="cell-ai-icons">
+            {shown.map((ic, i) => (
+              <i key={i} className={`mdi ${ic.mdi}`} style={{ color: ic.color }} title={ic.label} />
+            ))}
+            {allIcons.length > 5 && <span className="cell-ai-more">+{allIcons.length - 5}</span>}
+          </div>
+        )
+      })()}
     </div>
   )
 }

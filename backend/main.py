@@ -3,7 +3,7 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 # ── ANSI codes ────────────────────────────────────────────────────────────────
 _R   = "\033[0m"
@@ -1199,6 +1199,39 @@ def get_ai_analysis(file_ids: str = Query(..., description="Comma-separated file
         }
         for r in rows
     ]
+
+
+@app.get("/ai_objects_summary", summary="Unique AI-detected objects for a date range")
+def ai_objects_summary(
+    camera_id: Optional[int] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+):
+    q = """
+        SELECT aa.objects
+        FROM ai_analysis aa
+        JOIN files f ON aa.file_id = f.id
+        WHERE aa.objects IS NOT NULL AND aa.objects != ''
+    """
+    params: list = []
+    if camera_id is not None:
+        q += " AND f.camera_id = ?"
+        params.append(camera_id)
+    if date_from:
+        q += " AND f.timestamp >= ?"
+        params.append(date_from)
+    if date_to:
+        q += " AND f.timestamp <= ?"
+        params.append(date_to)
+    with get_connection() as conn:
+        rows = conn.execute(q, params).fetchall()
+    seen: dict = {}
+    for row in rows:
+        for obj in (row[0] or "").split():
+            low = obj.lower()
+            if low not in seen:
+                seen[low] = obj
+    return {"objects": list(seen.values())}
 
 
 def _fmt_range(dt_from, dt_to) -> str:

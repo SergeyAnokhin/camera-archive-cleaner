@@ -169,6 +169,10 @@ export function claudeAnalyzeBatch({ fileIds, prompt, model, apiKey }) {
   return postJson('/claude_analyze_batch', { file_ids: fileIds, prompt, model, api_key: apiKey })
 }
 
+export function getAiObjectsSummary(cameraId, dateFrom, dateTo) {
+  return get('/ai_objects_summary' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
+}
+
 export function getAiAnalysis(fileIds) {
   if (!fileIds.length) return Promise.resolve([])
   return get('/ai_analysis?file_ids=' + fileIds.join(','))

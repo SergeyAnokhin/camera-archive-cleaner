@@ -4,6 +4,7 @@ import DeleteConfirmModal from './DeleteConfirmModal.jsx'
 import GeminiAnalysisModal from './GeminiAnalysisModal.jsx'
 import ClaudeAnalysisModal from './ClaudeAnalysisModal.jsx'
 import { VIEW_MODES, DEFAULT_VIEW_MODE_KEY } from './viewModes/index.js'
+import { resolveAiIcons } from '../aiHelpers.js'
 import './HourViewer.css'
 
 const PAGE_SIZE_KEY    = 'hour_page_size'
@@ -438,46 +439,6 @@ function DistributionChart({ buckets, pageSize, page, total, onGoToPage, hourSta
 // AI analysis helpers
 // ---------------------------------------------------------------------------
 
-const AI_ICON_MAP = {
-  'человек': { mdi: 'mdi-account',           color: '#60a5fa' },
-  'люди':    { mdi: 'mdi-account-multiple',   color: '#60a5fa' },
-  'мужчина': { mdi: 'mdi-account',            color: '#60a5fa' },
-  'женщина': { mdi: 'mdi-account',            color: '#60a5fa' },
-  'ребёнок': { mdi: 'mdi-human-child',        color: '#60a5fa' },
-  'ребенок': { mdi: 'mdi-human-child',        color: '#60a5fa' },
-  'машина':  { mdi: 'mdi-car',               color: '#fbbf24' },
-  'автомобиль': { mdi: 'mdi-car',            color: '#fbbf24' },
-  'грузовик':{ mdi: 'mdi-truck',             color: '#fbbf24' },
-  'мотоцикл':{ mdi: 'mdi-motorbike',         color: '#fbbf24' },
-  'велосипед':{ mdi: 'mdi-bicycle',          color: '#fbbf24' },
-  'кошка':   { mdi: 'mdi-cat',              color: '#c084fc' },
-  'кот':     { mdi: 'mdi-cat',              color: '#c084fc' },
-  'собака':  { mdi: 'mdi-dog',              color: '#c084fc' },
-  'птица':   { mdi: 'mdi-bird',             color: '#34d399' },
-  'кролик':  { mdi: 'mdi-rabbit',           color: '#c084fc' },
-  'лиса':    { mdi: 'mdi-paw',              color: '#fb923c' },
-  'животное':{ mdi: 'mdi-paw',             color: '#fb923c' },
-  'дождь':   { mdi: 'mdi-weather-rainy',    color: '#93c5fd' },
-  'снег':    { mdi: 'mdi-weather-snowy',    color: '#bfdbfe' },
-  'паук':    { mdi: 'mdi-spider',           color: '#f87171' },
-  'паутина': { mdi: 'mdi-spider',           color: '#f87171' },
-  'насекомое':{ mdi: 'mdi-bug',            color: '#f87171' },
-  'пакет':   { mdi: 'mdi-package-variant',  color: '#fb923c' },
-  'посылка': { mdi: 'mdi-package-variant',  color: '#fb923c' },
-  'person':  { mdi: 'mdi-account',          color: '#60a5fa' },
-  'people':  { mdi: 'mdi-account-multiple', color: '#60a5fa' },
-  'car':     { mdi: 'mdi-car',             color: '#fbbf24' },
-  'truck':   { mdi: 'mdi-truck',           color: '#fbbf24' },
-  'motorcycle': { mdi: 'mdi-motorbike',    color: '#fbbf24' },
-  'bicycle': { mdi: 'mdi-bicycle',         color: '#fbbf24' },
-  'cat':     { mdi: 'mdi-cat',            color: '#c084fc' },
-  'dog':     { mdi: 'mdi-dog',            color: '#c084fc' },
-  'bird':    { mdi: 'mdi-bird',           color: '#34d399' },
-  'rain':    { mdi: 'mdi-weather-rainy',  color: '#93c5fd' },
-  'snow':    { mdi: 'mdi-weather-snowy',  color: '#bfdbfe' },
-  'spider':  { mdi: 'mdi-spider',         color: '#f87171' },
-}
-
 function recordAiRequest(provider) {
   const key = `ai_requests_${provider}`
   const now = Date.now()
@@ -495,14 +456,6 @@ function getAiRequestStats(provider) {
     lastMinute: arr.filter(t => t > now - 60_000).length,
     last24h:    arr.filter(t => t > now - 86_400_000).length,
   }
-}
-
-function resolveAiIcons(objectsStr) {
-  if (!objectsStr) return []
-  return objectsStr.split(/\s+/).filter(Boolean).map(o => {
-    const key = o.toLowerCase()
-    return AI_ICON_MAP[key] || { mdi: 'mdi-circle-small', color: '#94a3b8', label: o }
-  })
 }
 
 const AI_PROVIDER_CONFIG = {
