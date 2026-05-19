@@ -169,6 +169,14 @@ export function claudeAnalyzeBatch({ fileIds, prompt, model, apiKey }) {
   return postJson('/claude_analyze_batch', { file_ids: fileIds, prompt, model, api_key: apiKey })
 }
 
+export function openvinoAnalyzeBatch({ fileIds, modelName, confidence }) {
+  return postJson('/openvino_analyze_batch', { file_ids: fileIds, model_name: modelName, confidence })
+}
+
+export function getOpenVinoBboxThumbnailUrl(fileId, model, confidence) {
+  return `${BASE}/openvino_thumbnail/${fileId}?model=${encodeURIComponent(model)}&confidence=${confidence}`
+}
+
 export function getAiObjectsSummary(cameraId, dateFrom, dateTo) {
   return get('/ai_objects_summary' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }

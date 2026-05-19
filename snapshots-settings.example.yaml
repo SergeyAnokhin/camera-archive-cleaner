@@ -1,0 +1,55 @@
+# Camera Snapshots Cleaner — settings export
+# Generated: 2026-05-19T19:29:28.282Z
+
+ui:
+  font_size: 20
+  previews_per_cell: 6
+hour_view:
+  page_size: 20
+  thumb_width: 200
+  hover_zoom: 1.5
+  diff_threshold: 34
+  view_mode: gemini_analysis
+motion_modes:
+  motion_diff:
+    threshold: 26
+  diff_zoom:
+    threshold: 20
+  erosion:
+    threshold: 20
+  neon_mask:
+    threshold: 20
+  mhi:
+    threshold: 87
+  bounding_boxes:
+    threshold: 45
+  motion_stacking:
+    threshold: 100
+google_ai:
+  model: gemini-3.1-flash-lite
+  api_key: "# Get your key at aistudio.google.com"
+  prompt: >-
+    Ты анализируешь {n} снимков с камеры видеонаблюдения.
+
+
+    Для каждого снимка:
+
+    - description: 1-2 предложения. Опиши ДИНАМИЧЕСКИЕ объекты и их взаимодействие или положение. Если очевидно, что
+    объект что-то делает — укажи, но только при высокой уверенности. Фон и декорации не описывай.
+
+    - objects: массив коротких слов для динамических объектов. Используй максимально конкретные слова:
+      • Люди: "мужчина", "женщина", "ребёнок", "мальчик", "девочка" — или "человек" если пол/возраст не определить.
+      • Животные: "кошка", "собака", "птица", "курица", "кролик", "лиса", "белка", "конь", "корова", "ёж" и т.д. — НЕ пиши просто "животное".
+      • Транспорт: "машина", "грузовик", "велосипед", "мотоцикл", "автобус".
+      • Прочее: "дождь", "снег", "паук", "пакет".
+      Пустой массив [], если динамических объектов нет.
+
+    scene: 1 предложение — что в целом происходит на этих {n} снимках (общая активность, не описание места).
+
+
+    Ответь СТРОГО JSON (без markdown, без пояснений):
+
+    {"scene": "...", "images": [{"description": "...", "objects": [...]}, ...]}
+claude_ai:
+  model: claude-haiku-4-5-20251001
+  api_key: "# Get your key at console.anthropic.com"

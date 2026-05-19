@@ -150,3 +150,6 @@ vite.config.ts.timestamp-*
 /backend/diff_zoom_thumbnails_cache/*
 /backend/erosion_thumbnails_cache/*
 /backend/motion_thumbnails_cache/*
+/backend/openvino_thumbnails_cache/*
+/backend/models/*
+/backend/yolo**.pt

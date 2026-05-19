@@ -6,38 +6,41 @@ How the AI image analysis feature works: from API request to stored results to o
 
 ## Overview
 
-The app can send camera snapshots to an external AI API (Google Gemini or Anthropic Claude), receive a structured description of each image, persist the results to SQLite, and display object icons on every view level (individual photo cards, hour/day/month cells in the heatmap).
+The app supports two types of AI analysis:
+
+- **Cloud AI** (Gemini, Claude) — sends photos to an external API, receives a natural-language description + object list per photo. Requires an API key and internet access.
+- **Local AI** (OpenVINO) — runs YOLOv8 object detection on the local machine, no API key or internet required. Detects objects from the COCO 80-class vocabulary (people, animals, vehicles, etc.) and draws bounding boxes.
+
+Results from all providers are stored in the same `ai_analysis` table and displayed as icons on photo cards and heatmap cells.
 
 ---
 
 ## Supported providers
 
-| Provider | Key in DB | localStorage key (API key) | localStorage key (model) |
-|----------|-----------|---------------------------|--------------------------|
+| Provider | Key in DB | localStorage (API key) | localStorage (model) |
+|----------|-----------|------------------------|----------------------|
 | Google Gemini | `gemini` | `gemini_api_key` | `gemini_model` |
 | Anthropic Claude | `claude` | `claude_api_key` | `claude_model` |
+| OpenVINO (local) | `openvino` | — | `openvino_model` |
 
-Model lists and pricing are defined in:
-- [`frontend/src/components/HourViewer.jsx`](../frontend/src/components/HourViewer.jsx) — `AI_PROVIDER_CONFIG` constant (used in the mode-settings panel)
-- [`frontend/src/components/ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) — `GEMINI_MODELS / GEMINI_PRICING`, `CLAUDE_MODELS / CLAUDE_PRICING` (used in the Settings tabs)
-
-API keys and model choice are stored in `localStorage` only — they never reach the backend except as part of the analysis request body.
+OpenVINO also uses `openvino_confidence` (float, default `0.25`) stored in localStorage.
 
 ---
 
 ## View modes
 
-Each provider has a dedicated **view mode** registered in the mode switcher:
+| Mode key | Label | `isAiMode` | File |
+|----------|-------|-----------|------|
+| `gemini_analysis` | Gemini Analysis | ✓ | [`viewModes/geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) |
+| `claude_analysis` | Claude Analysis | ✓ | [`viewModes/claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) |
+| `openvino_detection` | OpenVINO Detection | ✓ | [`viewModes/openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) |
+| `openvino_bbox` | OpenVINO Boxes | — | [`viewModes/openvinoBboxMode.js`](../frontend/src/components/viewModes/openvinoBboxMode.js) |
 
-| Mode key | Label | File |
-|----------|-------|------|
-| `gemini_analysis` | Gemini Analysis | [`frontend/src/components/viewModes/geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) |
-| `claude_analysis` | Claude Analysis | [`frontend/src/components/viewModes/claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) |
+Modes with `isAiMode: true`:
+- Replace the normal mode-settings panel with `AiModePanel` (model selector + Run button + request stats)
+- Enable the per-card hover description tooltip
 
-Both modes set `isAiMode: true` and `aiProvider: 'gemini' | 'claude'`. This flag:
-- Replaces the normal mode-settings panel with `AiModePanel` (model selector + Run button + stats)
-- Enables the per-card hover description tooltip
-- Is checked in `HeatmapCell` logic (no effect there — cells always show icons regardless of active mode)
+**OpenVINO Boxes** (`openvino_bbox`) is a visualization mode, not an analysis mode — it fetches a cached JPEG with bounding boxes already drawn, using the model and confidence last set in the analysis modal.
 
 Mode registration: [`frontend/src/components/viewModes/index.js`](../frontend/src/components/viewModes/index.js)
 
@@ -53,23 +56,27 @@ AiModePanel (HourViewer.jsx)
     │  reads model from localStorage
     │  determines target file IDs (selected or all photos on page)
     │
-    ├─ provider === 'gemini' ──► GeminiAnalysisModal.jsx
-    │                               POST /gemini_analyze_batch
+    ├─ provider === 'gemini'   ──► GeminiAnalysisModal.jsx
+    │                                POST /gemini_analyze_batch
+    │                                (natural language description + object list)
     │
-    └─ provider === 'claude' ──► ClaudeAnalysisModal.jsx
-                                    POST /claude_analyze_batch
+    ├─ provider === 'claude'   ──► ClaudeAnalysisModal.jsx
+    │                                POST /claude_analyze_batch
+    │                                (same structured format)
+    │
+    └─ provider === 'openvino' ──► OpenVinoAnalysisModal.jsx
+                                     POST /openvino_analyze_batch
+                                     (YOLO detection, COCO classes → Russian words)
 ```
 
-### What the modals do
-
-1. Show the editable structured prompt (pre-filled from localStorage template or fallback)
-2. On submit: call the backend endpoint with `{ file_ids, prompt, model, api_key }`
-3. Show stats on completion: elapsed time, token counts, cost, saved count
-4. Call `onComplete()` → triggers `recordAiRequest(provider)` (localStorage stats) + `reloadAiAnalysis()` (refreshes icon map for current page)
+Each modal on completion calls `onComplete()` which:
+1. Calls `recordAiRequest(provider)` — appends timestamp to localStorage stats
+2. Calls `reloadAiAnalysis()` — refreshes the icon map for the current page
 
 **Modal files:**
-- [`frontend/src/components/GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx)
-- [`frontend/src/components/ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx)
+- [`frontend/src/components/GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) — editable prompt, token stats, cost estimate
+- [`frontend/src/components/ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) — same format
+- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider, per-photo object list, ms/photo timing
 - Shared CSS: [`frontend/src/components/GeminiAnalysisModal.css`](../frontend/src/components/GeminiAnalysisModal.css)
 
 ---
@@ -91,10 +98,33 @@ AiModePanel (HourViewer.jsx)
 
 [`backend/main.py`](../backend/main.py) — `claude_analyze_batch()`
 
-Same flow, but:
-- Converts images to base64 JPEG
-- Sends as `image` content blocks via `anthropic` SDK (`client.messages.create()`)
-- Same JSON response format expected
+Same flow, but converts images to base64 JPEG and sends via `anthropic` SDK (`client.messages.create()`).
+
+### `POST /openvino_analyze_batch`
+
+[`backend/main.py`](../backend/main.py) — `openvino_analyze_batch()`
+
+Request: `{ file_ids, model_name, confidence }`
+
+1. Loads YOLOv8 model lazily via `_load_yolo()` — tries `backend/models/{model}_openvino_model/` first, falls back to `.pt` download
+2. Runs detection on each photo at the given confidence threshold
+3. Maps COCO English class names → Russian via `_COCO_TO_RUSSIAN` dict
+4. Saves each result via `save_ai_analysis()` with `provider='openvino'`, empty `scene_description`/`image_description`
+5. Returns: `{ elapsed_ms, images_used, saved_count, results: { file_id: [ru_word, ...] } }`
+
+Objects are stored as Russian words so they match the existing `AI_ICON_MAP` in `aiHelpers.js`.
+
+### `GET /openvino_thumbnail/{file_id}?model=yolov8n&confidence=0.25`
+
+[`backend/main.py`](../backend/main.py) — `get_openvino_thumbnail()`
+
+Returns a JPEG with bounding boxes drawn by YOLO's built-in `.plot()` renderer:
+- Colored rectangle per detected object (automatic distinct color per class)
+- Label: `person 0.87`, `cat 0.62` etc. (COCO English name + confidence)
+- Output resized to max 640 × 640 px
+
+Cache: `backend/openvino_thumbnails_cache/{sha256(v1:file_id:model:conf)[:16]}.jpg`
+Included in `DELETE /all_thumbnails` cleanup.
 
 ### `GET /ai_analysis?file_ids=1,2,3`
 
@@ -102,9 +132,9 @@ Returns saved analysis rows for the given file IDs. Called by `HourViewer` on ev
 
 ### `GET /ai_objects_summary?camera_id=&date_from=&date_to=`
 
-Returns unique object words found across all `ai_analysis` rows for files in the given date range. Called by each `HeatmapCell` to show aggregate icons. Returns `{ objects: ["мужчина", "кошка", ...] }`.
+Returns unique object words across all `ai_analysis` rows for files in the given date range. Called by each `HeatmapCell` to show aggregate icons.
 
-**API client functions:** [`frontend/src/api.js`](../frontend/src/api.js) — `claudeAnalyzeBatch`, `geminiAnalyzeBatch`, `getAiAnalysis`, `getAiObjectsSummary`
+**API client functions:** [`frontend/src/api.js`](../frontend/src/api.js) — `geminiAnalyzeBatch`, `claudeAnalyzeBatch`, `openvinoAnalyzeBatch`, `getOpenVinoBboxThumbnailUrl`, `getAiAnalysis`, `getAiObjectsSummary`
 
 ---
 
@@ -119,14 +149,14 @@ CREATE TABLE IF NOT EXISTS ai_analysis (
     provider          TEXT    NOT NULL DEFAULT 'gemini',
     model             TEXT    NOT NULL,
     analyzed_at       TEXT    NOT NULL DEFAULT (datetime('now')),
-    scene_description TEXT,   -- shared scene sentence
-    image_description TEXT,   -- per-image description
+    scene_description TEXT,   -- shared scene sentence (empty for OpenVINO)
+    image_description TEXT,   -- per-image description (empty for OpenVINO)
     objects           TEXT,   -- space-separated object words
     FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
 );
 ```
 
-**UPSERT rule:** `UNIQUE(file_id)` — whichever analysis ran last wins. `provider`, `model`, and `analyzed_at` record which run produced the current data. Running Gemini after Claude (or vice versa) on the same photo will overwrite the previous result.
+**UPSERT rule:** `UNIQUE(file_id)` — whichever analysis ran last wins. Running any provider on the same photo overwrites the previous result.
 
 DB helpers: `save_ai_analysis()`, `get_ai_analysis_by_file_ids()` in [`backend/database.py`](../backend/database.py).
 
@@ -134,49 +164,205 @@ DB helpers: `save_ai_analysis()`, `get_ai_analysis_by_file_ids()` in [`backend/d
 
 ## Object vocabulary & icons
 
-Object words are short Russian (or English) keywords stored space-separated in `ai_analysis.objects`, e.g. `"мужчина кошка дождь"`.
-
-The icon map and deduplication logic live in a **shared helper** used by both HourViewer and HeatmapCell:
+Object words are short Russian (or English) keywords stored space-separated in `ai_analysis.objects`, e.g. `"человек кошка"`.
 
 **[`frontend/src/aiHelpers.js`](../frontend/src/aiHelpers.js)**
 - `AI_ICON_MAP` — maps keyword → `{ mdi: 'mdi-xxx', color: '#rrggbb' }`
 - `resolveAiIcons(objectsStr)` — splits string, looks up icons, deduplicates by MDI class
 
-### People keywords
+### COCO classes detected by OpenVINO (Russian → icon)
 
-| Word | Icon | Color |
-|------|------|-------|
-| `мужчина` | `mdi-human-male` | blue `#60a5fa` |
-| `женщина` | `mdi-human-female` | pink `#f9a8d4` |
-| `ребёнок` / `мальчик` | `mdi-human-child` | cyan / blue |
-| `девочка` | `mdi-human-child` | pink |
-| `человек` | `mdi-account` | blue (fallback if gender unknown) |
+| Russian word | COCO class | Icon |
+|---|---|---|
+| `человек` | person | `mdi-account` blue |
+| `велосипед` | bicycle | `mdi-bicycle` yellow |
+| `машина` | car | `mdi-car` yellow |
+| `мотоцикл` | motorcycle | `mdi-motorbike` yellow |
+| `автобус` | bus | `mdi-bus` yellow |
+| `грузовик` | truck | `mdi-truck` yellow |
+| `самолёт` | airplane | `mdi-airplane` gray |
+| `поезд` | train | `mdi-train` gray |
+| `лодка` | boat | `mdi-ferry` gray |
+| `птица` | bird | `mdi-bird` green |
+| `кошка` | cat | `mdi-cat` purple |
+| `собака` | dog | `mdi-dog` purple |
+| `лошадь` | horse | `mdi-horse` tan |
+| `овца` | sheep | `mdi-sheep` tan |
+| `корова` | cow | `mdi-cow` tan |
+| `слон` | elephant | `mdi-elephant` gray |
+| `медведь` | bear | `mdi-paw` orange |
+| `зебра` | zebra | `mdi-horse` tan |
+| `жираф` | giraffe | `mdi-paw` yellow |
+| `рюкзак` | backpack | `mdi-bag-personal` gray |
+| `зонт` | umbrella | `mdi-umbrella` gray |
+| `сумка` | handbag | `mdi-shopping` gray |
+| `чемодан` | suitcase | `mdi-briefcase` gray |
 
-### Animal keywords
+### Additional Cloud AI keywords (Gemini / Claude output)
 
-| Word | Icon |
-|------|------|
-| `кошка` / `кот` | `mdi-cat` |
-| `собака` | `mdi-dog` |
-| `птица` | `mdi-bird` |
-| `курица` | `mdi-bird` (yellow) |
-| `кролик` | `mdi-rabbit` |
-| `лиса` | `mdi-fox` |
-| `конь` / `лошадь` | `mdi-horse` |
-| `корова` | `mdi-cow` |
-| `белка` / `ёж` | `mdi-paw` |
+| Russian word | Icon |
+|---|---|
+| `мужчина` | `mdi-human-male` blue |
+| `женщина` | `mdi-human-female` pink |
+| `ребёнок` / `мальчик` | `mdi-human-child` cyan/blue |
+| `девочка` | `mdi-human-child` pink |
+| `кот` | `mdi-cat` purple |
+| `пёс` | `mdi-dog` purple |
+| `курица` / `петух` | `mdi-bird` yellow |
+| `кролик` | `mdi-rabbit` purple |
+| `лиса` | `mdi-fox` orange |
+| `белка` / `ёж` | `mdi-paw` orange/green |
+| `паук` / `паутина` | `mdi-spider` red |
+| `насекомое` | `mdi-bug` red |
+| `дождь` | `mdi-weather-rainy` light blue |
+| `снег` | `mdi-weather-snowy` light blue |
+| `пакет` / `посылка` | `mdi-package-variant` orange |
 
 ---
 
-## Prompt template
+## OpenVINO model export — step-by-step
+
+The default flow downloads a PyTorch `.pt` model and runs inference through the Python runtime. Exporting to OpenVINO format compiles the network graph for a specific Intel CPU architecture, enabling 2–5× faster inference.
+
+### Why it's faster
+
+| Runtime | How it works |
+|---------|-------------|
+| PyTorch `.pt` | Generic Python, uses standard x86 instructions |
+| OpenVINO `.xml` | Compiled C++ graph optimised for AVX-512 / VNNI / AMX — Intel-specific matrix math instructions that PyTorch doesn't always use |
+
+Expected speedup depends on CPU generation:
+
+| CPU | Speedup |
+|-----|---------|
+| Intel 12th gen+ (Alder Lake, Raptor Lake, Meteor Lake) | 3–5× |
+| Intel 10th–11th gen | 2–3× |
+| Intel 8th–9th gen | 1.5–2× |
+| AMD / very old Intel | minimal |
+
+### Export procedure
+
+All commands run in the `backend/` directory.
+
+**Step 1 — activate the same Python environment used by the backend:**
+
+```powershell
+cd C:\REPOS\camera-snapshots-cleaner-claude\backend
+```
+
+**Step 2 — export the model (one-time, takes ~20 seconds):**
+
+```powershell
+python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='openvino')"
+```
+
+This downloads `yolov8n.pt` (~6 MB) if not already cached, then creates a folder `yolov8n_openvino_model/` in the current directory containing:
+
+```
+yolov8n_openvino_model/
+  yolov8n.xml        ← model graph (human-readable XML)
+  yolov8n.bin        ← model weights (binary, ~12 MB)
+  metadata.yaml
+```
+
+**Step 3 — move the folder into `backend/models/`:**
+
+```powershell
+mkdir models -ErrorAction SilentlyContinue
+Move-Item yolov8n_openvino_model models\
+```
+
+Final path must be exactly:
+```
+backend/
+  models/
+    yolov8n_openvino_model/
+      yolov8n.xml
+      yolov8n.bin
+      metadata.yaml
+```
+
+**Step 4 — restart the backend.**
+
+On the next request the log will show:
+
+```
+🔷 Loading OpenVINO model: ...\backend\models\yolov8n_openvino_model
+```
+
+instead of:
+
+```
+🔷 Loading PyTorch model: yolov8n.pt (tip: export with ...)
+```
+
+### Exporting yolov8s or yolov8m
+
+Same procedure, just change the model name:
+
+```powershell
+python -c "from ultralytics import YOLO; YOLO('yolov8s.pt').export(format='openvino')"
+Move-Item yolov8s_openvino_model models\
+
+python -c "from ultralytics import YOLO; YOLO('yolov8m.pt').export(format='openvino')"
+Move-Item yolov8m_openvino_model models\
+```
+
+The backend selects the right folder automatically based on the model chosen in the UI.
+
+### Verifying speedup
+
+Run this in the `backend/` directory — it compares 10 inference runs with both runtimes:
+
+```python
+# save as benchmark.py, run: python benchmark.py <path-to-any-photo.jpg>
+import sys, time
+from pathlib import Path
+from PIL import Image
+from ultralytics import YOLO
+
+img = Image.open(sys.argv[1]).convert("RGB")
+
+# PyTorch
+m1 = YOLO("yolov8n.pt")
+m1(img, verbose=False)          # warm-up
+t = time.time()
+for _ in range(10): m1(img, verbose=False)
+print(f"PyTorch:  {(time.time()-t)/10*1000:.0f} ms/photo")
+
+# OpenVINO
+ov = Path("models/yolov8n_openvino_model")
+if ov.exists():
+    m2 = YOLO(str(ov))
+    m2(img, verbose=False)      # warm-up
+    t = time.time()
+    for _ in range(10): m2(img, verbose=False)
+    print(f"OpenVINO: {(time.time()-t)/10*1000:.0f} ms/photo")
+else:
+    print("OpenVINO model not found — run export first")
+```
+
+```powershell
+python benchmark.py "C:\path\to\any\photo.jpg"
+```
+
+Typical output on Intel i7-12700:
+```
+PyTorch:  1840 ms/photo
+OpenVINO:  390 ms/photo
+```
+
+---
+
+## Prompt template (Cloud AI)
 
 The structured prompt is a template with `{n}` placeholder (replaced with actual image count at run time).
 
-**Stored in:** `localStorage` key `gemini_structured_prompt`  
-**Editable in:** Tools modal → Google AI tab → "Structured prompt template"  
+**Stored in:** `localStorage` key `gemini_structured_prompt`
+**Editable in:** Tools modal → Google AI tab → "Structured prompt template"
 **Fallback if empty:** `FALLBACK_STRUCTURED_TEMPLATE` constant in `GeminiAnalysisModal.jsx`
 
-Claude uses the same prompt structure, defined as `CLAUDE_STRUCTURED_TEMPLATE` in `ClaudeAnalysisModal.jsx`. (No separate settings tab for Claude prompt yet — edit directly in the modal before running.)
+Claude uses `CLAUDE_STRUCTURED_TEMPLATE` in `ClaudeAnalysisModal.jsx`.
 
 The prompt instructs the model to return strict JSON:
 ```json
@@ -198,16 +384,14 @@ The prompt instructs the model to return strict JSON:
 
 - AI data loaded on every page change via `getAiAnalysis(pagePhotoIds)` → stored in `aiAnalysisMap` (Map keyed by `file_id`)
 - **Icons overlay** (top-left corner): always visible in all modes
-- **Hover description tooltip** (bottom of card): visible only when `mode.isAiMode === true`; click to expand/collapse full text
-- CSS: [`frontend/src/components/HourViewer.css`](../frontend/src/components/HourViewer.css) — `.hv-card-ai-icons`, `.hv-card-ai-desc`
+- **Hover description tooltip** (bottom of card): visible only when `mode.isAiMode === true`
 
 ### HeatmapCell — day/hour/month cells
 
 **File:** [`frontend/src/components/HeatmapCell.jsx`](../frontend/src/components/HeatmapCell.jsx)
 
-- Calls `getAiObjectsSummary(cameraId, dateFrom, dateTo)` on mount (same lazy pattern as thumbnail previews)
+- Calls `getAiObjectsSummary(cameraId, dateFrom, dateTo)` on mount
 - Shows up to 5 deduplicated icons below the thumbnail strip
-- CSS: [`frontend/src/components/HeatmapCell.css`](../frontend/src/components/HeatmapCell.css) — `.cell-ai-icons`
 
 ---
 
@@ -219,7 +403,7 @@ Tracked purely in `localStorage` — no backend storage.
 - `recordAiRequest(provider)` — appends timestamp, prunes entries older than 25h
 - `getAiRequestStats(provider)` — returns `{ lastMinute, last24h }` counts
 
-Displayed in `AiModePanel` after each completed analysis. Counts reset if you clear browser storage.
+Displayed in `AiModePanel` after each completed analysis.
 
 ---
 
@@ -231,6 +415,8 @@ Displayed in `AiModePanel` after each completed analysis. Counts reset if you cl
 |-----|---------|-----------------|
 | Google AI | API key | `gemini_api_key` |
 | Google AI | Model | `gemini_model` |
-| Google AI | Structured prompt template | `gemini_structured_prompt` |
+| Google AI | Prompt template | `gemini_structured_prompt` |
 | Claude AI | API key | `claude_api_key` |
 | Claude AI | Model | `claude_model` |
+
+OpenVINO settings (model, confidence) are stored in `openvino_model` and `openvino_confidence` — set via the analysis modal, no dedicated Tools tab.

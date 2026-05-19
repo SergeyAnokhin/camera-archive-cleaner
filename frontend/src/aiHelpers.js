@@ -67,6 +67,32 @@ export const AI_ICON_MAP = {
   'spider':    { mdi: 'mdi-spider',          color: '#f87171' },
   'rain':      { mdi: 'mdi-weather-rainy',   color: '#93c5fd' },
   'snow':      { mdi: 'mdi-weather-snowy',   color: '#bfdbfe' },
+  // YOLO/COCO classes (Russian — from OpenVINO detection)
+  'овца':      { mdi: 'mdi-sheep',           color: '#d4b483' },
+  'слон':      { mdi: 'mdi-elephant',        color: '#a3a3a3' },
+  'зебра':     { mdi: 'mdi-horse',           color: '#d4b483' },
+  'жираф':     { mdi: 'mdi-paw',             color: '#fbbf24' },
+  'рюкзак':    { mdi: 'mdi-bag-personal',    color: '#94a3b8' },
+  'зонт':      { mdi: 'mdi-umbrella',        color: '#94a3b8' },
+  'сумка':     { mdi: 'mdi-shopping',        color: '#94a3b8' },
+  'чемодан':   { mdi: 'mdi-briefcase',       color: '#94a3b8' },
+  'самолёт':   { mdi: 'mdi-airplane',        color: '#94a3b8' },
+  'поезд':     { mdi: 'mdi-train',           color: '#94a3b8' },
+  'лодка':     { mdi: 'mdi-ferry',           color: '#94a3b8' },
+  // YOLO/COCO classes (English fallback)
+  'sheep':     { mdi: 'mdi-sheep',           color: '#d4b483' },
+  'elephant':  { mdi: 'mdi-elephant',        color: '#a3a3a3' },
+  'bear':      { mdi: 'mdi-paw',             color: '#fb923c' },
+  'zebra':     { mdi: 'mdi-horse',           color: '#d4b483' },
+  'giraffe':   { mdi: 'mdi-paw',             color: '#fbbf24' },
+  'backpack':  { mdi: 'mdi-bag-personal',    color: '#94a3b8' },
+  'umbrella':  { mdi: 'mdi-umbrella',        color: '#94a3b8' },
+  'handbag':   { mdi: 'mdi-shopping',        color: '#94a3b8' },
+  'suitcase':  { mdi: 'mdi-briefcase',       color: '#94a3b8' },
+  'bus':       { mdi: 'mdi-bus',             color: '#fbbf24' },
+  'train':     { mdi: 'mdi-train',           color: '#94a3b8' },
+  'boat':      { mdi: 'mdi-ferry',           color: '#94a3b8' },
+  'airplane':  { mdi: 'mdi-airplane',        color: '#94a3b8' },
 }
 
 export function resolveAiIcons(objectsStr) {

@@ -6,3 +6,5 @@ numpy
 opencv-python-headless
 google-genai
 anthropic
+ultralytics
+openvino

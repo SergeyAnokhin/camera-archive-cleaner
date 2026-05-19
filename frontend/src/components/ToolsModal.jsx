@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { clearDatabase, clearAllThumbnails, getStorageInfo } from '../api.js'
+import * as yaml from 'js-yaml'
 import './ToolsModal.css'
 
 const FONT_KEY = 'font-base'
@@ -87,6 +88,56 @@ const GEMINI_PRICING = {
   'gemini-3.1-pro-preview':   { input: 2.00,  output: 12.00 },
 }
 
+const MOTION_MODE_KEYS = [
+  'motion_diff', 'diff_zoom', 'erosion', 'neon_mask', 'mhi', 'bounding_boxes', 'motion_stacking'
+]
+
+function tryParseJSON(s) {
+  try { return s ? JSON.parse(s) : null } catch { return null }
+}
+
+function collectSettings() {
+  const motionModes = {}
+  for (const m of MOTION_MODE_KEYS) {
+    motionModes[m] = tryParseJSON(localStorage.getItem('mode_params_' + m)) || { threshold: DIFF_THRESHOLD_DEFAULT }
+  }
+  return {
+    ui: {
+      font_size:          Number(localStorage.getItem(FONT_KEY)) || FONT_DEFAULT,
+      previews_per_cell:  Number(localStorage.getItem(PREVIEWS_PER_CELL_KEY) ?? PREVIEWS_PER_CELL_DEFAULT),
+    },
+    hour_view: {
+      page_size:       Number(localStorage.getItem(PAGE_SIZE_KEY)) || PAGE_SIZE_DEFAULT,
+      thumb_width:     Number(localStorage.getItem(THUMB_WIDTH_KEY)) || THUMB_WIDTH_DEFAULT,
+      hover_zoom:      Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT,
+      diff_threshold:  Number(localStorage.getItem(DIFF_THRESHOLD_KEY) ?? DIFF_THRESHOLD_DEFAULT),
+      view_mode:       localStorage.getItem('hour_view_mode') || 'normal',
+    },
+    motion_modes: motionModes,
+    google_ai: {
+      model:   localStorage.getItem(GEMINI_MODEL_KEY) || GEMINI_DEFAULT_MODEL,
+      api_key: '# Get your key at aistudio.google.com',
+      prompt:  localStorage.getItem(GEMINI_PROMPT_KEY) || GEMINI_DEFAULT_PROMPT,
+    },
+    claude_ai: {
+      model:   localStorage.getItem(CLAUDE_MODEL_KEY) || CLAUDE_DEFAULT_MODEL,
+      api_key: '# Get your key at console.anthropic.com',
+    },
+  }
+}
+
+function exportSettingsYaml() {
+  const header = `# Camera Snapshots Cleaner — settings export\n# Generated: ${new Date().toISOString()}\n\n`
+  const body = yaml.dump(collectSettings(), { lineWidth: 120, quotingType: '"' })
+  const blob = new Blob([header + body], { type: 'text/yaml' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'snapshots-settings.yaml'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function fmtBytes(b) {
   if (b == null) return null
   if (b < 1024) return `${b} B`
@@ -130,6 +181,94 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
   const [geminiPrompt, setGeminiPrompt] = useState(() => localStorage.getItem(GEMINI_PROMPT_KEY) || GEMINI_DEFAULT_PROMPT)
   const [claudeApiKey, setClaudeApiKey] = useState(() => localStorage.getItem(CLAUDE_API_KEY_KEY) || '')
   const [claudeModel, setClaudeModel]   = useState(() => localStorage.getItem(CLAUDE_MODEL_KEY) || CLAUDE_DEFAULT_MODEL)
+
+  const importRef = useRef(null)
+  const [importResult, setImportResult] = useState(null)
+
+  function applyImportedSettings(data) {
+    if (!data || typeof data !== 'object') return 0
+    let applied = 0
+
+    function safeNum(val, min, max) {
+      const n = Number(val)
+      if (isNaN(n)) return null
+      return Math.max(min, Math.min(max, n))
+    }
+    function safeStr(val, allowed) {
+      if (typeof val !== 'string') return null
+      return !allowed || allowed.includes(val) ? val : null
+    }
+
+    const fs = safeNum(data?.ui?.font_size, FONT_MIN, FONT_MAX)
+    if (fs !== null) {
+      localStorage.setItem(FONT_KEY, fs); setFontSize(fs); applyFontSize(fs)
+      document.dispatchEvent(new CustomEvent('font-base-change', { detail: fs })); applied++
+    }
+    const ppc = safeNum(data?.ui?.previews_per_cell, PREVIEWS_PER_CELL_MIN, PREVIEWS_PER_CELL_MAX)
+    if (ppc !== null) {
+      localStorage.setItem(PREVIEWS_PER_CELL_KEY, ppc); setPreviewsPerCell(ppc)
+      document.dispatchEvent(new CustomEvent('previews-per-cell-change', { detail: ppc })); applied++
+    }
+    const ps = safeNum(data?.hour_view?.page_size, PAGE_SIZE_MIN, PAGE_SIZE_MAX)
+    if (ps !== null) {
+      localStorage.setItem(PAGE_SIZE_KEY, ps); setPageSize(ps)
+      document.dispatchEvent(new CustomEvent('hour-page-size-change', { detail: ps })); applied++
+    }
+    const tw = safeNum(data?.hour_view?.thumb_width, THUMB_WIDTH_MIN, THUMB_WIDTH_MAX)
+    if (tw !== null) {
+      localStorage.setItem(THUMB_WIDTH_KEY, tw); setThumbWidth(tw)
+      document.dispatchEvent(new CustomEvent('thumb-width-change', { detail: tw })); applied++
+    }
+    const hz = safeNum(data?.hour_view?.hover_zoom, ZOOM_MIN, ZOOM_MAX)
+    if (hz !== null) {
+      localStorage.setItem(ZOOM_KEY, hz); setHoverZoom(hz)
+      document.dispatchEvent(new CustomEvent('hover-zoom-change', { detail: hz })); applied++
+    }
+    const dt = safeNum(data?.hour_view?.diff_threshold, DIFF_THRESHOLD_MIN, DIFF_THRESHOLD_MAX)
+    if (dt !== null) {
+      localStorage.setItem(DIFF_THRESHOLD_KEY, dt); setDiffThreshold(dt)
+      document.dispatchEvent(new CustomEvent('diff-threshold-change', { detail: dt })); applied++
+    }
+    const vm = safeStr(data?.hour_view?.view_mode)
+    if (vm !== null) { localStorage.setItem('hour_view_mode', vm); applied++ }
+
+    const mm = data?.motion_modes
+    if (mm && typeof mm === 'object') {
+      for (const key of MOTION_MODE_KEYS) {
+        const t = safeNum(mm[key]?.threshold, DIFF_THRESHOLD_MIN, DIFF_THRESHOLD_MAX)
+        if (t !== null) {
+          localStorage.setItem('mode_params_' + key, JSON.stringify({ threshold: t })); applied++
+        }
+      }
+    }
+
+    const gModel = safeStr(data?.google_ai?.model)
+    if (gModel) { localStorage.setItem(GEMINI_MODEL_KEY, gModel); setGeminiModel(gModel); applied++ }
+    const gPrompt = safeStr(data?.google_ai?.prompt)
+    if (gPrompt !== null) { localStorage.setItem(GEMINI_PROMPT_KEY, gPrompt); setGeminiPrompt(gPrompt); applied++ }
+
+    const cModel = safeStr(data?.claude_ai?.model)
+    if (cModel) { localStorage.setItem(CLAUDE_MODEL_KEY, cModel); setClaudeModel(cModel); applied++ }
+
+    return applied
+  }
+
+  function handleImportFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = yaml.load(ev.target.result)
+        const n = applyImportedSettings(data)
+        setImportResult({ ok: true, text: `Imported ${n} settings.` })
+      } catch (err) {
+        setImportResult({ ok: false, text: `Parse error: ${err.message}` })
+      }
+    }
+    reader.readAsText(file)
+  }
 
   const [dbConfirm, setDbConfirm] = useState(false)
   const [dbBusy, setDbBusy]       = useState(false)
@@ -307,6 +446,24 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
                 <span className="font-size-value">{previewsPerCell}</span>
               </div>
               <div className="modal-setting-hint">Thumbnails shown inside each heatmap cell (year/month/day). Set 0 to disable.</div>
+            </div>
+
+            {/* Export / Import */}
+            <div className="modal-section">
+              <div className="modal-section-title">Settings file</div>
+              <div className="modal-action-row">
+                <button className="modal-btn neutral" onClick={exportSettingsYaml}>
+                  <i className="mdi mdi-download-outline" /> Export YAML
+                </button>
+                <button className="modal-btn neutral" onClick={() => { setImportResult(null); importRef.current?.click() }}>
+                  <i className="mdi mdi-upload-outline" /> Import YAML
+                </button>
+                <input ref={importRef} type="file" accept=".yaml,.yml" style={{ display: 'none' }} onChange={handleImportFile} />
+              </div>
+              <div className="modal-setting-hint">Export saves all settings to <code>snapshots-settings.yaml</code>. Import applies only recognised keys — unknown or invalid values are silently skipped.</div>
+              {importResult && (
+                <div className={`modal-result ${importResult.ok ? 'ok' : 'err'}`}>{importResult.text}</div>
+              )}
             </div>
           </>}
 

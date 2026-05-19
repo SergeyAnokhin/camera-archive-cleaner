@@ -3,6 +3,7 @@ import { getFiles, getDistribution, getStatsTotal, getMediaUrl, previewDelete, c
 import DeleteConfirmModal from './DeleteConfirmModal.jsx'
 import GeminiAnalysisModal from './GeminiAnalysisModal.jsx'
 import ClaudeAnalysisModal from './ClaudeAnalysisModal.jsx'
+import OpenVinoAnalysisModal from './OpenVinoAnalysisModal.jsx'
 import { VIEW_MODES, DEFAULT_VIEW_MODE_KEY } from './viewModes/index.js'
 import { resolveAiIcons } from '../aiHelpers.js'
 import './HourViewer.css'
@@ -493,6 +494,17 @@ const AI_PROVIDER_CONFIG = {
     icon: 'mdi-robot',
     label: 'Claude Analysis',
   },
+  openvino: {
+    modelKey: 'openvino_model',
+    defaultModel: 'yolov8n',
+    models: [
+      { value: 'yolov8n', label: '🟢 YOLOv8n — Nano (быстро, ~1-3 с/фото)' },
+      { value: 'yolov8s', label: '🟡 YOLOv8s — Small (точнее, ~2-5 с/фото)' },
+      { value: 'yolov8m', label: '🔴 YOLOv8m — Medium (медленно, ~5-10 с/фото)' },
+    ],
+    icon: 'mdi-chip',
+    label: 'OpenVINO Detection',
+  },
 }
 
 function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun, statsKey }) {
@@ -596,6 +608,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [geminiOpen, setGeminiOpen]         = useState(false)
   const [geminiStructured, setGeminiStructured] = useState(false)
   const [claudeOpen, setClaudeOpen]         = useState(false)
+  const [openVinoOpen, setOpenVinoOpen]     = useState(false)
   const [aiAnalysisMap, setAiAnalysisMap]   = useState(new Map())
   const [aiStatsKey, setAiStatsKey]         = useState(0)
 
@@ -1084,6 +1097,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           onRun={() => {
             if (activeMode.aiProvider === 'claude') {
               setClaudeOpen(true)
+            } else if (activeMode.aiProvider === 'openvino') {
+              setOpenVinoOpen(true)
             } else {
               setGeminiStructured(true)
               setGeminiOpen(true)
@@ -1235,6 +1250,22 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             fileIds={ids}
             onClose={() => setClaudeOpen(false)}
             onComplete={() => { recordAiRequest('claude'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}
+          />
+        )
+      })()}
+
+      {openVinoOpen && (() => {
+        const photoFiles = files.filter(f => f.file_type === 'photo')
+        const ids = selectedIds.size > 0
+          ? photoFiles.filter(f => selectedIds.has(f.id)).map(f => f.id)
+          : photoFiles.map(f => f.id)
+        const model = localStorage.getItem('openvino_model') || 'yolov8n'
+        return (
+          <OpenVinoAnalysisModal
+            fileIds={ids}
+            model={model}
+            onClose={() => setOpenVinoOpen(false)}
+            onComplete={() => { recordAiRequest('openvino'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}
           />
         )
       })()}

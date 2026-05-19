@@ -437,6 +437,61 @@ def get_motion_thumbnail(
 
 
 # ---------------------------------------------------------------------------
+# /openvino_thumbnail/{file_id} — photo with YOLO bounding boxes
+# ---------------------------------------------------------------------------
+
+OV_THUMB_DIR = Path(__file__).parent / "openvino_thumbnails_cache"
+_OV_THUMB_VERSION = "v1"
+
+
+def _ov_cache_path(file_id: int, model: str, confidence: float) -> Path:
+    import hashlib
+    key = f"{_OV_THUMB_VERSION}:{file_id}:{model}:{confidence:.2f}"
+    h = hashlib.sha256(key.encode()).hexdigest()[:16]
+    return OV_THUMB_DIR / f"{h}.jpg"
+
+
+@app.get("/openvino_thumbnail/{file_id}", summary="Photo with YOLO bounding boxes (OpenVINO detection)")
+def get_openvino_thumbnail(
+    file_id: int,
+    model: str = Query(default="yolov8n"),
+    confidence: float = Query(default=0.25, ge=0.05, le=0.95),
+):
+    from PIL import Image as PILImage
+
+    cache_path = _ov_cache_path(file_id, model, confidence)
+    if cache_path.exists():
+        return FileResponse(str(cache_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
+
+    with get_connection() as conn:
+        file_row = get_file_by_id(conn, file_id)
+    if file_row is None:
+        raise HTTPException(status_code=404, detail="File not found")
+    if file_row["file_type"] != "photo":
+        raise HTTPException(status_code=400, detail="Only available for photos")
+
+    src = Path(file_row["file_path"])
+    if not src.exists():
+        raise HTTPException(status_code=404, detail="Source file not found on disk")
+
+    yolo = _load_yolo(model)
+    try:
+        img = PILImage.open(src).convert("RGB")
+        results = yolo(img, conf=confidence, verbose=False)
+        # results[0].plot() returns BGR numpy array with boxes, labels, confidence drawn
+        annotated_bgr = results[0].plot(line_width=2, font_size=10)
+        annotated_rgb = annotated_bgr[:, :, ::-1]   # BGR → RGB
+        out_img = PILImage.fromarray(annotated_rgb)
+        out_img.thumbnail((640, 640), PILImage.LANCZOS)
+        OV_THUMB_DIR.mkdir(exist_ok=True)
+        out_img.save(str(cache_path), format="JPEG", quality=88)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Detection error: {e}")
+
+    return FileResponse(str(cache_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
+
+
+# ---------------------------------------------------------------------------
 # /media/{file_id} — serve original file (photos and videos)
 # ---------------------------------------------------------------------------
 
@@ -847,12 +902,13 @@ def clear_all_thumbnails():
     dzoom_files, dzoom_bytes     = _clear_dir(DIFF_ZOOM_THUMB_DIR)
     erosion_files, erosion_bytes = _clear_dir(EROSION_THUMB_DIR)
     motion_files, motion_bytes   = _clear_dir(MOTION_THUMB_DIR)
+    ov_files, ov_bytes           = _clear_dir(OV_THUMB_DIR)
 
     with get_connection() as conn:
         delete_all_thumbnails(conn)
 
-    total_files = basic_files + diff_files + dzoom_files + erosion_files + motion_files
-    total_bytes = basic_bytes + diff_bytes + dzoom_bytes + erosion_bytes + motion_bytes
+    total_files = basic_files + diff_files + dzoom_files + erosion_files + motion_files + ov_files
+    total_bytes = basic_bytes + diff_bytes + dzoom_bytes + erosion_bytes + motion_bytes + ov_bytes
 
     logger.info("   └─ все миниатюры очищены → %d файлов, %d байт", total_files, total_bytes)
     return {
@@ -862,6 +918,7 @@ def clear_all_thumbnails():
             "diff_zoom":{"deleted_files": dzoom_files,   "freed_bytes": dzoom_bytes},
             "erosion":  {"deleted_files": erosion_files, "freed_bytes": erosion_bytes},
             "motion":   {"deleted_files": motion_files,  "freed_bytes": motion_bytes},
+            "openvino": {"deleted_files": ov_files,      "freed_bytes": ov_bytes},
         },
         "total_files": total_files,
         "freed_bytes": total_bytes,
@@ -872,7 +929,7 @@ def clear_all_thumbnails():
 def get_storage_info():
     db_size = DB_PATH.stat().st_size if DB_PATH.exists() else 0
 
-    thumb_dirs = [THUMB_DIR, DIFF_THUMB_DIR, DIFF_ZOOM_THUMB_DIR, EROSION_THUMB_DIR, MOTION_THUMB_DIR]
+    thumb_dirs = [THUMB_DIR, DIFF_THUMB_DIR, DIFF_ZOOM_THUMB_DIR, EROSION_THUMB_DIR, MOTION_THUMB_DIR, OV_THUMB_DIR]
     thumb_size = 0
     for d in thumb_dirs:
         if d.exists():
@@ -1176,6 +1233,111 @@ def claude_analyze_batch(req: ClaudeAnalyzeRequest):
         "elapsed_ms": elapsed_ms,
         "images_used": len(images_b64),
         "saved_count": saved_count,
+    }
+
+
+# ── OpenVINO / YOLO local detection ──────────────────────────────────────────
+
+# Maps COCO English class names → Russian keywords (matching aiHelpers.js vocabulary)
+_COCO_TO_RUSSIAN: dict[str, str] = {
+    'person':     'человек',
+    'bicycle':    'велосипед',
+    'car':        'машина',
+    'motorcycle': 'мотоцикл',
+    'airplane':   'самолёт',
+    'bus':        'автобус',
+    'train':      'поезд',
+    'truck':      'грузовик',
+    'boat':       'лодка',
+    'bird':       'птица',
+    'cat':        'кошка',
+    'dog':        'собака',
+    'horse':      'лошадь',
+    'sheep':      'овца',
+    'cow':        'корова',
+    'elephant':   'слон',
+    'bear':       'медведь',
+    'zebra':      'зебра',
+    'giraffe':    'жираф',
+    'backpack':   'рюкзак',
+    'umbrella':   'зонт',
+    'handbag':    'сумка',
+    'suitcase':   'чемодан',
+}
+
+_yolo_models: dict = {}
+
+
+def _load_yolo(model_name: str):
+    """Load YOLO model lazily. Tries local OpenVINO export first, falls back to .pt."""
+    if model_name not in _yolo_models:
+        try:
+            from ultralytics import YOLO
+        except ImportError:
+            raise HTTPException(status_code=500, detail="ultralytics not installed. Run: pip install ultralytics openvino")
+        ov_path = Path(__file__).parent / "models" / f"{model_name}_openvino_model"
+        if ov_path.exists():
+            logger.info("🔷 Loading OpenVINO model: %s", ov_path)
+            _yolo_models[model_name] = YOLO(str(ov_path), task="detect")
+        else:
+            logger.info("🔷 Loading PyTorch model: %s.pt (tip: export with `yolo export model=%s.pt format=openvino` for faster Intel CPU inference)", model_name, model_name)
+            _yolo_models[model_name] = YOLO(f"{model_name}.pt", task="detect")
+    return _yolo_models[model_name]
+
+
+class OpenVinoAnalyzeRequest(BaseModel):
+    file_ids:   list[int]
+    model_name: str   = "yolov8n"
+    confidence: float = 0.25
+
+
+@app.post("/openvino_analyze_batch", summary="Local object detection via YOLO / OpenVINO (no API key)")
+def openvino_analyze_batch(req: OpenVinoAnalyzeRequest):
+    from PIL import Image as PILImage
+
+    yolo = _load_yolo(req.model_name)
+
+    with get_connection() as conn:
+        file_rows = [get_file_by_id(conn, fid) for fid in req.file_ids]
+
+    t0 = time.time()
+    results_out: dict[int, list[str]] = {}
+    saved_count = 0
+    images_used = 0
+
+    with get_connection() as conn:
+        for row in file_rows:
+            if row is None or row["file_type"] != "photo":
+                continue
+            fid = row["id"]
+            try:
+                img = PILImage.open(row["file_path"]).convert("RGB")
+                images_used += 1
+                detections = yolo(img, conf=req.confidence, verbose=False)
+                seen: set[str] = set()
+                objects_ru: list[str] = []
+                for det in detections:
+                    for cls_id in det.boxes.cls.tolist():
+                        en = yolo.names[int(cls_id)]
+                        ru = _COCO_TO_RUSSIAN.get(en, en)
+                        if ru not in seen:
+                            seen.add(ru)
+                            objects_ru.append(ru)
+                objects_str = " ".join(objects_ru)
+                save_ai_analysis(conn, fid, "openvino", req.model_name, "", "", objects_str)
+                results_out[fid] = objects_ru
+                saved_count += 1
+            except Exception as e:
+                logger.warning("OpenVINO: ошибка файла %s: %s", row.get("file_path", "?"), e)
+
+    elapsed_ms = int((time.time() - t0) * 1000)
+    logger.info("🔷 OpenVINO %s: %d фото, %.0f мс, сохранено %d", req.model_name, images_used, elapsed_ms, saved_count)
+
+    return {
+        "elapsed_ms": elapsed_ms,
+        "images_used": images_used,
+        "saved_count": saved_count,
+        "results": {str(k): v for k, v in results_out.items()},
     }
 
 

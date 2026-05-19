@@ -55,6 +55,7 @@ config.py ──► scanner.py ──► database.py (SQLite: snapshots.db)
 | File | Description |
 |------|-------------|
 | [`docs/code-map.md`](docs/code-map.md) | Code map — all backend and frontend files, what each file does |
+| [`docs/settings.md`](docs/settings.md) | All user settings: localStorage keys, defaults, ranges, where each is defined |
 | [`docs/api.md`](docs/api.md) | All API endpoints with parameters and descriptions |
 | [`docs/database.md`](docs/database.md) | SQLite schema: `files`, `thumbnails`, `ai_analysis` tables, cascades, data flow |
 | [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis: Gemini & Claude integration, DB schema, prompt format, icon display |
