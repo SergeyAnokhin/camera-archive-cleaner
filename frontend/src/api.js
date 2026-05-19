@@ -177,6 +177,10 @@ export function getOpenVinoBboxThumbnailUrl(fileId, model, confidence) {
   return `${BASE}/openvino_thumbnail/${fileId}?model=${encodeURIComponent(model)}&confidence=${confidence}`
 }
 
+export function openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName, confidence }) {
+  return postJson('/openvino_analyze_range', { camera_id: cameraId, date_from: dateFrom, date_to: dateTo, model_name: modelName, confidence })
+}
+
 export function getAiObjectsSummary(cameraId, dateFrom, dateTo) {
   return get('/ai_objects_summary' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }

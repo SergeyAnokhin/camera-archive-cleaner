@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getCameras, getStatsTotal, getStatsGrouped, previewDeleteRange, confirmDelete, deleteByRange } from './api.js'
+import { getCameras, getStatsTotal, getStatsGrouped, previewDeleteRange, confirmDelete, deleteByRange, getPreviews, openvinoAnalyzeRange, geminiAnalyzeBatch, claudeAnalyzeBatch } from './api.js'
 import DeleteConfirmModal from './components/DeleteConfirmModal.jsx'
 import Header from './components/Header.jsx'
 import CameraSelector from './components/CameraSelector.jsx'
@@ -10,6 +10,9 @@ import StatsBar from './components/StatsBar.jsx'
 import ScanButton from './components/ScanButton.jsx'
 import ToolsButton from './components/ToolsButton.jsx'
 import { initFontSize } from './components/ToolsModal.jsx'
+
+const CELL_ANALYSIS_PROMPT = (n) =>
+  `You are analyzing ${n} photos from a security camera. Return ONLY valid JSON:\n{"scene":"one sentence","images":[{"description":"1-2 sentences","objects":["мужчина","кошка"]}]}\nUse Russian words for people and animals (человек, мужчина, женщина, ребёнок, кошка, собака, птица, машина, велосипед, etc.).`
 
 const LEVELS = ['year', 'month', 'day', 'hour']
 const PREVIEWS_PER_CELL_KEY = 'previews_per_cell'
@@ -81,11 +84,14 @@ function KeyboardHints({ hints }) {
   if (!hints.length) return null
   return (
     <div style={{
-      padding: '6px 16px 10px',
+      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+      padding: '4px 16px 6px',
       fontSize: 'calc(var(--font-base) * 0.75)',
       color: 'var(--text-dim)',
       textAlign: 'center',
       userSelect: 'none',
+      background: 'var(--bg)',
+      borderTop: 'var(--border)',
     }}>
       {hints.map((h, i) => (
         <span key={i}>
@@ -102,8 +108,18 @@ function KeyboardHints({ hints }) {
   )
 }
 
-function HourSelBar({ periods, selectedMap, onSelectAll, onSelectNone, onClose, onDelete, loading, error, confirmOpen, onSetConfirmOpen }) {
+function CellSelBar({ level, periods, selectedMap, onSelectAll, onSelectNone, onClose,
+                       onDelete, loading, error, confirmOpen, onSetConfirmOpen,
+                       onAnalyze, analyzing, analyzeProgress, analyzeError }) {
+  const [provider, setProvider] = useState('openvino')
+  const [ovModel, setOvModel]   = useState(() => localStorage.getItem('openvino_model') || 'yolov8n')
+  const [ovConf, setOvConf]     = useState(25)
+
   const count = selectedMap.size
+  const isHour = level === 'hour'
+  const unitLabel = isHour ? 'hour' : 'day'
+  const unitLabelPlural = isHour ? 'hours' : 'days'
+
   const stats = [...selectedMap.values()].reduce(
     (acc, p) => ({
       photos: acc.photos + (p.photo_count || 0),
@@ -118,53 +134,124 @@ function HourSelBar({ periods, selectedMap, onSelectAll, onSelectNone, onClose, 
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
         background: '#450a0a', border: '1px solid #7f1d1d',
-        borderRadius: 'var(--radius)', padding: '8px 14px',
+        borderRadius: 'var(--radius)', padding: '10px 14px',
       }}>
         <i className="mdi mdi-alert-outline" style={{ color: '#f87171' }} />
         <span style={{ color: '#fca5a5', fontSize: 'calc(var(--font-base) * 0.88)', flex: 1 }}>
-          Delete {count} {count === 1 ? 'hour' : 'hours'}?
+          Delete {count} {count === 1 ? unitLabel : unitLabelPlural}?
           &ensp;{stats.photos.toLocaleString()} photos · {stats.videos.toLocaleString()} videos · {formatBytes(stats.bytes)}
         </span>
         {error && <span style={{ color: '#fca5a5', fontSize: 'calc(var(--font-base) * 0.82)' }}>{error}</span>}
-        <button className="modal-btn danger" disabled={loading} onClick={onDelete} style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}>
+        <button className="modal-btn danger" disabled={loading} onClick={onDelete}>
           {loading ? <i className="mdi mdi-loading mdi-spin" /> : <><i className="mdi mdi-delete-outline" /> Delete</>}
         </button>
-        <button className="modal-btn neutral" disabled={loading} onClick={() => onSetConfirmOpen(false)} style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}>
-          Cancel
-        </button>
+        <button className="modal-btn neutral" disabled={loading} onClick={() => onSetConfirmOpen(false)}>Cancel</button>
       </div>
     )
   }
 
+  const btn = { fontSize: 'calc(var(--font-base) * 0.85)' }
+  const dim = { fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--text-dim)', whiteSpace: 'nowrap' }
+
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
-      padding: '6px 10px', background: 'var(--bg-surface)',
-      border: 'var(--border)', borderRadius: 'var(--radius)',
+      display: 'flex', flexDirection: 'column', gap: 0,
+      background: 'var(--bg-surface)', border: 'var(--border)', borderRadius: 'var(--radius)',
+      overflow: 'hidden',
     }}>
-      <button className="modal-btn neutral" style={{ fontSize: 'calc(var(--font-base) * 0.88)' }} onClick={onSelectAll}>
-        <i className="mdi mdi-select-all" /> All ({periods.filter(p => p.total_size_bytes > 0).length})
-      </button>
-      <button className="modal-btn neutral" style={{ fontSize: 'calc(var(--font-base) * 0.88)' }} disabled={count === 0} onClick={onSelectNone}>
-        <i className="mdi mdi-select-off" /> None
-      </button>
-      {count > 0 && (
-        <span style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--accent)', padding: '0 4px' }}>
-          {count} {count === 1 ? 'hour' : 'hours'} · {stats.photos.toLocaleString()} photos · {stats.videos.toLocaleString()} videos · {formatBytes(stats.bytes)}
-        </span>
-      )}
-      <div style={{ flex: 1 }} />
-      <button
-        className="modal-btn danger-outline"
-        style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}
-        disabled={count === 0}
-        onClick={() => onSetConfirmOpen(true)}
-      >
-        <i className="mdi mdi-delete-outline" /> Delete selected
-      </button>
-      <button className="modal-btn neutral" style={{ fontSize: 'calc(var(--font-base) * 0.88)' }} onClick={onClose}>
-        <i className="mdi mdi-close" /> Cancel
-      </button>
+      {/* Row 1: selection info + navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '8px 12px' }}>
+        <button className="modal-btn neutral" style={btn} onClick={onSelectAll}>
+          <i className="mdi mdi-select-all" /> All ({periods.filter(p => p.total_size_bytes > 0).length})
+        </button>
+        <button className="modal-btn neutral" style={btn} disabled={count === 0} onClick={onSelectNone}>
+          <i className="mdi mdi-select-off" /> None
+        </button>
+        {count > 0 ? (
+          <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: 'var(--accent)' }}>
+            {count} {count === 1 ? unitLabel : unitLabelPlural} · {stats.photos.toLocaleString()} photos · {stats.videos.toLocaleString()} videos · {formatBytes(stats.bytes)}
+          </span>
+        ) : (
+          <span style={dim}>Select {unitLabelPlural} to analyze</span>
+        )}
+        <div style={{ flex: 1 }} />
+        {isHour && (
+          <button className="modal-btn danger-outline" style={btn} disabled={count === 0} onClick={() => onSetConfirmOpen(true)}>
+            <i className="mdi mdi-delete-outline" /> Delete selected
+          </button>
+        )}
+        <button className="modal-btn neutral" style={btn} onClick={onClose}>
+          <i className="mdi mdi-close" /> Cancel
+        </button>
+      </div>
+
+      {/* Row 2: AI analysis panel */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        padding: '8px 12px', borderTop: 'var(--border)',
+        background: 'rgba(14,165,233,0.04)',
+      }}>
+        <span style={dim}><i className="mdi mdi-robot-outline" /> AI Analysis:</span>
+
+        {/* Provider buttons */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          {[
+            { key: 'openvino', icon: 'mdi-chip',   label: 'OpenVINO' },
+            { key: 'gemini',   icon: 'mdi-google',  label: 'Gemini' },
+            { key: 'claude',   icon: 'mdi-robot',   label: 'Claude' },
+          ].map(p => (
+            <button key={p.key}
+              className={`modal-btn ${provider === p.key ? 'accent' : 'neutral'}`}
+              style={btn}
+              onClick={() => setProvider(p.key)}
+            >
+              <i className={`mdi ${p.icon}`} /> {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* OpenVINO params */}
+        {provider === 'openvino' && (
+          <>
+            <span style={dim}>Model:</span>
+            <select
+              value={ovModel}
+              onChange={e => { setOvModel(e.target.value); localStorage.setItem('openvino_model', e.target.value) }}
+              style={{
+                colorScheme: 'dark',
+                background: 'var(--bg-surface)', color: 'var(--text)',
+                border: 'var(--border)', borderRadius: 4,
+                padding: '4px 8px', fontSize: 'calc(var(--font-base) * 0.85)', cursor: 'pointer',
+              }}
+            >
+              <option value="yolov8n">YOLOv8n — fast</option>
+              <option value="yolov8s">YOLOv8s — balanced</option>
+              <option value="yolov8m">YOLOv8m — accurate</option>
+            </select>
+            <span style={dim}>Threshold: {ovConf}%</span>
+            <input type="range" min={10} max={80} step={5} value={ovConf}
+              onChange={e => setOvConf(+e.target.value)}
+              style={{ width: 90, accentColor: 'var(--accent)', cursor: 'pointer' }}
+            />
+          </>
+        )}
+
+        {/* Analyze button */}
+        <button className="modal-btn accent" style={{ ...btn, marginLeft: 4 }}
+          disabled={count === 0 || analyzing}
+          onClick={() => onAnalyze(provider, ovModel, ovConf / 100)}
+        >
+          {analyzing
+            ? <><i className="mdi mdi-loading mdi-spin" /> {analyzeProgress || 'Analyzing...'}</>
+            : <><i className="mdi mdi-play-circle-outline" /> Analyze {count > 0 ? `(${count})` : ''}</>}
+        </button>
+
+        {analyzeError && (
+          <span style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: '#f87171' }} title={analyzeError}>
+            <i className="mdi mdi-alert-circle-outline" /> {analyzeError}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
@@ -180,11 +267,15 @@ export default function App() {
   const [refreshKey, setRefreshKey]     = useState(0)
   const [selectedHour, setSelectedHour] = useState(_nav.selectedHour ?? null)
   const [previewsPerCell, setPreviewsPerCell] = useState(getPreviewsPerCell)
-  const [hourSelMode, setHourSelMode]     = useState(false)
-  const [selectedHourPeriods, setSelectedHourPeriods] = useState(new Map())
-  const [hourSelLoading, setHourSelLoading] = useState(false)
-  const [hourSelError, setHourSelError]   = useState(null)
-  const [hourSelConfirm, setHourSelConfirm] = useState(false)
+  const [selMode, setSelMode]             = useState(false)
+  const [selectedPeriods, setSelectedPeriods] = useState(new Map())
+  const [selDelLoading, setSelDelLoading] = useState(false)
+  const [selDelError, setSelDelError]     = useState(null)
+  const [selDelConfirm, setSelDelConfirm] = useState(false)
+  const [aiRefreshKey, setAiRefreshKey]   = useState(0)
+  const [selAnalyzing, setSelAnalyzing]   = useState(false)
+  const [selAnalyzeError, setSelAnalyzeError] = useState(null)
+  const [selAnalyzeProgress, setSelAnalyzeProgress] = useState('')
   const [rangeDeletePreview, setRangeDeletePreview]           = useState(null)
   const [rangeDeletePreviewLoading, setRangeDeletePreviewLoading] = useState(false)
   const [rangeDeleteDeleteLoading, setRangeDeleteDeleteLoading]   = useState(false)
@@ -205,10 +296,11 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    setHourSelMode(false)
-    setSelectedHourPeriods(new Map())
-    setHourSelError(null)
-    setHourSelConfirm(false)
+    setSelMode(false)
+    setSelectedPeriods(new Map())
+    setSelDelError(null)
+    setSelDelConfirm(false)
+    setSelAnalyzeError(null)
   }, [drillStack, cameraId])
 
   useEffect(() => {
@@ -316,41 +408,45 @@ export default function App() {
         if (cell) drillInto(cell)
       } else if (e.key === 'Escape') {
         e.preventDefault()
-        if (hourSelMode) {
-          setHourSelMode(false)
-          setSelectedHourPeriods(new Map())
+        if (selMode) {
+          setSelMode(false)
+          setSelectedPeriods(new Map())
         } else if (drillStack.length > 0) {
           restorePeriodRef.current = drillStack[drillStack.length - 1].label
           setDrillStack(prev => prev.slice(0, -1))
         }
       } else if (e.key === 'Backspace' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
-        if (currentLevel === 'hour' && drillStack.length > 0 && !hourSelMode) {
+        if (currentLevel === 'hour' && drillStack.length > 0 && !selMode) {
           e.preventDefault()
           const dayEntry = drillStack[drillStack.length - 1]
           handleRangeDeletePreview(dayEntry.dateFrom, dayEntry.dateTo, drillStack.length - 2)
         }
-      } else if (e.key === ' ' && currentLevel === 'hour') {
+      } else if (e.key === ' ' && (currentLevel === 'hour' || currentLevel === 'day')) {
         e.preventDefault()
         const cell = periods[idx]
-        if (cell) {
-          setHourSelMode(true)
-          setSelectedHourPeriods(prev => {
+        if (cell && cell.total_size_bytes > 0) {
+          setSelMode(true)
+          setSelectedPeriods(prev => {
             const next = new Map(prev)
             next.has(cell.period) ? next.delete(cell.period) : next.set(cell.period, cell)
             return next
           })
         }
-      } else if (e.key === 'Delete' && hourSelMode && selectedHourPeriods.size > 0) {
+      } else if (e.key === 'Delete' && selMode && selectedPeriods.size > 0 && currentLevel === 'hour') {
         e.preventDefault()
-        setHourSelConfirm(true)
+        setSelDelConfirm(true)
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'a' && (currentLevel === 'hour' || currentLevel === 'day')) {
+        e.preventDefault()
+        setSelMode(true)
+        setSelectedPeriods(new Map(periods.filter(p => p.total_size_bytes > 0).map(p => [p.period, p])))
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedHour, periods, focusedPeriod, currentLevel, drillStack, hourSelMode, selectedHourPeriods])
+  }, [selectedHour, periods, focusedPeriod, currentLevel, drillStack, selMode, selectedPeriods])
 
-  function handleToggleHourPeriod(cell) {
-    setSelectedHourPeriods(prev => {
+  function handleTogglePeriod(cell) {
+    setSelectedPeriods(prev => {
       const next = new Map(prev)
       next.has(cell.period) ? next.delete(cell.period) : next.set(cell.period, cell)
       return next
@@ -358,23 +454,73 @@ export default function App() {
   }
 
   async function handleDeleteHours() {
-    setHourSelLoading(true)
-    setHourSelError(null)
+    setSelDelLoading(true)
+    setSelDelError(null)
     try {
       const dayContext = drillStack[drillStack.length - 1]
       const date = dayContext?.dateFrom?.substring(0, 10)
-      for (const [period] of selectedHourPeriods) {
+      for (const [period] of selectedPeriods) {
         const h = period.padStart(2, '0')
         await deleteByRange(cameraId, `${date}T${h}:00:00`, `${date}T${h}:59:59`)
       }
-      setHourSelMode(false)
-      setHourSelConfirm(false)
-      setSelectedHourPeriods(new Map())
+      setSelMode(false)
+      setSelDelConfirm(false)
+      setSelectedPeriods(new Map())
       handleScanComplete()
     } catch (e) {
-      setHourSelError(e.message)
+      setSelDelError(e.message)
     } finally {
-      setHourSelLoading(false)
+      setSelDelLoading(false)
+    }
+  }
+
+  function getCellDateRange(period) {
+    if (currentLevel === 'hour') {
+      const date = drillStack[drillStack.length - 1]?.dateFrom?.substring(0, 10) ?? ''
+      const h = period.padStart(2, '0')
+      return { dateFrom: `${date}T${h}:00:00`, dateTo: `${date}T${h}:59:59` }
+    }
+    return dateRangeForPeriod(period, currentLevel)
+  }
+
+  async function handleAnalyzeCells(provider, ovModel, ovConf) {
+    setSelAnalyzing(true)
+    setSelAnalyzeError(null)
+    setSelAnalyzeProgress('')
+    try {
+      const cells = [...selectedPeriods.values()]
+
+      if (provider === 'openvino') {
+        for (let i = 0; i < cells.length; i++) {
+          setSelAnalyzeProgress(`${i + 1}/${cells.length}`)
+          const { dateFrom, dateTo } = getCellDateRange(cells[i].period)
+          await openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName: ovModel, confidence: ovConf })
+        }
+      } else {
+        const apiKey = localStorage.getItem(provider === 'gemini' ? 'gemini_api_key' : 'claude_api_key')
+        if (!apiKey) throw new Error(`Нет API ключа ${provider === 'gemini' ? 'Gemini' : 'Claude'}. Откройте Tools.`)
+        const model = localStorage.getItem(provider === 'gemini' ? 'gemini_model' : 'claude_model') || ''
+        const fileIds = []
+        for (const cell of cells) {
+          const { dateFrom, dateTo } = getCellDateRange(cell.period)
+          const data = await getPreviews(cameraId, dateFrom, dateTo, 1)
+          if (data.file_ids?.length) fileIds.push(...data.file_ids)
+        }
+        if (!fileIds.length) throw new Error('В выбранных ячейках нет фотографий')
+        const prompt = CELL_ANALYSIS_PROMPT(fileIds.length)
+        if (provider === 'gemini') {
+          await geminiAnalyzeBatch({ fileIds, model, apiKey, prompt })
+        } else {
+          await claudeAnalyzeBatch({ fileIds, model, apiKey, prompt })
+        }
+      }
+
+      setAiRefreshKey(k => k + 1)
+    } catch (e) {
+      setSelAnalyzeError(e.message)
+    } finally {
+      setSelAnalyzing(false)
+      setSelAnalyzeProgress('')
     }
   }
 
@@ -418,7 +564,7 @@ export default function App() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Header totals={totals} />
 
-      <main style={{ flex: 1, padding: 'var(--gap-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--gap-md)', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+      <main style={{ flex: 1, padding: 'var(--gap-lg)', paddingBottom: 'calc(var(--gap-lg) + 28px)', display: 'flex', flexDirection: 'column', gap: 'var(--gap-md)', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
 
         {/* Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--gap-sm)' }}>
@@ -440,38 +586,46 @@ export default function App() {
           </div>
         )}
 
-        {currentLevel === 'hour' && !selectedHour && drillStack.length > 0 && (
+        {(currentLevel === 'hour' || currentLevel === 'day') && !selectedHour && (
           <>
-            {hourSelMode ? (
-              <HourSelBar
+            {selMode ? (
+              <CellSelBar
+                level={currentLevel}
                 periods={periods}
-                selectedMap={selectedHourPeriods}
-                onSelectAll={() => setSelectedHourPeriods(new Map(periods.filter(p => p.total_size_bytes > 0).map(p => [p.period, p])))}
-                onSelectNone={() => setSelectedHourPeriods(new Map())}
-                onClose={() => { setHourSelMode(false); setHourSelConfirm(false); setSelectedHourPeriods(new Map()) }}
+                selectedMap={selectedPeriods}
+                onSelectAll={() => setSelectedPeriods(new Map(periods.filter(p => p.total_size_bytes > 0).map(p => [p.period, p])))}
+                onSelectNone={() => setSelectedPeriods(new Map())}
+                onClose={() => { setSelMode(false); setSelDelConfirm(false); setSelectedPeriods(new Map()); setSelAnalyzeError(null) }}
                 onDelete={handleDeleteHours}
-                loading={hourSelLoading}
-                error={hourSelError}
-                confirmOpen={hourSelConfirm}
-                onSetConfirmOpen={setHourSelConfirm}
+                loading={selDelLoading}
+                error={selDelError}
+                confirmOpen={selDelConfirm}
+                onSetConfirmOpen={setSelDelConfirm}
+                onAnalyze={handleAnalyzeCells}
+                analyzing={selAnalyzing}
+                analyzeProgress={selAnalyzeProgress}
+                analyzeError={selAnalyzeError}
               />
             ) : (
               <div style={{ display: 'flex', gap: 'var(--gap-sm)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                <DayDeleteBar
-                  label={drillStack[drillStack.length - 1].label}
-                  onPreview={() => handleRangeDeletePreview(
-                    drillStack[drillStack.length - 1].dateFrom,
-                    drillStack[drillStack.length - 1].dateTo,
-                    drillStack.length - 2,
-                  )}
-                  loading={rangeDeletePreviewLoading}
-                />
+                {currentLevel === 'hour' && drillStack.length > 0 && (
+                  <DayDeleteBar
+                    label={drillStack[drillStack.length - 1].label}
+                    onPreview={() => handleRangeDeletePreview(
+                      drillStack[drillStack.length - 1].dateFrom,
+                      drillStack[drillStack.length - 1].dateTo,
+                      drillStack.length - 2,
+                    )}
+                    loading={rangeDeletePreviewLoading}
+                  />
+                )}
                 <button
                   className="modal-btn neutral"
                   style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}
-                  onClick={() => setHourSelMode(true)}
+                  onClick={() => setSelMode(true)}
                 >
-                  <i className="mdi mdi-checkbox-multiple-marked-outline" /> Select hours
+                  <i className="mdi mdi-checkbox-multiple-marked-outline" />
+                  {currentLevel === 'hour' ? ' Select hours' : ' Select days'}
                 </button>
               </div>
             )}
@@ -498,9 +652,10 @@ export default function App() {
               cameraId={cameraId}
               previewsPerCell={previewsPerCell}
               contextDateFrom={drillStack[drillStack.length - 1]?.dateFrom ?? null}
-              selectionMode={hourSelMode}
-              selectedPeriods={selectedHourPeriods}
-              onTogglePeriod={handleToggleHourPeriod}
+              selectionMode={selMode}
+              selectedPeriods={selectedPeriods}
+              onTogglePeriod={handleTogglePeriod}
+              aiRefreshKey={aiRefreshKey}
               focusedPeriod={focusedPeriod}
             />
             {!loading && periods.length > 0 && (
@@ -514,13 +669,20 @@ export default function App() {
       <KeyboardHints hints={
         selectedHour
           ? []
-          : hourSelMode
-            ? [{ key: '↑ ↓ ← →', label: 'navigate' }, { key: 'Space', label: 'toggle focused' }, { key: 'Click', label: 'toggle hour' }, { key: 'Del', label: 'delete selected' }, { key: 'Esc / Cancel', label: 'exit' }]
+          : selMode
+            ? [
+                { key: '↑ ↓ ← →', label: 'navigate' },
+                { key: 'Space', label: 'toggle' },
+                { key: 'Ctrl+A', label: 'select all' },
+                ...(currentLevel === 'hour' ? [{ key: 'Del', label: 'delete selected' }] : []),
+                { key: 'Esc', label: 'exit selection' },
+              ]
             : [
                 { key: '↑ ↓ ← →', label: 'navigate' },
                 { key: 'Enter', label: 'open' },
                 ...(drillStack.length > 0 ? [{ key: 'Esc / ⌫', label: 'back' }] : []),
-                ...(currentLevel === 'hour' ? [{ key: 'Space', label: 'select hour' }, { key: '⌫', label: 'delete day' }] : []),
+                ...((currentLevel === 'hour' || currentLevel === 'day') ? [{ key: 'Space', label: 'select' }, { key: 'Ctrl+A', label: 'select all' }] : []),
+                ...(currentLevel === 'hour' ? [{ key: '⌫', label: 'delete day' }] : []),
               ]
       } />
 

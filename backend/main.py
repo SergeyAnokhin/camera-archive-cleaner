@@ -1356,6 +1356,28 @@ def openvino_analyze_batch(req: OpenVinoAnalyzeRequest):
     }
 
 
+class OpenVinoRangeRequest(BaseModel):
+    camera_id:  str
+    date_from:  str
+    date_to:    str
+    model_name: str   = "yolov8n"
+    confidence: float = 0.25
+
+
+@app.post("/openvino_analyze_range", summary="Local object detection for all photos in a date range")
+def openvino_analyze_range(req: OpenVinoRangeRequest):
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id FROM files WHERE camera_id=? AND captured_at>=? AND captured_at<=? AND file_type='photo' ORDER BY captured_at",
+            (req.camera_id, req.date_from, req.date_to),
+        ).fetchall()
+    file_ids = [r[0] for r in rows]
+    if not file_ids:
+        return {"elapsed_ms": 0, "images_used": 0, "saved_count": 0, "results": {}}
+    inner = OpenVinoAnalyzeRequest(file_ids=file_ids, model_name=req.model_name, confidence=req.confidence)
+    return openvino_analyze_batch(inner)
+
+
 @app.get("/ai_analysis", summary="Fetch saved AI analysis for given file IDs")
 def get_ai_analysis(file_ids: str = Query(..., description="Comma-separated file IDs")):
     try:

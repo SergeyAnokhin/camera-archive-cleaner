@@ -46,7 +46,7 @@ function dateRangeForCell(period, level, contextDateFrom) {
   return null
 }
 
-export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selected, onToggle, isFocused }) {
+export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selected, onToggle, isFocused, aiRefreshKey }) {
   const [previewIds, setPreviewIds] = useState([])
   const [aiObjects, setAiObjects]   = useState([])
   const cellRef = useRef(null)
@@ -66,7 +66,7 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
       .then(data => { if (!cancelled) setAiObjects(data.objects ?? []) })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [cell.period, level, cameraId, contextDateFrom, cell.bucket])
+  }, [cell.period, level, cameraId, contextDateFrom, cell.bucket, aiRefreshKey])
 
   useEffect(() => {
     if (!showPreviews) { setPreviewIds([]); return }
