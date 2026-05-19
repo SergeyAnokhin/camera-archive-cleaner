@@ -145,11 +145,6 @@ vite.config.ts.timestamp-*
 /backend/__pycache__/*
 /backend/snapshots.db
 /backend/snapshots.db*
-/backend/thumbnails_cache/*
-/backend/diff_thumbnails_cache/*
-/backend/diff_zoom_thumbnails_cache/*
-/backend/erosion_thumbnails_cache/*
-/backend/motion_thumbnails_cache/*
-/backend/openvino_thumbnails_cache/*
+/backend/*_cache/*
 /backend/models/*
 /backend/yolo**.pt
