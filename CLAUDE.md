@@ -111,8 +111,4 @@ Read for more details technical specifications:
 - [Часть 2 из 3](technical-specifications/part2.md)
 - [Часть 3 из 3](technical-specifications/part3.md)
 
-Docs index (architecture references):
-
-- [AI Analysis](docs/ai-analysis.md) — Gemini/Claude integration, DB schema, icons, prompt
-- [Visualization Modes](docs/visualization-modes.md) — All 9 view modes
-- [Logging](docs/logging.md) — Log levels and format
+**Docs index** — see the Documentation table in [`README.md`](README.md). That table is the single source of truth for all architecture docs. Before touching any feature area, find the relevant doc there and read it first.
