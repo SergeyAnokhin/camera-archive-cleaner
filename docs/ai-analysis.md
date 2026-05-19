@@ -140,6 +140,18 @@ Request: `{ file_ids, model_name, confidence }`
 
 Objects are stored as Russian words so they match the existing `AI_ICON_MAP` in `aiHelpers.js`.
 
+### `POST /openvino_analyze_range`
+
+[`backend/main.py`](../backend/main.py) — `openvino_analyze_range()`
+
+Request: `{ camera_id, date_from, date_to, model_name, confidence }`
+
+Fetches all photo `file_id`s for the given camera and date range from the DB, then delegates to `openvino_analyze_batch()`. Used by the heatmap **CellSelBar** "Analyze" button to process all photos in selected cells without entering each hour individually.
+
+Returns the same shape as `/openvino_analyze_batch`.
+
+---
+
 ### `GET /openvino_thumbnail/{file_id}?model=yolov8n&confidence=0.25`
 
 [`backend/main.py`](../backend/main.py) — `get_openvino_thumbnail()`
@@ -401,6 +413,51 @@ The prompt instructs the model to return strict JSON:
   ]
 }
 ```
+
+---
+
+## Batch analysis from the heatmap (CellSelBar)
+
+Without opening a specific hour, the user can select multiple cells in the heatmap and run AI analysis on all of them at once.
+
+### How to enter selection mode
+
+| Action | Effect |
+|--------|--------|
+| Click **Select hours** / **Select days** button | Enter selection mode at hour or day level |
+| `Space` on focused cell | Toggle that cell + enter selection mode |
+| `Ctrl+A` | Enter selection mode and select all non-empty cells |
+| Click a cell (in selection mode) | Toggle that cell |
+| `Esc` | Exit selection mode |
+
+Selection mode is available at:
+- **`hour` level** (day view showing hour cells)
+- **`day` level** (month view showing day cells)
+
+### CellSelBar
+
+When selection mode is active, the **CellSelBar** appears in [`frontend/src/App.jsx`](../frontend/src/App.jsx). It has two rows:
+
+**Row 1 — selection controls:**
+`All` · `None` · selected count/size stats · `Delete selected` (hour level only) · `Cancel`
+
+**Row 2 — AI analysis panel:**
+- **Provider dropdown**: OpenVINO Detection / Gemini Analysis / Claude Analysis
+- **Model dropdown**: provider-specific models (same list as HourViewer's AiModePanel)
+- **Threshold slider** (OpenVINO only): 10–80 %, default 25 %
+- **Analyze (N)** button — runs analysis on all selected cells
+
+### What "Analyze" does per provider
+
+| Provider | Action |
+|----------|--------|
+| **OpenVINO** | Calls `POST /openvino_analyze_range` for each selected cell sequentially. Progress shown as `X/Y`. After all cells complete, increments `aiRefreshKey` to refresh cell icons |
+| **Gemini** | Gets 1 preview photo per selected cell via `GET /previews`, bundles all IDs, calls `POST /gemini_analyze_batch`. Requires `gemini_api_key` in localStorage |
+| **Claude** | Same as Gemini but via `POST /claude_analyze_batch`. Requires `claude_api_key` |
+
+### Icon refresh after analysis (`aiRefreshKey`)
+
+After `handleAnalyzeCells()` completes, App.jsx increments `aiRefreshKey` (integer state). This is passed as a prop through `HeatmapGrid` → `HeatmapCell`, where it is included in the `useEffect` dependency array for `getAiObjectsSummary`. Each affected cell re-fetches its AI object summary and re-renders icons.
 
 ---
 

@@ -88,9 +88,10 @@ logging.root.setLevel(logging.DEBUG)
 
 logger = logging.getLogger("api")
 
-from fastapi import FastAPI, HTTPException, Query
+import traceback
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from config import load_cameras
@@ -127,6 +128,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    logger.error("Unhandled exception on %s:\n%s", request.url.path, tb)
+    return JSONResponse(status_code=500, content={"detail": str(exc), "traceback": tb})
 
 
 @app.on_event("startup")
@@ -1368,7 +1376,7 @@ class OpenVinoRangeRequest(BaseModel):
 def openvino_analyze_range(req: OpenVinoRangeRequest):
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT id FROM files WHERE camera_id=? AND captured_at>=? AND captured_at<=? AND file_type='photo' ORDER BY captured_at",
+            "SELECT id FROM files WHERE camera_id=? AND timestamp>=? AND timestamp<=? AND file_type='photo' ORDER BY timestamp",
             (req.camera_id, req.date_from, req.date_to),
         ).fetchall()
     file_ids = [r[0] for r in rows]

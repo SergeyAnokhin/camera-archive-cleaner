@@ -137,7 +137,15 @@ async function postJson(path, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  if (!res.ok) throw new Error(`API ${res.status}: ${path}`)
+  if (!res.ok) {
+    let msg = `API ${res.status}: ${path}`
+    try {
+      const j = await res.json()
+      if (j.traceback) msg = j.traceback
+      else if (j.detail) msg = j.detail
+    } catch {}
+    throw new Error(msg)
+  }
   return res.json()
 }
 

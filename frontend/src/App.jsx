@@ -84,20 +84,18 @@ function KeyboardHints({ hints }) {
   if (!hints.length) return null
   return (
     <div style={{
-      position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
       padding: '4px 16px 6px',
       fontSize: 'calc(var(--font-base) * 0.75)',
       color: 'var(--text-dim)',
       textAlign: 'center',
       userSelect: 'none',
-      background: 'var(--bg)',
-      borderTop: 'var(--border)',
+      marginTop: 'var(--gap-md)',
     }}>
       {hints.map((h, i) => (
         <span key={i}>
           {i > 0 && <span style={{ margin: '0 8px', opacity: 0.4 }}>·</span>}
           <kbd style={{
-            background: 'var(--bg-surface)', border: 'var(--border)',
+            background: '#1f2937', border: '1px solid #374151',
             borderRadius: '3px', padding: '0px 4px', fontSize: 'inherit',
             fontFamily: 'inherit', marginRight: 4,
           }}>{h.key}</kbd>
@@ -108,12 +106,54 @@ function KeyboardHints({ hints }) {
   )
 }
 
+const CELL_PROVIDERS = [
+  {
+    key: 'openvino', label: 'OpenVINO Detection', icon: 'mdi-chip',
+    modelKey: 'openvino_model', defaultModel: 'yolov8n',
+    models: [
+      { value: 'yolov8n', label: '🟢 YOLOv8n — Nano (быстро)' },
+      { value: 'yolov8s', label: '🟡 YOLOv8s — Small (точнее)' },
+      { value: 'yolov8m', label: '🔴 YOLOv8m — Medium (медленно)' },
+    ],
+  },
+  {
+    key: 'gemini', label: 'Gemini Analysis', icon: 'mdi-google',
+    modelKey: 'gemini_model', defaultModel: 'gemini-3.1-flash-lite',
+    models: [
+      { value: 'gemini-3.1-flash-lite',    label: '🟢 gemini-3.1-flash-lite' },
+      { value: 'gemini-2.5-flash',         label: '🟡 gemini-2.5-flash' },
+      { value: 'gemini-2.5-pro',           label: '🔴 gemini-2.5-pro' },
+    ],
+  },
+  {
+    key: 'claude', label: 'Claude Analysis', icon: 'mdi-robot',
+    modelKey: 'claude_model', defaultModel: 'claude-haiku-4-5-20251001',
+    models: [
+      { value: 'claude-haiku-4-5-20251001', label: '🟢 claude-haiku-4-5' },
+      { value: 'claude-sonnet-4-6',         label: '🟡 claude-sonnet-4-6' },
+      { value: 'claude-opus-4-7',           label: '🔴 claude-opus-4-7' },
+    ],
+  },
+]
+
 function CellSelBar({ level, periods, selectedMap, onSelectAll, onSelectNone, onClose,
                        onDelete, loading, error, confirmOpen, onSetConfirmOpen,
                        onAnalyze, analyzing, analyzeProgress, analyzeError }) {
-  const [provider, setProvider] = useState('openvino')
-  const [ovModel, setOvModel]   = useState(() => localStorage.getItem('openvino_model') || 'yolov8n')
-  const [ovConf, setOvConf]     = useState(25)
+  const [providerKey, setProviderKey] = useState('openvino')
+  const [modelMap, setModelMap] = useState(() => {
+    const m = {}
+    for (const p of CELL_PROVIDERS) m[p.key] = localStorage.getItem(p.modelKey) || p.defaultModel
+    return m
+  })
+  const [ovConf, setOvConf] = useState(25)
+
+  const providerCfg = CELL_PROVIDERS.find(p => p.key === providerKey)
+  const currentModel = modelMap[providerKey]
+
+  function handleModelChange(val) {
+    setModelMap(prev => ({ ...prev, [providerKey]: val }))
+    localStorage.setItem(providerCfg.modelKey, val)
+  }
 
   const count = selectedMap.size
   const isHour = level === 'hour'
@@ -150,25 +190,31 @@ function CellSelBar({ level, periods, selectedMap, onSelectAll, onSelectNone, on
     )
   }
 
-  const btn = { fontSize: 'calc(var(--font-base) * 0.85)' }
-  const dim = { fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--text-dim)', whiteSpace: 'nowrap' }
+  // Use explicit hex colors — CSS vars don't resolve inside native <select> dropdowns
+  const selStyle = {
+    colorScheme: 'dark',
+    background: '#1f2937', color: '#f1f5f9',
+    border: '1px solid #374151', borderRadius: 6,
+    padding: '4px 8px', fontSize: 'calc(var(--font-base) * 0.85)', cursor: 'pointer',
+  }
+  const dim = { fontSize: 'calc(var(--font-base) * 0.82)', color: '#64748b', whiteSpace: 'nowrap' }
 
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 0,
-      background: 'var(--bg-surface)', border: 'var(--border)', borderRadius: 'var(--radius)',
+      background: '#1f2937', border: '1px solid #374151', borderRadius: 'var(--radius)',
       overflow: 'hidden',
     }}>
-      {/* Row 1: selection info + navigation */}
+      {/* Row 1: selection info + actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '8px 12px' }}>
-        <button className="modal-btn neutral" style={btn} onClick={onSelectAll}>
+        <button className="modal-btn neutral" onClick={onSelectAll}>
           <i className="mdi mdi-select-all" /> All ({periods.filter(p => p.total_size_bytes > 0).length})
         </button>
-        <button className="modal-btn neutral" style={btn} disabled={count === 0} onClick={onSelectNone}>
+        <button className="modal-btn neutral" disabled={count === 0} onClick={onSelectNone}>
           <i className="mdi mdi-select-off" /> None
         </button>
         {count > 0 ? (
-          <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: 'var(--accent)' }}>
+          <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: '#0ea5e9' }}>
             {count} {count === 1 ? unitLabel : unitLabelPlural} · {stats.photos.toLocaleString()} photos · {stats.videos.toLocaleString()} videos · {formatBytes(stats.bytes)}
           </span>
         ) : (
@@ -176,70 +222,51 @@ function CellSelBar({ level, periods, selectedMap, onSelectAll, onSelectNone, on
         )}
         <div style={{ flex: 1 }} />
         {isHour && (
-          <button className="modal-btn danger-outline" style={btn} disabled={count === 0} onClick={() => onSetConfirmOpen(true)}>
+          <button className="modal-btn danger-outline" disabled={count === 0} onClick={() => onSetConfirmOpen(true)}>
             <i className="mdi mdi-delete-outline" /> Delete selected
           </button>
         )}
-        <button className="modal-btn neutral" style={btn} onClick={onClose}>
+        <button className="modal-btn neutral" onClick={onClose}>
           <i className="mdi mdi-close" /> Cancel
         </button>
       </div>
 
-      {/* Row 2: AI analysis panel */}
+      {/* Row 2: AI analysis panel — styled like HourViewer AiModePanel */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-        padding: '8px 12px', borderTop: 'var(--border)',
-        background: 'rgba(14,165,233,0.04)',
+        padding: '8px 12px', borderTop: '1px solid #374151',
+        background: 'rgba(14,165,233,0.05)',
       }}>
-        <span style={dim}><i className="mdi mdi-robot-outline" /> AI Analysis:</span>
-
-        {/* Provider buttons */}
-        <div style={{ display: 'flex', gap: 4 }}>
-          {[
-            { key: 'openvino', icon: 'mdi-chip',   label: 'OpenVINO' },
-            { key: 'gemini',   icon: 'mdi-google',  label: 'Gemini' },
-            { key: 'claude',   icon: 'mdi-robot',   label: 'Claude' },
-          ].map(p => (
-            <button key={p.key}
-              className={`modal-btn ${provider === p.key ? 'accent' : 'neutral'}`}
-              style={btn}
-              onClick={() => setProvider(p.key)}
-            >
-              <i className={`mdi ${p.icon}`} /> {p.label}
-            </button>
+        {/* Provider combobox */}
+        <select value={providerKey} onChange={e => setProviderKey(e.target.value)} style={selStyle}>
+          {CELL_PROVIDERS.map(p => (
+            <option key={p.key} value={p.key}>{p.label}</option>
           ))}
-        </div>
+        </select>
 
-        {/* OpenVINO params */}
-        {provider === 'openvino' && (
+        {/* Model combobox */}
+        <select value={currentModel} onChange={e => handleModelChange(e.target.value)} style={selStyle}>
+          {providerCfg.models.map(m => (
+            <option key={m.value} value={m.value}>{m.label}</option>
+          ))}
+        </select>
+
+        {/* OpenVINO-only: confidence slider */}
+        {providerKey === 'openvino' && (
           <>
-            <span style={dim}>Model:</span>
-            <select
-              value={ovModel}
-              onChange={e => { setOvModel(e.target.value); localStorage.setItem('openvino_model', e.target.value) }}
-              style={{
-                colorScheme: 'dark',
-                background: 'var(--bg-surface)', color: 'var(--text)',
-                border: 'var(--border)', borderRadius: 4,
-                padding: '4px 8px', fontSize: 'calc(var(--font-base) * 0.85)', cursor: 'pointer',
-              }}
-            >
-              <option value="yolov8n">YOLOv8n — fast</option>
-              <option value="yolov8s">YOLOv8s — balanced</option>
-              <option value="yolov8m">YOLOv8m — accurate</option>
-            </select>
-            <span style={dim}>Threshold: {ovConf}%</span>
+            <span style={dim}><i className="mdi mdi-tune-variant" /> Threshold: {ovConf}%</span>
             <input type="range" min={10} max={80} step={5} value={ovConf}
               onChange={e => setOvConf(+e.target.value)}
-              style={{ width: 90, accentColor: 'var(--accent)', cursor: 'pointer' }}
+              style={{ width: 90, accentColor: '#0ea5e9', cursor: 'pointer' }}
             />
           </>
         )}
 
         {/* Analyze button */}
-        <button className="modal-btn accent" style={{ ...btn, marginLeft: 4 }}
+        <button className="modal-btn accent"
           disabled={count === 0 || analyzing}
-          onClick={() => onAnalyze(provider, ovModel, ovConf / 100)}
+          onClick={() => onAnalyze(providerKey, currentModel, ovConf / 100)}
+          style={{ marginLeft: 4 }}
         >
           {analyzing
             ? <><i className="mdi mdi-loading mdi-spin" /> {analyzeProgress || 'Analyzing...'}</>
@@ -247,9 +274,14 @@ function CellSelBar({ level, periods, selectedMap, onSelectAll, onSelectNone, on
         </button>
 
         {analyzeError && (
-          <span style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: '#f87171' }} title={analyzeError}>
-            <i className="mdi mdi-alert-circle-outline" /> {analyzeError}
-          </span>
+          <details style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: '#f87171', maxWidth: 600 }}>
+            <summary style={{ cursor: 'pointer', listStyle: 'none' }}>
+              <i className="mdi mdi-alert-circle-outline" /> Error (click for details)
+            </summary>
+            <pre style={{ marginTop: 6, padding: '6px 8px', background: '#1a0a0a', borderRadius: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '0.9em', maxHeight: 200, overflowY: 'auto' }}>
+              {analyzeError}
+            </pre>
+          </details>
         )}
       </div>
     </div>
@@ -483,7 +515,7 @@ export default function App() {
     return dateRangeForPeriod(period, currentLevel)
   }
 
-  async function handleAnalyzeCells(provider, ovModel, ovConf) {
+  async function handleAnalyzeCells(provider, model, confidence) {
     setSelAnalyzing(true)
     setSelAnalyzeError(null)
     setSelAnalyzeProgress('')
@@ -494,12 +526,11 @@ export default function App() {
         for (let i = 0; i < cells.length; i++) {
           setSelAnalyzeProgress(`${i + 1}/${cells.length}`)
           const { dateFrom, dateTo } = getCellDateRange(cells[i].period)
-          await openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName: ovModel, confidence: ovConf })
+          await openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName: model, confidence })
         }
       } else {
         const apiKey = localStorage.getItem(provider === 'gemini' ? 'gemini_api_key' : 'claude_api_key')
         if (!apiKey) throw new Error(`Нет API ключа ${provider === 'gemini' ? 'Gemini' : 'Claude'}. Откройте Tools.`)
-        const model = localStorage.getItem(provider === 'gemini' ? 'gemini_model' : 'claude_model') || ''
         const fileIds = []
         for (const cell of cells) {
           const { dateFrom, dateTo } = getCellDateRange(cell.period)
@@ -564,7 +595,7 @@ export default function App() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Header totals={totals} />
 
-      <main style={{ flex: 1, padding: 'var(--gap-lg)', paddingBottom: 'calc(var(--gap-lg) + 28px)', display: 'flex', flexDirection: 'column', gap: 'var(--gap-md)', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+      <main style={{ flex: 1, padding: 'var(--gap-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--gap-md)', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
 
         {/* Toolbar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--gap-sm)' }}>
@@ -661,30 +692,29 @@ export default function App() {
             {!loading && periods.length > 0 && (
               <StatsBar periods={periods} level={currentLevel} />
             )}
+            {!selectedHour && (
+              <KeyboardHints hints={
+                selMode
+                  ? [
+                      { key: '↑ ↓ ← →', label: 'navigate' },
+                      { key: 'Space', label: 'toggle' },
+                      { key: 'Ctrl+A', label: 'select all' },
+                      ...(currentLevel === 'hour' ? [{ key: 'Del', label: 'delete selected' }] : []),
+                      { key: 'Esc', label: 'exit selection' },
+                    ]
+                  : [
+                      { key: '↑ ↓ ← →', label: 'navigate' },
+                      { key: 'Enter', label: 'open' },
+                      ...(drillStack.length > 0 ? [{ key: 'Esc / ⌫', label: 'back' }] : []),
+                      ...((currentLevel === 'hour' || currentLevel === 'day') ? [{ key: 'Space', label: 'select' }, { key: 'Ctrl+A', label: 'select all' }] : []),
+                      ...(currentLevel === 'hour' ? [{ key: '⌫', label: 'delete day' }] : []),
+                    ]
+              } />
+            )}
           </>
         )}
 
       </main>
-
-      <KeyboardHints hints={
-        selectedHour
-          ? []
-          : selMode
-            ? [
-                { key: '↑ ↓ ← →', label: 'navigate' },
-                { key: 'Space', label: 'toggle' },
-                { key: 'Ctrl+A', label: 'select all' },
-                ...(currentLevel === 'hour' ? [{ key: 'Del', label: 'delete selected' }] : []),
-                { key: 'Esc', label: 'exit selection' },
-              ]
-            : [
-                { key: '↑ ↓ ← →', label: 'navigate' },
-                { key: 'Enter', label: 'open' },
-                ...(drillStack.length > 0 ? [{ key: 'Esc / ⌫', label: 'back' }] : []),
-                ...((currentLevel === 'hour' || currentLevel === 'day') ? [{ key: 'Space', label: 'select' }, { key: 'Ctrl+A', label: 'select all' }] : []),
-                ...(currentLevel === 'hour' ? [{ key: '⌫', label: 'delete day' }] : []),
-              ]
-      } />
 
       {rangeDeletePreview && (
         <DeleteConfirmModal

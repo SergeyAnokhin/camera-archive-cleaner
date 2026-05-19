@@ -1,6 +1,6 @@
 # Visualization Modes
 
-The HourViewer offers 7 visualization modes for browsing camera snapshots. All modes except **Normal** are computed server-side and cached on disk.
+The HourViewer offers 11 visualization modes for browsing camera snapshots. Modes 2–7 are motion-analysis modes computed server-side and cached on disk. Modes 8–10 are AI analysis modes that send photos to an external API or run a local model.
 
 ---
 
@@ -8,8 +8,9 @@ The HourViewer offers 7 visualization modes for browsing camera snapshots. All m
 
 | Control | Where | Effect |
 |---------|-------|--------|
-| **Mode selector** | HourViewer header dropdown | Switch between the 7 modes |
-| **Threshold slider** | Tools → Hour view | 0–100, default 20. Controls sensitivity of the underlying algorithm (see per-mode notes below) |
+| **Mode selector** | HourViewer header dropdown | Switch between the 11 modes |
+| **Threshold slider** | Tools → Hour view | 0–100, default 20. Controls sensitivity of motion modes (see per-mode notes below) |
+| **AI mode panel** | Appears below mode selector when an AI mode is active | Model selector, confidence slider (OpenVINO), Analyze button, usage stats |
 
 ---
 
@@ -131,6 +132,60 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
+## 8. Gemini Analysis
+
+**Key:** `gemini_analysis` | **Cache:** none (results stored in `ai_analysis` DB table) | **`isAiMode: true`**
+
+Sends all photos on the current page to the Google Gemini API (or a selection if files are selected). Returns a natural-language description per photo plus a list of detected objects (Russian keywords). Results are saved to the DB and displayed as:
+- Per-photo icon overlay and hover tooltip in HourViewer
+- Aggregate icons in heatmap cells (day, month, year views)
+
+**Panel controls:** Model selector (gemini-3.1-flash-lite / gemini-2.5-flash / gemini-2.5-pro), structured prompt editor, **Analyze** button, cost estimate and token stats after each run.
+
+**Requires:** `gemini_api_key` in localStorage (set in Tools → Google AI tab).
+
+---
+
+## 9. Claude Analysis
+
+**Key:** `claude_analysis` | **Cache:** none (results in `ai_analysis` table) | **`isAiMode: true`**
+
+Same flow as Gemini but uses the Anthropic Claude API. Sends photos as base64 JPEG.
+
+**Panel controls:** Model selector (claude-haiku-4-5 / claude-sonnet-4-6 / claude-opus-4-7), **Analyze** button, token/cost stats.
+
+**Requires:** `claude_api_key` in localStorage (set in Tools → Claude AI tab).
+
+---
+
+## 10. OpenVINO Detection
+
+**Key:** `openvino_detection` | **Cache:** `backend/openvino_thumbnails_cache/` (bbox JPEG per file+model+confidence) | **`isAiMode: true`**
+
+Runs local YOLOv8 object detection using the Intel OpenVINO runtime (falls back to PyTorch if no exported model is found). No API key or internet connection required.
+
+**How it works:**
+- `getImageUrl()` returns `/openvino_thumbnail/{file_id}?model=…&confidence=…` — a JPEG with bounding boxes drawn by YOLO's `.plot()` renderer
+- On **cache miss**: YOLO runs, bounding-box image is saved to disk, **and detected objects are also saved to `ai_analysis`** — icons appear automatically after load without clicking Analyze
+- On **cache hit**: the cached JPEG is returned immediately (no DB write)
+
+**Panel controls:** Model dropdown (YOLOv8n / YOLOv8s / YOLOv8m), confidence slider (10–80 %, default 25 %), **Analyze** button (bulk pre-save via `/openvino_analyze_batch` — useful after changing threshold to replace cached results)
+
+**Model change:** Stored in `openvino_model` localStorage key. Changing the model triggers a forced URL re-render via `onParamChange('_refresh', timestamp)` so all photo cards request new bbox images.
+
+**Optional: export to OpenVINO IR format (2–5× faster on Intel CPUs):**
+```powershell
+cd backend
+python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='openvino')"
+mkdir models -ErrorAction SilentlyContinue
+Move-Item yolov8n_openvino_model models\
+```
+Restart the backend; the log will confirm: `🔷 Loading OpenVINO model: …\models\yolov8n_openvino_model`.
+
+See full export guide in [`docs/ai-analysis.md`](ai-analysis.md#openvino-model-export--step-by-step).
+
+---
+
 ## Tuning guide
 
 | Symptom | Adjustment |
@@ -153,6 +208,7 @@ All computed thumbnails are cached on disk to avoid re-processing.
 | `backend/diff_thumbnails_cache/` | Motion diff | Tools → Maintenance → Clear diff thumbnails |
 | `backend/erosion_thumbnails_cache/` | Erosion | Tools → Maintenance → Clear erosion thumbnails |
 | `backend/motion_thumbnails_cache/` | Neon mask, MHI trail, Bounding boxes, Motion stacking | Tools → Maintenance → Clear motion thumbnails |
+| `backend/openvino_thumbnails_cache/` | OpenVINO Detection | Tools → Maintenance → Clear all thumbnails |
 
 Cache keys include the sorted list of page photo IDs and the current threshold value, so changing either will generate new cached images.
 

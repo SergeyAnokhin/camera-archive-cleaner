@@ -42,8 +42,9 @@ Key pattern: `mode_params_<mode_key>` (JSON object).
 | `mode_params_mhi` | `{"threshold":20}` | MHI threshold |
 | `mode_params_bounding_boxes` | `{"threshold":20}` | Bounding Boxes threshold |
 | `mode_params_motion_stacking` | `{"threshold":20}` | Motion Stacking threshold |
+| `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Used for the AiModePanel slider and bbox thumbnail URL |
 
-Initial value for all modes is taken from `diff_threshold` (the global default).
+Initial value for motion modes is taken from `diff_threshold` (the global default). OpenVINO defaults to 25.
 
 ---
 
@@ -71,6 +72,19 @@ Initial value for all modes is taken from `diff_threshold` (the global default).
 |---|---|---|
 | `claude_api_key` | `''` | Anthropic API key. Sent to the backend only as part of the analysis request body |
 | `claude_model` | `claude-haiku-4-5-20251001` | Selected Claude model |
+
+---
+
+## OpenVINO (local AI) settings
+
+No dedicated Tools tab — settings are set inline in the AI mode panel and in the heatmap selection bar.
+
+| localStorage key | Default | Description |
+|---|---|---|
+| `openvino_model` | `yolov8n` | Selected YOLO model. Options: `yolov8n`, `yolov8s`, `yolov8m`. Written when the model dropdown changes in HourViewer's AiModePanel or in the heatmap CellSelBar |
+| `openvino_confidence` | `0.25` | Confidence threshold (float 0–1) used by `OpenVinoAnalysisModal` (the "Run" button flow only). **Not** the same as the AiModePanel slider |
+
+Note: the AiModePanel confidence slider uses React `modeParams.confidence` (integer %) stored in `mode_params_openvino_detection` — it is **not** stored in `openvino_confidence`.
 
 ---
 

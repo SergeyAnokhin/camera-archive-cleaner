@@ -61,13 +61,28 @@ All thumbnail endpoints generate and cache on first request.
 
 ## AI analysis
 
+### Cloud AI (Gemini / Claude)
+
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/gemini_analyze` | Analyse images with Gemini — free-text response. Body: `file_ids`, `prompt`, `model`, `api_key` |
 | `POST` | `/gemini_analyze_batch` | Gemini analysis with structured JSON response; results saved to `ai_analysis` table |
 | `POST` | `/claude_analyze_batch` | Claude analysis with structured JSON response; results saved to `ai_analysis` table |
+
+### Local AI (OpenVINO / YOLOv8)
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/openvino_thumbnail/{file_id}` | Returns a JPEG with YOLO bounding boxes drawn. Params: `model` (default `yolov8n`), `confidence` (default `0.25`). Generates and caches on first request; **also saves detected objects to `ai_analysis`** on cache miss. Cache: `backend/openvino_thumbnails_cache/` |
+| `POST` | `/openvino_analyze_batch` | Run YOLO on a list of photos. Body: `file_ids`, `model_name`, `confidence`. Saves results to `ai_analysis`. Returns `{elapsed_ms, images_used, saved_count, results}` |
+| `POST` | `/openvino_analyze_range` | Same as `/openvino_analyze_batch` but fetches all photos in a date range. Body: `camera_id`, `date_from`, `date_to`, `model_name`, `confidence`. Used by heatmap batch analysis |
+
+### Shared
+
+| Method | Path | Description |
+|---|---|---|
 | `GET` | `/ai_analysis` | Fetch saved AI results. Param: `file_ids` comma-separated |
-| `GET` | `/ai_objects_summary` | Unique object keywords detected by AI for a date range. Optional: `camera_id`, `date_from`, `date_to` |
+| `GET` | `/ai_objects_summary` | Unique object keywords for a date range. Optional: `camera_id`, `date_from`, `date_to`. Used by heatmap cells for icon display |
 
 ---
 

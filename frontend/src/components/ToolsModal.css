@@ -228,6 +228,22 @@
   color: var(--text-primary);
 }
 
+.modal-btn.accent {
+  background: rgba(14, 165, 233, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.45);
+}
+
+.modal-btn.accent:hover:not(:disabled) {
+  background: rgba(14, 165, 233, 0.30);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.modal-btn.accent:disabled {
+  opacity: 0.45;
+}
+
 /* Number input */
 .modal-number-input {
   width: 80px;
