@@ -23,7 +23,9 @@ Results from all providers are stored in the same `ai_analysis` table and displa
 | Anthropic Claude | `claude` | `claude_api_key` | `claude_model` |
 | OpenVINO (local) | `openvino` | — | `openvino_model` |
 
-OpenVINO also uses `openvino_confidence` (float, default `0.25`) stored in localStorage.
+OpenVINO stores two separate confidence values:
+- `openvino_confidence` (float, default `0.25`) in localStorage — used by `OpenVinoAnalysisModal` (the "Run" button)
+- `confidence` mode param (integer %, default `25`) in React `modeParams` state — used by the `AiModePanel` slider and the bbox thumbnail URL
 
 ---
 
@@ -34,49 +36,73 @@ OpenVINO also uses `openvino_confidence` (float, default `0.25`) stored in local
 | `gemini_analysis` | Gemini Analysis | ✓ | [`viewModes/geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) |
 | `claude_analysis` | Claude Analysis | ✓ | [`viewModes/claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) |
 | `openvino_detection` | OpenVINO Detection | ✓ | [`viewModes/openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) |
-| `openvino_bbox` | OpenVINO Boxes | — | [`viewModes/openvinoBboxMode.js`](../frontend/src/components/viewModes/openvinoBboxMode.js) |
 
 Modes with `isAiMode: true`:
-- Replace the normal mode-settings panel with `AiModePanel` (model selector + Run button + request stats)
+- Replace the normal mode-settings panel with `AiModePanel` (model selector + confidence slider for openvino + Run button + stats)
 - Enable the per-card hover description tooltip
 
-**OpenVINO Boxes** (`openvino_bbox`) is a visualization mode, not an analysis mode — it fetches a cached JPEG with bounding boxes already drawn, using the model and confidence last set in the analysis modal.
+**OpenVINO Detection** combines visualization and analysis in one mode:
+- `getImageUrl` returns `/openvino_thumbnail/{file_id}?model=…&confidence=…` — boxes drawn on the photo
+- `params: [{ key: 'confidence', min: 10, max: 80, default: 25 }]` — confidence shown as a slider in `AiModePanel`; changing it immediately changes the thumbnail URL, forcing a new cached image to be requested
+- Model selector in `AiModePanel` calls `onParamChange('_refresh', Date.now())` on change to force photo URL re-render (since model is stored in localStorage, not React state)
 
 Mode registration: [`frontend/src/components/viewModes/index.js`](../frontend/src/components/viewModes/index.js)
 
 ---
 
-## Request flow — "Run" button
+## How icons reach the UI
+
+### Cloud AI (Gemini / Claude) — explicit Run
 
 ```
-User clicks Run
+User clicks Run in AiModePanel
+    │
+    ├─ provider === 'gemini' ──► GeminiAnalysisModal.jsx
+    │                              POST /gemini_analyze_batch
+    │                              saves to ai_analysis
+    │
+    └─ provider === 'claude' ──► ClaudeAnalysisModal.jsx
+                                   POST /claude_analyze_batch
+                                   saves to ai_analysis
+    │
+    └─ onComplete() ──► recordAiRequest(provider)
+                    └─► reloadAiAnalysis()  ← icons appear
+```
+
+### OpenVINO — automatic on thumbnail load
+
+```
+User switches to OpenVINO Detection mode
+    │
+    ▼ (for each photo visible on page)
+GET /openvino_thumbnail/{file_id}?model=…&confidence=…
+    │
+    ├─ cache hit  → return cached JPEG  (no DB write)
+    │
+    └─ cache miss → run YOLO
+                    draw bounding boxes  (results[0].plot())
+                    save JPEG to openvino_thumbnails_cache/
+                    save_ai_analysis() → ai_analysis table
+                    return JPEG
+    │
+    ▼ (PhotoCard.onLoad fires)
+debounce 1.5 s after last image load
     │
     ▼
-AiModePanel (HourViewer.jsx)
-    │  reads model from localStorage
-    │  determines target file IDs (selected or all photos on page)
+reloadAiAnalysis()  ← one DB read covers all loaded photos
     │
-    ├─ provider === 'gemini'   ──► GeminiAnalysisModal.jsx
-    │                                POST /gemini_analyze_batch
-    │                                (natural language description + object list)
-    │
-    ├─ provider === 'claude'   ──► ClaudeAnalysisModal.jsx
-    │                                POST /claude_analyze_batch
-    │                                (same structured format)
-    │
-    └─ provider === 'openvino' ──► OpenVinoAnalysisModal.jsx
-                                     POST /openvino_analyze_batch
-                                     (YOLO detection, COCO classes → Russian words)
+    ▼
+icons appear: top-left corner of each photo card
+              + hour / day / month cells in HeatmapCell
 ```
 
-Each modal on completion calls `onComplete()` which:
-1. Calls `recordAiRequest(provider)` — appends timestamp to localStorage stats
-2. Calls `reloadAiAnalysis()` — refreshes the icon map for the current page
+**"Run" button for OpenVINO** (optional):
+Opens `OpenVinoAnalysisModal` → `POST /openvino_analyze_batch` → saves to DB → calls `reloadAiAnalysis()`. Useful to bulk pre-save all photos on the page, e.g. after changing the confidence threshold so new results replace cached ones.
 
 **Modal files:**
 - [`frontend/src/components/GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) — editable prompt, token stats, cost estimate
 - [`frontend/src/components/ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) — same format
-- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider, per-photo object list, ms/photo timing
+- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider (reads `openvino_confidence` from localStorage), per-photo object list, ms/photo timing
 - Shared CSS: [`frontend/src/components/GeminiAnalysisModal.css`](../frontend/src/components/GeminiAnalysisModal.css)
 
 ---
@@ -122,6 +148,8 @@ Returns a JPEG with bounding boxes drawn by YOLO's built-in `.plot()` renderer:
 - Colored rectangle per detected object (automatic distinct color per class)
 - Label: `person 0.87`, `cat 0.62` etc. (COCO English name + confidence)
 - Output resized to max 640 × 640 px
+
+**On cache miss:** runs YOLO, draws boxes, saves JPEG, and **also calls `save_ai_analysis()`** to persist detected objects (Russian words) to the DB. This is what triggers icon display without needing to click "Run".
 
 Cache: `backend/openvino_thumbnails_cache/{sha256(v1:file_id:model:conf)[:16]}.jpg`
 Included in `DELETE /all_thumbnails` cleanup.
@@ -385,6 +413,7 @@ The prompt instructs the model to return strict JSON:
 - AI data loaded on every page change via `getAiAnalysis(pagePhotoIds)` → stored in `aiAnalysisMap` (Map keyed by `file_id`)
 - **Icons overlay** (top-left corner): always visible in all modes
 - **Hover description tooltip** (bottom of card): visible only when `mode.isAiMode === true`
+- **OpenVINO auto-refresh**: each `PhotoCard` fires `onImageLoad()` when its bbox thumbnail loads → debounced 1.5 s → single `reloadAiAnalysis()` call refreshes the map after the last image settles
 
 ### HeatmapCell — day/hour/month cells
 
@@ -419,4 +448,6 @@ Displayed in `AiModePanel` after each completed analysis.
 | Claude AI | API key | `claude_api_key` |
 | Claude AI | Model | `claude_model` |
 
-OpenVINO settings (model, confidence) are stored in `openvino_model` and `openvino_confidence` — set via the analysis modal, no dedicated Tools tab.
+OpenVINO has no dedicated Tools tab. Its settings are:
+- `openvino_model` — set via the model dropdown in `AiModePanel` (active when mode is `openvino_detection`)
+- `openvino_confidence` (float) — set via the confidence slider in `OpenVinoAnalysisModal` (the "Run" modal only); the `AiModePanel` slider uses React `modeParams.confidence` (integer %) instead
