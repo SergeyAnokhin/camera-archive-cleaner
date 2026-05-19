@@ -9,7 +9,6 @@ import motionStackingMode from './motionStackingMode.js'
 import geminiMode from './geminiMode.js'
 import claudeMode from './claudeMode.js'
 import openvinoMode from './openvinoMode.js'
-import openvinoBboxMode from './openvinoBboxMode.js'
 
 export const VIEW_MODES = [
   normalMode,
@@ -23,6 +22,5 @@ export const VIEW_MODES = [
   geminiMode,
   claudeMode,
   openvinoMode,
-  openvinoBboxMode,
 ]
 export const DEFAULT_VIEW_MODE_KEY = normalMode.key

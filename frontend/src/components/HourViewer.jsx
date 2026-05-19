@@ -149,7 +149,7 @@ function ModeSettingsPanel({ mode, params, onChange }) {
   )
 }
 
-function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused, aiData }) {
+function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused, aiData, onImageLoad }) {
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
@@ -211,7 +211,7 @@ function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode,
               alt={formatTime(file.timestamp)}
               className="hv-photo-img"
               style={{ display: loaded ? 'block' : 'none' }}
-              onLoad={() => setLoaded(true)}
+              onLoad={() => { setLoaded(true); onImageLoad?.() }}
               onError={() => setError(true)}
             />
         }
@@ -507,7 +507,7 @@ const AI_PROVIDER_CONFIG = {
   },
 }
 
-function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun, statsKey }) {
+function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun, statsKey, params, onParamChange }) {
   const cfg = AI_PROVIDER_CONFIG[provider] ?? AI_PROVIDER_CONFIG.gemini
   const [model, setModel] = useState(() =>
     localStorage.getItem(cfg.modelKey) || cfg.defaultModel
@@ -530,7 +530,11 @@ function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun, stats
   function handleModelChange(e) {
     setModel(e.target.value)
     localStorage.setItem(cfg.modelKey, e.target.value)
+    // Force photo URLs to update (getImageUrl reads model from localStorage)
+    onParamChange?.('_refresh', Date.now())
   }
+
+  const confidence = params?.confidence ?? 25
 
   return (
     <div className="hv-mode-settings hv-ai-panel">
@@ -548,6 +552,20 @@ function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun, stats
           <option key={m.value} value={m.value}>{m.label}</option>
         ))}
       </select>
+      {provider === 'openvino' && (
+        <div className="hv-ai-confidence">
+          <span className="hv-ai-confidence-label">
+            <i className="mdi mdi-tune-variant" /> Порог: {confidence}%
+          </span>
+          <input
+            type="range"
+            className="hv-ai-confidence-slider"
+            min={10} max={80} step={5}
+            value={confidence}
+            onChange={e => onParamChange?.('confidence', +e.target.value)}
+          />
+        </div>
+      )}
       <button className="hv-ai-run-btn" onClick={onRun}>
         <i className="mdi mdi-play" />
         {selectedIds.size > 0
@@ -950,6 +968,14 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       .catch(() => {})
   }
 
+  // Debounced reload triggered by each bbox thumbnail finishing load in OpenVINO mode.
+  // Waits 1.5 s after the last load event so one DB call covers all visible photos.
+  const _ovReloadTimer = useRef(null)
+  function handleOpenVinoImageLoad() {
+    clearTimeout(_ovReloadTimer.current)
+    _ovReloadTimer.current = setTimeout(() => reloadAiAnalysis(), 1500)
+  }
+
   function getGridCols() {
     if (!gridRef.current) return 4
     const cards = gridRef.current.querySelectorAll('.hv-card')
@@ -1094,6 +1120,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           selectedIds={selectedIds}
           aiAnalysisMap={aiAnalysisMap}
           statsKey={aiStatsKey}
+          params={activeModeParams}
+          onParamChange={(k, v) => handleModeParamChange(viewMode, k, v)}
           onRun={() => {
             if (activeMode.aiProvider === 'claude') {
               setClaudeOpen(true)
@@ -1182,6 +1210,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
                   onToggle={toggleSelect}
                   isFocused={index === focusedFileIndex}
                   aiData={aiAnalysisMap.get(file.id) ?? null}
+                  onImageLoad={activeMode.aiProvider === 'openvino' ? handleOpenVinoImageLoad : undefined}
                 />
           )}
         </div>

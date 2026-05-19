@@ -1,12 +1,16 @@
-import { getThumbnailUrl } from '../../api.js'
+import { getOpenVinoBboxThumbnailUrl } from '../../api.js'
 
 export default {
   key: 'openvino_detection',
   label: 'OpenVINO Detection',
-  params: [],
+  params: [
+    { key: 'confidence', label: 'Confidence %', min: 10, max: 80, default: 25, step: 5 },
+  ],
   isAiMode: true,
   aiProvider: 'openvino',
-  getImageUrl(file) {
-    return getThumbnailUrl(file.id)
+  getImageUrl(file, { params } = {}) {
+    const model = localStorage.getItem('openvino_model') || 'yolov8n'
+    const confidence = (params?.confidence ?? 25) / 100
+    return getOpenVinoBboxThumbnailUrl(file.id, model, confidence)
   },
 }

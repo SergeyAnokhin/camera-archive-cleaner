@@ -718,6 +718,24 @@
 }
 .hv-ai-scene .mdi { color: var(--accent); margin-right: 4px; }
 
+.hv-ai-confidence {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 1px 0;
+}
+.hv-ai-confidence-label {
+  font-size: calc(var(--font-base) * 0.8);
+  color: var(--text-dim);
+}
+.hv-ai-confidence-label .mdi { color: var(--accent); margin-right: 3px; }
+.hv-ai-confidence-slider {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 /* ── AI icons on photo cards ── */
 .hv-card-ai-icons {
   position: absolute;

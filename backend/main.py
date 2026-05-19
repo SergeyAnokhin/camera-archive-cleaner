@@ -478,13 +478,28 @@ def get_openvino_thumbnail(
     try:
         img = PILImage.open(src).convert("RGB")
         results = yolo(img, conf=confidence, verbose=False)
-        # results[0].plot() returns BGR numpy array with boxes, labels, confidence drawn
+
+        # Extract detected Russian object names for ai_analysis
+        seen: set[str] = set()
+        objects_ru: list[str] = []
+        for cls_id in results[0].boxes.cls.tolist():
+            en = yolo.names[int(cls_id)]
+            ru = _COCO_TO_RUSSIAN.get(en, en)
+            if ru not in seen:
+                seen.add(ru)
+                objects_ru.append(ru)
+
+        # Draw bounding boxes (results[0].plot() returns BGR numpy array)
         annotated_bgr = results[0].plot(line_width=2, font_size=10)
         annotated_rgb = annotated_bgr[:, :, ::-1]   # BGR → RGB
         out_img = PILImage.fromarray(annotated_rgb)
         out_img.thumbnail((640, 640), PILImage.LANCZOS)
         OV_THUMB_DIR.mkdir(exist_ok=True)
         out_img.save(str(cache_path), format="JPEG", quality=88)
+
+        # Save detected objects to ai_analysis so icons appear at all levels
+        with get_connection() as conn:
+            save_ai_analysis(conn, file_id, "openvino", model, "", "", " ".join(objects_ru))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Detection error: {e}")
 
