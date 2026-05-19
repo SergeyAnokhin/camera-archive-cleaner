@@ -52,14 +52,14 @@ config.py ──► scanner.py ──► database.py (SQLite: snapshots.db)
 
 ## Documentation
 
-| Файл | Описание |
-|------|----------|
-| [`docs/code-map.md`](docs/code-map.md) | Карта кода — все файлы backend и frontend, что в каждом файле |
-| [`docs/api.md`](docs/api.md) | Все API-эндпоинты с параметрами и описанием |
-| [`docs/database.md`](docs/database.md) | SQLite-схема: таблицы `files`, `thumbnails`, `ai_analysis`, каскады, поток данных |
-| [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI-анализ: Gemini и Claude интеграция, DB-схема, формат промпта, иконки |
-| [`docs/visualization-modes.md`](docs/visualization-modes.md) | 9 режимов просмотра: Normal, Motion Diff, Erosion и др. |
-| [`docs/logging.md`](docs/logging.md) | Уровни логирования, формат, цвета |
+| File | Description |
+|------|-------------|
+| [`docs/code-map.md`](docs/code-map.md) | Code map — all backend and frontend files, what each file does |
+| [`docs/api.md`](docs/api.md) | All API endpoints with parameters and descriptions |
+| [`docs/database.md`](docs/database.md) | SQLite schema: `files`, `thumbnails`, `ai_analysis` tables, cascades, data flow |
+| [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis: Gemini & Claude integration, DB schema, prompt format, icon display |
+| [`docs/visualization-modes.md`](docs/visualization-modes.md) | All 9 view modes: Normal, Motion Diff, Erosion, etc. |
+| [`docs/logging.md`](docs/logging.md) | Log levels, format, colours, how to configure |
 
 ---
 

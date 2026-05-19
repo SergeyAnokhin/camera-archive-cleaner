@@ -1,85 +1,85 @@
 # API Reference
 
-FastAPI-бэкенд на порту `8000`. Swagger UI: `http://localhost:8000/docs`.
+FastAPI backend on port `8000`. Swagger UI: `http://localhost:8000/docs`.
 
-Все параметры фильтрации (`camera_id`, `date_from`, `date_to`) необязательны — без них запрос охватывает все камеры и всё время.
+All filter parameters (`camera_id`, `date_from`, `date_to`) are optional — omitting them covers all cameras and all time.
 
 ---
 
-## Камеры и сканирование
+## Cameras & scanning
 
-| Метод | Путь | Описание |
+| Method | Path | Description |
 |---|---|---|
-| `GET` | `/cameras` | Список камер из `cameras.yaml` — id, name, пути |
-| `POST` | `/scan` | Сканировать директории и обновить БД. Параметр `?camera_id=` — одна камера; без него — все |
+| `GET` | `/cameras` | List cameras from `cameras.yaml` — id, name, paths |
+| `POST` | `/scan` | Scan directories and update the DB. `?camera_id=` scans one camera; omit to scan all |
 
 ---
 
-## Статистика
+## Statistics
 
-| Метод | Путь | Описание |
+| Method | Path | Description |
 |---|---|---|
-| `GET` | `/stats` | Агрегированная статистика. Параметр `group_by`: `total` / `camera` / `year` / `month` / `day` / `hour`. Опционально: `camera_id`, `date_from`, `date_to` |
-| `GET` | `/distribution` | 60 бакетов (по минуте) для диапазона дат. Используется в HourViewer для distribution chart |
+| `GET` | `/stats` | Aggregated stats. `group_by`: `total` / `camera` / `year` / `month` / `day` / `hour`. Optional: `camera_id`, `date_from`, `date_to` |
+| `GET` | `/distribution` | 60 buckets (one per minute) for a date range. Used by HourViewer distribution chart |
 
 ---
 
-## Файлы и превью
+## Files & previews
 
-| Метод | Путь | Описание |
+| Method | Path | Description |
 |---|---|---|
-| `GET` | `/files` | Постраничный список файлов. Параметры: `camera_id`, `date_from`, `date_to`, `page`, `page_size` |
-| `GET` | `/previews` | N равномерно выбранных `file_id` фотографий за период. Используется для стрипа превьюшек в ячейках тепловой карты |
-| `GET` | `/media/{file_id}` | Отдаёт оригинальный файл (фото или видео) с правильным MIME-типом |
+| `GET` | `/files` | Paginated file list. Params: `camera_id`, `date_from`, `date_to`, `page`, `page_size` |
+| `GET` | `/previews` | N uniformly-sampled photo `file_id`s for a period. Used to populate thumbnail strips in heatmap cells |
+| `GET` | `/media/{file_id}` | Serve the original file (photo or video) with the correct MIME type |
 
 ---
 
-## Миниатюры (thumbnails)
+## Thumbnails
 
-Все thumbnail-эндпоинты генерируют и кэшируют превьюшку при первом обращении.
+All thumbnail endpoints generate and cache on first request.
 
-| Метод | Путь | Описание |
+| Method | Path | Description |
 |---|---|---|
-| `GET` | `/thumbnail/{file_id}` | Базовая миниатюра 256×256 JPEG |
-| `GET` | `/diff_thumbnail/{file_id}` | Motion Diff: разница кадра со средним по странице. Параметры: `page_ids` (через запятую), `threshold` (0–255, по умолч. 20) |
-| `GET` | `/diff_zoom_thumbnail/{file_id}` | Diff Zoom: кроп до самого активного тайла 1/9. Параметры: те же |
-| `GET` | `/erosion_thumbnail/{file_id}` | Erosion/MOG2: морфологическая эрозия движения. Параметры: те же |
-| `GET` | `/motion_thumbnail/{file_id}` | Один из 4 motion-режимов: `neon_mask` / `mhi` / `bounding_boxes` / `motion_stacking`. Параметры: `page_ids`, `threshold`, `mode` |
+| `GET` | `/thumbnail/{file_id}` | Basic 256×256 JPEG thumbnail |
+| `GET` | `/diff_thumbnail/{file_id}` | Motion Diff: delta from page mean. Params: `page_ids` (comma-separated), `threshold` (0–255, default 20) |
+| `GET` | `/diff_zoom_thumbnail/{file_id}` | Diff Zoom: crop to the most active 1/9 tile. Same params |
+| `GET` | `/erosion_thumbnail/{file_id}` | Erosion/MOG2: morphological erosion. Same params |
+| `GET` | `/motion_thumbnail/{file_id}` | One of 4 motion modes: `neon_mask` / `mhi` / `bounding_boxes` / `motion_stacking`. Params: `page_ids`, `threshold`, `mode` |
 
 ---
 
-## Удаление
+## Deletion
 
-| Метод | Путь | Тело запроса | Описание |
+| Method | Path | Request body | Description |
 |---|---|---|---|
-| `POST` | `/delete/preview` | `{"file_ids": [...]}` | Превью удаления: список выбранных файлов + автоматически найденные парные видео (±5 сек) |
-| `POST` | `/delete/confirm` | `{"file_ids": [...]}` | Физически удалить файлы с диска и из БД. Попутно удаляет превьюшки |
-| `POST` | `/delete/preview_range` | `{"camera_id": ..., "date_from": ..., "date_to": ...}` | Превью удаления всего диапазона дат |
-| `POST` | `/delete/by_range` | те же поля | Удалить все файлы в диапазоне дат |
+| `POST` | `/delete/preview` | `{"file_ids": [...]}` | Preview: selected files + auto-matched paired videos (±5 s) |
+| `POST` | `/delete/confirm` | `{"file_ids": [...]}` | Physically delete files from disk and DB. Also removes thumbnails |
+| `POST` | `/delete/preview_range` | `{"camera_id": ..., "date_from": ..., "date_to": ...}` | Preview all files in a date range |
+| `POST` | `/delete/by_range` | same fields | Delete all files in a date range |
 
 ---
 
-## AI-анализ
+## AI analysis
 
-| Метод | Путь | Описание |
+| Method | Path | Description |
 |---|---|---|
-| `POST` | `/gemini_analyze` | Анализ изображений через Gemini — свободный текстовый ответ. Тело: `file_ids`, `prompt`, `model`, `api_key` |
-| `POST` | `/gemini_analyze_batch` | Анализ через Gemini с JSON-ответом, результаты сохраняются в `ai_analysis` |
-| `POST` | `/claude_analyze_batch` | Анализ через Anthropic Claude с JSON-ответом, результаты сохраняются в `ai_analysis` |
-| `GET` | `/ai_analysis` | Получить сохранённые AI-результаты. Параметр: `file_ids` через запятую |
-| `GET` | `/ai_objects_summary` | Уникальные объекты, обнаруженные AI за диапазон. Опционально: `camera_id`, `date_from`, `date_to` |
+| `POST` | `/gemini_analyze` | Analyse images with Gemini — free-text response. Body: `file_ids`, `prompt`, `model`, `api_key` |
+| `POST` | `/gemini_analyze_batch` | Gemini analysis with structured JSON response; results saved to `ai_analysis` table |
+| `POST` | `/claude_analyze_batch` | Claude analysis with structured JSON response; results saved to `ai_analysis` table |
+| `GET` | `/ai_analysis` | Fetch saved AI results. Param: `file_ids` comma-separated |
+| `GET` | `/ai_objects_summary` | Unique object keywords detected by AI for a date range. Optional: `camera_id`, `date_from`, `date_to` |
 
 ---
 
-## Обслуживание (maintenance)
+## Maintenance
 
-| Метод | Путь | Описание |
+| Method | Path | Description |
 |---|---|---|
-| `DELETE` | `/database` | Удалить все записи файлов из БД (не трогает файлы на диске) |
-| `DELETE` | `/thumbnails` | Удалить базовые превьюшки (диск + БД) |
-| `DELETE` | `/diff_thumbnails` | Удалить diff-превьюшки |
-| `DELETE` | `/erosion_thumbnails` | Удалить erosion-превьюшки |
-| `DELETE` | `/diff_zoom_thumbnails` | Удалить diff-zoom-превьюшки |
-| `DELETE` | `/motion_thumbnails` | Удалить motion-превьюшки |
-| `DELETE` | `/all_thumbnails` | Удалить все превьюшки всех типов |
-| `GET` | `/storage_info` | Размер БД и всех кэшей превьюшек в байтах |
+| `DELETE` | `/database` | Delete all file records from DB (does not touch files on disk) |
+| `DELETE` | `/thumbnails` | Delete basic thumbnails (disk + DB) |
+| `DELETE` | `/diff_thumbnails` | Delete diff thumbnails |
+| `DELETE` | `/erosion_thumbnails` | Delete erosion thumbnails |
+| `DELETE` | `/diff_zoom_thumbnails` | Delete diff-zoom thumbnails |
+| `DELETE` | `/motion_thumbnails` | Delete motion thumbnails |
+| `DELETE` | `/all_thumbnails` | Delete all thumbnails of all types |
+| `GET` | `/storage_info` | DB size and all thumbnail cache sizes in bytes |

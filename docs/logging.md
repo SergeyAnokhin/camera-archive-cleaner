@@ -1,116 +1,112 @@
-# Логирование бэкенда
+# Backend Logging
 
-## Где живёт конфигурация
-
-Весь код настройки логирования — в одном файле: **`backend/main.py`**, в начале файла до первого `import fastapi`.
+All logging configuration lives in one file: **`backend/main.py`**, at the top before the first `import fastapi`.
 
 ---
 
-## Уровни логирования
+## Log levels
 
-| Уровень | Число | Что туда попадает |
-|---------|-------|-------------------|
-| `TRACE` | 5     | Запросы к `/thumbnail/` и `/diff_thumbnail/` |
-| `DEBUG` | 10    | HTTP-запросы ко всем остальным эндпоинтам |
-| `INFO`  | 20    | Наши смысловые логи (📁 📊 📈 …) |
-| `WARNING` | 30  | Предупреждения (например, недоступная директория при скане) |
-| `ERROR` | 40    | Ошибки |
+| Level | Value | What it captures |
+|-------|-------|-----------------|
+| `TRACE` | 5 | Requests to `/thumbnail/` and `/diff_thumbnail/` |
+| `DEBUG` | 10 | HTTP requests to all other endpoints |
+| `INFO` | 20 | Application logs (📁 📊 📈 …) |
+| `WARNING` | 30 | Warnings (e.g. inaccessible directory during scan) |
+| `ERROR` | 40 | Errors |
 
 ---
 
-## Как изменить уровень
+## Changing the log level
 
-Найдите в `backend/main.py` строку:
+Find this line in `backend/main.py`:
 
 ```python
 logging.root.setLevel(logging.DEBUG)
 ```
 
-Замените значение на нужное:
+Replace with the desired level:
 
 ```python
-logging.root.setLevel(logging.INFO)    # только наши api-логи, без http-запросов
-logging.root.setLevel(logging.DEBUG)   # + http-запросы к эндпоинтам (без thumbnail)
-logging.root.setLevel(TRACE)           # абсолютно всё, включая thumbnail-запросы
-logging.root.setLevel(logging.WARNING) # только предупреждения и ошибки
+logging.root.setLevel(logging.INFO)     # app logs only, no HTTP requests
+logging.root.setLevel(logging.DEBUG)    # + HTTP requests (excluding thumbnails)
+logging.root.setLevel(TRACE)            # everything, including thumbnail requests
+logging.root.setLevel(logging.WARNING)  # warnings and errors only
 ```
 
-> **Подсказка:** `TRACE = 5` — кастомный уровень, объявленный в том же файле. Уровень `TRACE` нужен только если хотите видеть многочисленные запросы к превьюшкам; обычно они не несут полезной информации.
+`TRACE = 5` is a custom level declared in the same file. Only needed if you want to see the high-frequency thumbnail requests; usually not useful.
 
 ---
 
-## Формат строки лога
-
-Каждая строка выглядит так:
+## Log line format
 
 ```
-19:59:05  INFO     api:  📁 Файлы стр.1 (по 40) камера=foscamHut с 2024-08-11T10:00 по 2024-08-11T10:59
+19:59:05  INFO     api:  📁 Files page 1 (40 per page) camera=foscamHut 2024-08-11T10:00–10:59
 │         │        │     │
-│         │        │     └── сообщение (с подсветкой чисел и имён камер)
-│         │        └──────── источник: "api" (наши логи) или "http" (uvicorn access)
-│         └───────────────── уровень: TRACE / DEBUG / INFO / WARNING / ERROR
-└─────────────────────────── время HH:MM:SS
+│         │        │     └── message (numbers and camera names are colour-highlighted)
+│         │        └──────── source: "api" (app logs) or "http" (uvicorn access)
+│         └───────────────── level: TRACE / DEBUG / INFO / WARNING / ERROR
+└─────────────────────────── time HH:MM:SS
 ```
 
-Строки-продолжения (результат запроса) начинаются с `└─`:
+Continuation lines (query result) start with `└─`:
 
 ```
-19:59:05  INFO     api:  📁 Файлы стр.1 (по 40) камера=foscamHut ...
-19:59:05  INFO     api:     └─ всего 158, показано 40 на стр.1
+19:59:05  INFO     api:  📁 Files page 1 (40 per page) camera=foscamHut ...
+19:59:05  INFO     api:     └─ total 158, showing 40 on page 1
 ```
 
 ---
 
-## Цветовая схема
+## Colour scheme
 
-| Элемент | Цвет |
-|---------|------|
-| Время | Голубой |
-| `INFO` | Зелёный |
-| `DEBUG` / `TRACE` | Серый приглушённый |
-| `WARNING` | Жёлтый |
-| `ERROR` | Красный |
-| Имя источника `api` | Ярко-синий жирный |
-| Имя источника `http` | Серый |
-| Числа в сообщении | Ярко-жёлтый |
-| Имя камеры (`камера=…`) | Ярко-голубой |
+| Element | Colour |
+|---------|--------|
+| Timestamp | Cyan |
+| `INFO` | Green |
+| `DEBUG` / `TRACE` | Dim grey |
+| `WARNING` | Yellow |
+| `ERROR` | Red |
+| Source `api` | Bright blue bold |
+| Source `http` | Grey |
+| Numbers in message | Bright yellow |
+| Camera name (`camera=…`) | Bright cyan |
 
-Реализовано в классе `_ColorFmt` (`backend/main.py`). ANSI-коды определены как константы `_R`, `_GREEN`, `_BRIGHT_CYAN` и т.д. в начале файла.
-
----
-
-## Как работает перехват uvicorn
-
-Uvicorn при старте добавляет свои хендлеры к логгерам `uvicorn`, `uvicorn.access`, `uvicorn.error`. Чтобы все логи шли через наш форматтер, в `startup`-событии мы:
-
-1. Очищаем хендлеры uvicorn: `_lg.handlers.clear()`
-2. Включаем propagation: `_lg.propagate = True` — записи уходят в наш root-хендлер
-3. Вешаем фильтр `_AccessFilter` на `uvicorn.access`, который:
-   - понижает уровень http-запросов с `INFO` до `DEBUG`
-   - запросы к `/thumbnail/` и `/diff_thumbnail/` понижает до `TRACE`
+Implemented in the `_ColorFmt` class (`backend/main.py`). ANSI codes are defined as constants `_R`, `_GREEN`, `_BRIGHT_CYAN`, etc. at the top of the file.
 
 ---
 
-## Как добавить новый лог
+## Uvicorn log interception
+
+Uvicorn adds its own handlers to `uvicorn`, `uvicorn.access`, and `uvicorn.error` loggers on startup. To route everything through our formatter, the `startup` event:
+
+1. Clears uvicorn handlers: `_lg.handlers.clear()`
+2. Enables propagation: `_lg.propagate = True` — records flow to our root handler
+3. Attaches `_AccessFilter` to `uvicorn.access`, which:
+   - Downgrades HTTP request logs from `INFO` to `DEBUG`
+   - Downgrades `/thumbnail/` and `/diff_thumbnail/` requests to `TRACE`
+
+---
+
+## Adding a new log line
 
 ```python
-# Вверху функции — что запрашивается
-logger.info("🔍 Описание: параметр=%s", значение)
+# At the start of a handler — what is being requested
+logger.info("🔍 Description: param=%s", value)
 
-# После получения результата — что вернулось
-logger.info("   └─ результат: %d элементов", len(items))
+# After getting the result — what was returned
+logger.info("   └─ result: %d items", len(items))
 ```
 
-Используйте `logger` (уже объявлен в `backend/main.py`), а не `logging.info(...)` напрямую — иначе источник в логе будет `root`, а не `api`.
+Use `logger` (already declared in `backend/main.py`), not `logging.info()` directly — otherwise the source in the log will show as `root` instead of `api`.
 
-Для числовых значений подсветка применяется автоматически (`_colorize_msg`), если число стоит отдельным словом (окружено границами `\b`).
+Number highlighting is applied automatically by `_colorize_msg` for values that appear as standalone words (surrounded by `\b` word boundaries).
 
 ---
 
-## Отключить логирование целиком
+## Disable logging entirely
 
 ```python
 logging.root.setLevel(logging.CRITICAL)
 ```
 
-Либо при запуске uvicorn добавьте флаг `--no-access-log` — это отключит только http-доступ-логи uvicorn, наши `api`-логи при этом останутся.
+Or pass `--no-access-log` to uvicorn — this disables only HTTP access logs; app `api` logs remain active.

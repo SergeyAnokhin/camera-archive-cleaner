@@ -1,69 +1,69 @@
 # Database
 
-SQLite база данных (`backend/snapshots.db`). Инициализируется при старте бэкенда через [`backend/database.py`](../backend/database.py).
+SQLite database (`backend/snapshots.db`). Initialised on backend startup via [`backend/database.py`](../backend/database.py).
 
 ---
 
-## Таблицы
+## Tables
 
-### `files` — индекс файлов на диске
+### `files` — file index
 
-Основная таблица. Заполняется сканером при вызове `/scan`. Каждый файл (фото или видео) — одна строка.
+Main table. Populated by the scanner on `/scan`. One row per file (photo or video).
 
-| Колонка | Тип | Описание |
+| Column | Type | Description |
 |---|---|---|
-| `id` | INTEGER PK | Автоинкремент |
-| `camera_id` | TEXT | ID камеры из `cameras.yaml` |
-| `file_type` | TEXT | `'photo'` или `'video'` |
-| `file_path` | TEXT UNIQUE | Полный путь к файлу на диске |
-| `file_size` | INTEGER | Размер файла в байтах |
-| `timestamp` | TEXT | Время снимка в ISO-8601 (из имени файла или mtime) |
+| `id` | INTEGER PK | Auto-increment |
+| `camera_id` | TEXT | Camera ID from `cameras.yaml` |
+| `file_type` | TEXT | `'photo'` or `'video'` |
+| `file_path` | TEXT UNIQUE | Full path to the file on disk |
+| `file_size` | INTEGER | File size in bytes |
+| `timestamp` | TEXT | Snapshot time in ISO-8601 (from filename or mtime) |
 
-**Индексы:**
-- `idx_cam_ts` — `(camera_id, timestamp)` — для heatmap-запросов
-- `idx_cam_type_ts` — `(camera_id, file_type, timestamp)` — для фильтрации по типу
+**Indexes:**
+- `idx_cam_ts` — `(camera_id, timestamp)` — for heatmap queries
+- `idx_cam_type_ts` — `(camera_id, file_type, timestamp)` — for type-filtered queries
 
-**Поведение при сканировании:** перед каждым `/scan` все записи для данной `camera_id` удаляются, затем пересоздаются заново (`DELETE` + `upsert`).
+**Scan behaviour:** before each `/scan` all records for that `camera_id` are deleted, then recreated (`DELETE` + `upsert`).
 
 ---
 
-### `thumbnails` — кэш миниатюр
+### `thumbnails` — thumbnail cache
 
-Хранит пути к сгенерированным превьюшкам (256×256 JPEG). Генерируются лениво при первом обращении к `/thumbnail/{file_id}`.
+Stores paths to generated thumbnails (256×256 JPEG). Generated lazily on first `/thumbnail/{file_id}` request.
 
-| Колонка | Тип | Описание |
+| Column | Type | Description |
 |---|---|---|
-| `id` | INTEGER PK | Автоинкремент |
+| `id` | INTEGER PK | Auto-increment |
 | `file_id` | INTEGER UNIQUE | FK → `files.id` (CASCADE DELETE) |
-| `thumb_path` | TEXT | Путь к файлу миниатюры в `thumbnails_cache/` |
-| `created_at` | TEXT | Время создания (для автоочистки) |
+| `thumb_path` | TEXT | Path to thumbnail file in `thumbnails_cache/` |
+| `created_at` | TEXT | Creation time (used for auto-cleanup) |
 
-Миниатюры старше 30 дней удаляются автоматически через `pop_old_basic_thumbnails()`. Все миниатюры можно сбросить вручную через `DELETE /thumbnails`.
+Thumbnails older than 30 days are purged automatically via `pop_old_basic_thumbnails()`. All thumbnails can be cleared manually via `DELETE /thumbnails`.
 
 ---
 
-### `ai_analysis` — результаты AI-анализа
+### `ai_analysis` — AI analysis results
 
-Кэш результатов Gemini-анализа снимков. Один файл — одна запись. При повторном анализе запись перезаписывается (`ON CONFLICT DO UPDATE`).
+Cache of Gemini/Claude analysis results. One row per file. Re-running analysis overwrites the existing row (`ON CONFLICT DO UPDATE`).
 
-| Колонка | Тип | Описание |
+| Column | Type | Description |
 |---|---|---|
-| `id` | INTEGER PK | Автоинкремент |
+| `id` | INTEGER PK | Auto-increment |
 | `file_id` | INTEGER UNIQUE | FK → `files.id` (CASCADE DELETE) |
-| `provider` | TEXT | Провайдер AI (сейчас `'gemini'`) |
-| `model` | TEXT | Модель (например, `gemini-2.0-flash`) |
-| `analyzed_at` | TEXT | Время анализа |
-| `scene_description` | TEXT | Тип сцены (улица, двор, парковка и т.д.) |
-| `image_description` | TEXT | Детальное описание того, что видно на снимке |
-| `objects` | TEXT | JSON-массив обнаруженных объектов |
+| `provider` | TEXT | AI provider: `'gemini'` or `'claude'` |
+| `model` | TEXT | Model name (e.g. `gemini-2.0-flash`) |
+| `analyzed_at` | TEXT | Analysis timestamp |
+| `scene_description` | TEXT | Scene type (street, yard, parking, etc.) |
+| `image_description` | TEXT | Detailed description of what is visible in the frame |
+| `objects` | TEXT | Space-separated list of detected object keywords |
 
-**Индекс:** `idx_ai_analysis_file` — `(file_id)`.
+**Index:** `idx_ai_analysis_file` — `(file_id)`.
 
 ---
 
-## Каскадные удаления
+## Cascade deletes
 
-При удалении строки из `files` — автоматически удаляются связанные записи в `thumbnails` и `ai_analysis` (`ON DELETE CASCADE`).
+Deleting a row from `files` automatically removes related rows in `thumbnails` and `ai_analysis` (`ON DELETE CASCADE`).
 
 ```
 files
@@ -73,7 +73,7 @@ files
 
 ---
 
-## Схема потока данных
+## Data flow
 
 ```
 /scan (POST)
@@ -86,8 +86,9 @@ scanner.py ──► upsert_file() ──► files
     ▼                               │
 thumbnails.py ──► save_thumbnail_path() ──► thumbnails
                                     │
-/gemini_analyze (POST)              │
+/gemini_analyze_batch (POST)        │
+/claude_analyze_batch (POST)        │
     │                               │
     ▼                               │
-Gemini API ──► save_ai_analysis() ──► ai_analysis
+AI API ──► save_ai_analysis() ──► ai_analysis
 ```
