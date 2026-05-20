@@ -1,7 +1,7 @@
 """On-demand thumbnail generation and original-file serving.
 
 Endpoints: /thumbnail, /diff_thumbnail, /diff_zoom_thumbnail, /erosion_thumbnail,
-/motion_thumbnail, /openvino_thumbnail, /media.
+/motion_thumbnail, /openvino_thumbnail, /video_thumbnail, /media.
 """
 import logging
 from pathlib import Path
@@ -16,6 +16,7 @@ from erosion_thumbnails import get_or_create_erosion_thumbnail
 from motion_thumbnails import get_or_create_motion_thumbnail, VALID_MODES as MOTION_VALID_MODES
 from diff_zoom_thumbnails import get_or_create_diff_zoom_thumbnail
 from yolo_detect import COCO_TO_RUSSIAN, OV_THUMB_DIR, load_yolo, ov_cache_path, excluded_to_en
+from video_thumbnails import get_or_create_video_thumbnail, VALID_MODES as VIDEO_THUMB_MODES
 
 router = APIRouter()
 logger = logging.getLogger("api")
@@ -226,6 +227,30 @@ def get_openvino_thumbnail(
         raise HTTPException(status_code=500, detail=f"Detection error: {e}")
 
     return FileResponse(str(cache_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
+
+
+@router.get("/video_thumbnail/{file_id}", summary="Get or generate a video preview thumbnail")
+def get_video_thumbnail(
+    file_id: int,
+    mode: str = Query(default="first_frame", description=f"Preview mode: {', '.join(VIDEO_THUMB_MODES)}"),
+):
+    if mode not in VIDEO_THUMB_MODES:
+        raise HTTPException(status_code=400, detail=f"Invalid mode. Choose one of: {', '.join(VIDEO_THUMB_MODES)}")
+    with get_connection() as conn:
+        file_row = get_file_by_id(conn, file_id)
+        if file_row is None:
+            raise HTTPException(status_code=404, detail="File not found")
+        if file_row["file_type"] != "video":
+            raise HTTPException(status_code=400, detail="video_thumbnail only available for video files")
+    try:
+        thumb_path = get_or_create_video_thumbnail(file_id, file_row["file_path"], mode)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error("[video_thumbnail] file_id=%d mode=%s error=%s", file_id, mode, e)
+        raise HTTPException(status_code=500, detail=f"Thumbnail error: {e}")
+    media_type = "image/gif" if mode == "max_change_gif" else "image/jpeg"
+    return FileResponse(str(thumb_path), media_type=media_type, headers=_THUMB_CACHE_HEADERS)
 
 
 @router.get("/media/{file_id}", summary="Serve the original file")

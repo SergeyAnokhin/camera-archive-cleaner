@@ -1,16 +1,38 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { getMediaUrl } from '../../api.js'
 import { formatTime } from './hourUtils.js'
 
 export default function VideoModal({ file, onClose }) {
   const [videoError, setVideoError] = useState(false)
+  const videoRef = useRef(null)
   const mediaUrl = getMediaUrl(file.id)
 
   useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape' || e.key === 'Backspace') { e.stopImmediatePropagation(); onClose() } }
+    function onKey(e) {
+      if (e.key === 'Escape' || e.key === 'Backspace') {
+        e.stopImmediatePropagation()
+        onClose()
+        return
+      }
+      const video = videoRef.current
+      if (!video || videoError) return
+      if (e.key === ' ') {
+        e.preventDefault()
+        e.stopPropagation()
+        video.paused ? video.play() : video.pause()
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        e.stopPropagation()
+        video.currentTime = Math.min(video.duration || 0, video.currentTime + (video.duration || 0) / 5)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        e.stopPropagation()
+        video.currentTime = Math.max(0, video.currentTime - (video.duration || 0) / 5)
+      }
+    }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose])
+  }, [onClose, videoError])
 
   function openExternal() { window.open(mediaUrl, '_blank') }
 
@@ -21,6 +43,7 @@ export default function VideoModal({ file, onClose }) {
           <span className="hv-video-modal-title">
             <i className="mdi mdi-video" /> {formatTime(file.timestamp)}
           </span>
+          <div className="hv-video-modal-hint">Пробел — пауза · ← → — перемотка на 1/5</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="hv-video-modal-btn" onClick={openExternal}>
               <i className="mdi mdi-open-in-new" /> Open externally
@@ -51,6 +74,7 @@ export default function VideoModal({ file, onClose }) {
           </div>
         ) : (
           <video
+            ref={videoRef}
             className="hv-video-fullplayer"
             src={mediaUrl}
             controls

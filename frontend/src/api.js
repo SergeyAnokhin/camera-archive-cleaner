@@ -75,6 +75,10 @@ export function getMediaUrl(fileId) {
   return `${BASE}/media/${fileId}`
 }
 
+export function getVideoThumbnailUrl(fileId, mode) {
+  return `${BASE}/video_thumbnail/${fileId}?mode=${mode}`
+}
+
 export function getDistribution(cameraId, dateFrom, dateTo) {
   return get('/distribution' + buildQuery({
     camera_id: cameraId,

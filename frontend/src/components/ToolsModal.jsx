@@ -35,6 +35,16 @@ const DIFF_THRESHOLD_MIN     = 0
 const DIFF_THRESHOLD_MAX     = 100
 const DIFF_THRESHOLD_DEFAULT = 20
 
+const VIDEO_PREVIEW_KEY     = 'video_preview_mode'
+const VIDEO_PREVIEW_DEFAULT = 'none'
+const VIDEO_PREVIEW_OPTIONS = [
+  { value: 'none',           label: 'Нет (иконка камеры)' },
+  { value: 'first_frame',    label: 'Первый кадр' },
+  { value: 'last_frame',     label: 'Последний кадр' },
+  { value: 'four_frames',    label: '4 кадра (2×2 сетка)' },
+  { value: 'max_change_gif', label: 'GIF — максимальное изменение' },
+]
+
 const GEMINI_API_KEY_KEY = 'gemini_api_key'
 const GEMINI_MODEL_KEY   = 'gemini_model'
 const GEMINI_PROMPT_KEY  = 'gemini_structured_prompt'
@@ -219,6 +229,9 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     const v = localStorage.getItem(DIFF_THRESHOLD_KEY)
     return v !== null ? Number(v) : DIFF_THRESHOLD_DEFAULT
   })
+  const [videoPreviewMode, setVideoPreviewMode] = useState(
+    () => localStorage.getItem(VIDEO_PREVIEW_KEY) || VIDEO_PREVIEW_DEFAULT
+  )
   const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem(GEMINI_API_KEY_KEY) || '')
   const [geminiModel, setGeminiModel]   = useState(() => localStorage.getItem(GEMINI_MODEL_KEY) || GEMINI_DEFAULT_MODEL)
   const [geminiPrompt, setGeminiPrompt] = useState(() => localStorage.getItem(GEMINI_PROMPT_KEY) || GEMINI_DEFAULT_PROMPT)
@@ -366,6 +379,13 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     setDiffThreshold(v)
     localStorage.setItem(DIFF_THRESHOLD_KEY, v)
     document.dispatchEvent(new CustomEvent('diff-threshold-change', { detail: v }))
+  }
+
+  function handleVideoPreviewModeChange(e) {
+    const v = e.target.value
+    setVideoPreviewMode(v)
+    localStorage.setItem(VIDEO_PREVIEW_KEY, v)
+    document.dispatchEvent(new CustomEvent('video-preview-mode-change', { detail: v }))
   }
 
   async function handleClearDb() {
@@ -588,6 +608,19 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
                 <span className="font-size-value">{diffThreshold}</span>
               </div>
               <div className="modal-setting-hint">Pixels with a channel delta below this value are darkened in Motion diff mode. Higher = only significant changes shown.</div>
+            </div>
+
+            {/* Video preview mode */}
+            <div className="modal-section">
+              <div className="modal-section-title">Превью видео</div>
+              <select className="modal-select" value={videoPreviewMode} onChange={handleVideoPreviewModeChange}>
+                {VIDEO_PREVIEW_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <div className="modal-setting-hint">
+                Режим отображения превью для видеофайлов на карточках. GIF генерируется дольше и кешируется.
+              </div>
             </div>
           </>}
 

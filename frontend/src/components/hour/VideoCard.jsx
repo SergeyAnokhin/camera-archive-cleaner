@@ -1,18 +1,33 @@
 import { useState, useEffect, useRef } from 'react'
 import VideoModal from './VideoModal.jsx'
 import { formatTime } from './hourUtils.js'
+import { getVideoThumbnailUrl } from '../../api.js'
+
+function readPreviewMode() {
+  return localStorage.getItem('video_preview_mode') || 'none'
+}
 
 export default function VideoCard({ file, selectionMode, selected, onToggle, index, isFocused }) {
   const [modalOpen, setModalOpen] = useState(false)
+  const [previewMode, setPreviewMode] = useState(readPreviewMode)
   const cardRef = useRef(null)
 
   useEffect(() => {
     if (isFocused) cardRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [isFocused])
 
+  useEffect(() => {
+    function onModeChange(e) { setPreviewMode(e.detail) }
+    document.addEventListener('video-preview-mode-change', onModeChange)
+    return () => document.removeEventListener('video-preview-mode-change', onModeChange)
+  }, [])
+
   function handleClick(e) {
     if (selectionMode) { onToggle(file, index, e.shiftKey) } else { setModalOpen(true) }
   }
+
+  const showThumb = previewMode !== 'none'
+  const thumbUrl = showThumb ? getVideoThumbnailUrl(file.id, previewMode) : null
 
   return (
     <>
@@ -27,8 +42,18 @@ export default function VideoCard({ file, selectionMode, selected, onToggle, ind
             <i className={`mdi mdi-${selected ? 'checkbox-marked' : 'checkbox-blank-outline'}`} />
           </div>
         )}
-        <i className="mdi mdi-video hv-video-icon" />
-        <span className="hv-card-time">{formatTime(file.timestamp)}</span>
+        {showThumb ? (
+          <img
+            src={thumbUrl}
+            className="hv-video-thumb"
+            alt=""
+            draggable={false}
+          />
+        ) : (
+          <i className="mdi mdi-video hv-video-icon" />
+        )}
+        <span className="hv-card-time hv-video-time-overlay">{formatTime(file.timestamp)}</span>
+        {showThumb && <i className="mdi mdi-video hv-video-badge" />}
       </div>
       {!selectionMode && modalOpen && <VideoModal file={file} onClose={() => setModalOpen(false)} />}
     </>

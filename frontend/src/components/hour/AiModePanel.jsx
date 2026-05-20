@@ -61,7 +61,6 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
   const analyzedCount = photoFiles.filter(f => aiAnalysisMap.has(f.id)).length
   const sceneEntry = [...aiAnalysisMap.values()][0]
 
-  // Aggregate all detected objects across the current page
   const pageIcons = useMemo(() => {
     const allWords = []
     for (const entry of aiAnalysisMap.values()) {
@@ -80,22 +79,30 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
 
   return (
     <div className="hv-mode-settings hv-ai-panel">
+      {/* Row 1: label */}
       <span className="hv-mode-settings-label">
         <i className={`mdi ${cfg.icon}`} /> {cfg.label}
       </span>
-      <div className="hv-ai-panel-info">
-        {analyzedCount > 0
-          ? <><i className="mdi mdi-check-circle-outline" style={{color:'#86efac'}} /> {analyzedCount}/{photoFiles.length} проанализировано</>
-          : <><i className="mdi mdi-circle-outline" style={{color:'var(--text-dim)'}} /> не проанализировано</>
-        }
+
+      {/* Row 2: model selector + run button */}
+      <div className="hv-ai-model-row">
+        <select className="hv-ai-model-select" value={model} onChange={handleModelChange}>
+          {cfg.models.map(m => (
+            <option key={m.value} value={m.value}>{m.label}</option>
+          ))}
+        </select>
+        <button className="hv-ai-run-btn" onClick={onRun}>
+          <i className="mdi mdi-play" />
+          {selectedIds.size > 0
+            ? `Анализ выбранных (${targetCount})`
+            : `Анализ страницы (${photoFiles.length})`
+          }
+        </button>
       </div>
-      <select className="hv-ai-model-select" value={model} onChange={handleModelChange}>
-        {cfg.models.map(m => (
-          <option key={m.value} value={m.value}>{m.label}</option>
-        ))}
-      </select>
+
+      {/* Row 3 (OpenVINO only): threshold inline */}
       {provider === 'openvino' && (
-        <div className="hv-ai-confidence">
+        <div className="hv-ai-confidence-row">
           <span className="hv-ai-confidence-label">
             <i className="mdi mdi-tune-variant" /> Порог: {confidence}%
           </span>
@@ -108,28 +115,33 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
           />
         </div>
       )}
-      <button className="hv-ai-run-btn" onClick={onRun}>
-        <i className="mdi mdi-play" />
-        {selectedIds.size > 0
-          ? `Анализ выбранных (${targetCount})`
-          : `Анализ страницы (${photoFiles.length})`
-        }
-      </button>
-      {(stats.lastMinute > 0 || stats.last24h > 0) && (
-        <div className="hv-ai-stats">
-          <i className="mdi mdi-chart-timeline-variant" />
-          {stats.lastMinute > 0 && <span>{stats.lastMinute}/мин</span>}
-          <span>{stats.last24h}/24ч</span>
+
+      {/* Row 4: stats + analyzed count + emojis */}
+      {(analyzedCount > 0 || stats.lastMinute > 0 || stats.last24h > 0 || pageIcons.length > 0) && (
+        <div className="hv-ai-bottom-row">
+          {analyzedCount > 0 && (
+            <span className="hv-ai-panel-info">
+              <i className="mdi mdi-check-circle-outline" style={{color:'#86efac'}} />
+              {analyzedCount}/{photoFiles.length}
+            </span>
+          )}
+          {(stats.lastMinute > 0 || stats.last24h > 0) && (
+            <span className="hv-ai-stats">
+              <i className="mdi mdi-chart-timeline-variant" />
+              {stats.lastMinute > 0 && <span>{stats.lastMinute}/мин</span>}
+              <span>{stats.last24h}/24ч</span>
+            </span>
+          )}
+          {pageIcons.length > 0 && (
+            <span className="hv-ai-page-objects-inline">
+              {pageIcons.map((ic, i) => (
+                <span key={i} className="hv-ai-page-emoji" title={ic.label}>{ic.emoji}</span>
+              ))}
+            </span>
+          )}
         </div>
       )}
-      {/* Page-level objects summary */}
-      {pageIcons.length > 0 && (
-        <div className="hv-ai-page-objects">
-          {pageIcons.map((ic, i) => (
-            <span key={i} className="hv-ai-page-emoji" title={ic.label}>{ic.emoji}</span>
-          ))}
-        </div>
-      )}
+
       {sceneEntry?.scene_description && (
         <div className="hv-ai-scene" title={sceneEntry.scene_description}>
           <i className="mdi mdi-image-filter-hdr-outline" />

@@ -11,6 +11,7 @@ from erosion_thumbnails import EROSION_THUMB_DIR
 from motion_thumbnails import MOTION_THUMB_DIR
 from diff_zoom_thumbnails import DIFF_ZOOM_THUMB_DIR
 from yolo_detect import OV_THUMB_DIR
+from video_thumbnails import VID_THUMB_DIR
 
 router = APIRouter()
 logger = logging.getLogger("api")
@@ -112,12 +113,13 @@ def clear_all_thumbnails():
     erosion_files, erosion_bytes = _clear_dir(EROSION_THUMB_DIR)
     motion_files, motion_bytes   = _clear_dir(MOTION_THUMB_DIR)
     ov_files, ov_bytes           = _clear_dir(OV_THUMB_DIR)
+    vid_files, vid_bytes         = _clear_dir(VID_THUMB_DIR)
 
     with get_connection() as conn:
         delete_all_thumbnails(conn)
 
-    total_files = basic_files + diff_files + dzoom_files + erosion_files + motion_files + ov_files
-    total_bytes = basic_bytes + diff_bytes + dzoom_bytes + erosion_bytes + motion_bytes + ov_bytes
+    total_files = basic_files + diff_files + dzoom_files + erosion_files + motion_files + ov_files + vid_files
+    total_bytes = basic_bytes + diff_bytes + dzoom_bytes + erosion_bytes + motion_bytes + ov_bytes + vid_bytes
 
     logger.info("   └─ все миниатюры очищены → %d файлов, %d байт", total_files, total_bytes)
     return {
@@ -128,6 +130,7 @@ def clear_all_thumbnails():
             "erosion":  {"deleted_files": erosion_files, "freed_bytes": erosion_bytes},
             "motion":   {"deleted_files": motion_files,  "freed_bytes": motion_bytes},
             "openvino": {"deleted_files": ov_files,      "freed_bytes": ov_bytes},
+            "video":    {"deleted_files": vid_files,     "freed_bytes": vid_bytes},
         },
         "total_files": total_files,
         "freed_bytes": total_bytes,
@@ -138,7 +141,7 @@ def clear_all_thumbnails():
 def get_storage_info():
     db_size = DB_PATH.stat().st_size if DB_PATH.exists() else 0
 
-    thumb_dirs = [THUMB_DIR, DIFF_THUMB_DIR, DIFF_ZOOM_THUMB_DIR, EROSION_THUMB_DIR, MOTION_THUMB_DIR, OV_THUMB_DIR]
+    thumb_dirs = [THUMB_DIR, DIFF_THUMB_DIR, DIFF_ZOOM_THUMB_DIR, EROSION_THUMB_DIR, MOTION_THUMB_DIR, OV_THUMB_DIR, VID_THUMB_DIR]
     thumb_size = 0
     for d in thumb_dirs:
         if d.exists():
