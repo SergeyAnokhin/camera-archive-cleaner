@@ -62,7 +62,7 @@ diff_zoom_thumbnails.py ─────────┘
 |---|---|
 | [`App.jsx`](../frontend/src/App.jsx) | Root component. Owns all state: selected camera, drill-down level (year/month/day/hour), date range, delete mode. Orchestrates level transitions |
 | [`api.js`](../frontend/src/api.js) | All HTTP calls to the backend. The only file that knows API URLs |
-| [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI mode utilities: `AI_ICON_MAP`, `resolveAiIcons()` — maps object keywords to MDI icons |
+| [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI display utilities: `OBJECT_EMOJI_DEFAULTS` (100+ label→emoji), `resolveAiIcons(str)` → `[{emoji,label}]`, `getExcludedObjects()` — reads `detection_excluded_objects` from localStorage |
 | [`main.jsx`](../frontend/src/main.jsx) | React entry point. Mounts `<App />` |
 
 ### Components (`frontend/src/components/`)
@@ -74,8 +74,9 @@ diff_zoom_thumbnails.py ─────────┘
 | [`HeatmapCell.jsx`](../frontend/src/components/HeatmapCell.jsx) | Single heatmap cell: intensity colour, photo/video count badges, thumbnail strip, AI icons, tooltip |
 | [`GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) | Gemini AI analysis modal: scene description, objects, token/cost/time stats |
 | [`ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) | Claude AI analysis modal (same structure as Gemini) |
+| [`OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) | OpenVINO "Run" modal: confidence slider, per-photo object tags with emoji, ms/photo timing |
 | [`DeleteConfirmModal.jsx`](../frontend/src/components/DeleteConfirmModal.jsx) | Delete confirmation modal: file list with relative paths, paired video preview |
-| [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal (tabs): font size, previews per cell, zoom, cache clearing, Google AI / Claude AI config |
+| [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal (6 tabs): General, Hour view, **Detection** (OpenVINO confidence/excluded objects/emoji overrides), Google AI, Claude AI, Maintenance |
 | [`Header.jsx`](../frontend/src/components/Header.jsx) | Top bar: total GB / photo count / video count |
 | [`CameraSelector.jsx`](../frontend/src/components/CameraSelector.jsx) | Horizontal pill buttons for camera selection |
 | [`DrilldownBreadcrumb.jsx`](../frontend/src/components/DrilldownBreadcrumb.jsx) | Navigation breadcrumb: All Years / 2024 / Nov / 16 |
@@ -96,7 +97,7 @@ diff_zoom_thumbnails.py ─────────┘
 | [`DistributionChart.jsx`](../frontend/src/components/hour/DistributionChart.jsx) | 60-bar per-minute distribution chart; click a bar to jump to its page |
 | [`SelectionBar.jsx`](../frontend/src/components/hour/SelectionBar.jsx) | Selection-mode toolbar: select all/none, selection stats, delete |
 | [`ModeSettingsPanel.jsx`](../frontend/src/components/hour/ModeSettingsPanel.jsx) | Slider panel for non-AI view modes with tunable params (e.g. motion threshold) |
-| [`AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx) | AI mode panel: provider/model selectors, run button, request stats (`AI_PROVIDER_CONFIG`) |
+| [`AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx) | AI mode panel: provider/model selectors (`AI_PROVIDER_CONFIG`), run button, per-page emoji object summary, request stats |
 | [`useHourKeyboard.js`](../frontend/src/components/hour/useHourKeyboard.js) | Custom hook holding all keyboard handling: peek original, browse-mode keys, selection-mode keys |
 
 ### View modes (`frontend/src/components/viewModes/`)
@@ -111,7 +112,9 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 | [`erosionMode.js`](../frontend/src/components/viewModes/erosionMode.js) | Erosion (morphological erosion) |
 | [`neonMaskMode.js`](../frontend/src/components/viewModes/neonMaskMode.js) | Neon Mask (MOG2 mask in colour) |
 | [`mhiMode.js`](../frontend/src/components/viewModes/mhiMode.js) | MHI — Motion History Image |
-| [`boundingBoxesMode.js`](../frontend/src/components/viewModes/boundingBoxesMode.js) | Bounding Boxes (rectangles around detected objects) |
+| [`boundingBoxesMode.js`](../frontend/src/components/viewModes/boundingBoxesMode.js) | Bounding Boxes (motion-based rectangles, not YOLO) |
+| [`openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) | OpenVINO Detection — `isAiMode`, calls `/openvino_thumbnail` with model+confidence+excluded params |
+| [`openvinoBboxMode.js`](../frontend/src/components/viewModes/openvinoBboxMode.js) | OpenVINO Boxes — same URL as openvinoMode but without `isAiMode`, reads confidence from `openvino_confidence` key |
 | [`motionStackingMode.js`](../frontend/src/components/viewModes/motionStackingMode.js) | Motion Stacking (accumulated motion heatmap) |
 | [`geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) | Gemini AI (icon overlay from analysis results) |
 | [`claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) | Claude AI (icon overlay from analysis results) |

@@ -83,6 +83,8 @@ Do **not** create docs for: single-function fixes, UI tweaks, settings additions
 
 Update the relevant doc whenever you change the architecture of a documented area — new endpoints, DB schema changes, new display locations, new providers, changed localStorage keys. The user may also say **"обнови документацию"** — treat that as: update all docs affected by recent changes.
 
+**Also fix gaps found during search.** When updating docs, look back at what was slow to locate at the start of the session (had to grep instead of reading a doc, found nothing in `ai.py` but the endpoint was in `thumbnails_api.py`, a file wasn't listed in code-map, etc.). Add exactly that missing fact to the relevant doc — even if it's unrelated to what was changed. One or two targeted additions per session, not a full rewrite.
+
 ### Doc format
 
 - Lead with a one-paragraph overview

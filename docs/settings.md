@@ -75,16 +75,22 @@ Initial value for motion modes is taken from `diff_threshold` (the global defaul
 
 ---
 
+## Detection settings (Tools modal → Detection tab)
+
+| localStorage key | Default | Description |
+|---|---|---|
+| `mode_params_openvino` | `{"confidence":25}` | Default OpenVINO confidence % (10–80). Also used by AiModePanel slider. Written by both the Detection tab and the AiModePanel slider |
+| `detection_excluded_objects` | `[]` (JSON array) | Labels to hide from emoji display and hover text. Backend also skips drawing boxes for these classes. E.g. `["стул","bench"]` |
+| `detection_emoji_overrides` | `{}` (JSON object) | Custom emoji per label. Merged over `OBJECT_EMOJI_DEFAULTS` at display time. E.g. `{"машина":"🏎️"}` |
+
 ## OpenVINO (local AI) settings
 
-No dedicated Tools tab — settings are set inline in the AI mode panel and in the heatmap selection bar.
+Model is set inline via the AiModePanel dropdown; confidence is in the Detection tab (above) and also in the OpenVINO Run modal.
 
 | localStorage key | Default | Description |
 |---|---|---|
 | `openvino_model` | `yolov8n` | Selected YOLO model. Options: `yolov8n`, `yolov8s`, `yolov8m`. Written when the model dropdown changes in HourViewer's AiModePanel or in the heatmap CellSelBar |
-| `openvino_confidence` | `0.25` | Confidence threshold (float 0–1) used by `OpenVinoAnalysisModal` (the "Run" button flow only). **Not** the same as the AiModePanel slider |
-
-Note: the AiModePanel confidence slider uses React `modeParams.confidence` (integer %) stored in `mode_params_openvino_detection` — it is **not** stored in `openvino_confidence`.
+| `openvino_confidence` | `0.25` | Confidence threshold (float 0–1) used **only** by `OpenVinoAnalysisModal` (the "Run" button flow). The AiModePanel slider and the Detection tab both use `mode_params_openvino.confidence` (integer %) |
 
 ---
 

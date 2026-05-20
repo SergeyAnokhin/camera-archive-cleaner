@@ -149,3 +149,4 @@ vite.config.ts.timestamp-*
 /backend/models/*
 /backend/yolo**.pt
 /backend/routers/__pycache__/*
+/.claude/settings.local.json
