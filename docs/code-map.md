@@ -21,6 +21,7 @@ Map of all project files — what each file contains and what it is responsible 
 | [`erosion_thumbnails.py`](../backend/erosion_thumbnails.py) | Erosion thumbnails: MOG2 + morphological erosion. Cache in `erosion_thumbnails_cache/` |
 | [`motion_thumbnails.py`](../backend/motion_thumbnails.py) | Thumbnails for 4 motion modes: neon_mask, mhi, bounding_boxes, motion_stacking. Cache in `motion_thumbnails_cache/` |
 | [`diff_zoom_thumbnails.py`](../backend/diff_zoom_thumbnails.py) | Diff Zoom thumbnails: crop to most active 1/9 tile. Cache in `diff_zoom_thumbnails_cache/` |
+| [`video_thumbnails.py`](../backend/video_thumbnails.py) | Video preview thumbnails (OpenCV): first/last frame, 2×2 grid, max-change animated GIF. Cache in `video_thumbnails_cache/` |
 | `cameras.yaml` | Camera config. Edit manually before running |
 | `snapshots.db` | SQLite database (auto-created on startup) |
 
@@ -32,7 +33,7 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 |---|---|
 | [`catalog.py`](../backend/routers/catalog.py) | `/cameras`, `/scan` |
 | [`stats.py`](../backend/routers/stats.py) | `/stats`, `/files`, `/distribution`, `/previews` |
-| [`thumbnails_api.py`](../backend/routers/thumbnails_api.py) | `/thumbnail`, `/diff_thumbnail`, `/diff_zoom_thumbnail`, `/erosion_thumbnail`, `/motion_thumbnail`, `/openvino_thumbnail`, `/media` |
+| [`thumbnails_api.py`](../backend/routers/thumbnails_api.py) | `/thumbnail`, `/diff_thumbnail`, `/diff_zoom_thumbnail`, `/erosion_thumbnail`, `/motion_thumbnail`, `/openvino_thumbnail`, `/video_thumbnail`, `/media` |
 | [`delete.py`](../backend/routers/delete.py) | `/delete/preview`, `/delete/confirm`, `/delete/preview_range`, `/delete/by_range` |
 | [`maintenance.py`](../backend/routers/maintenance.py) | `/database`, per-type `/*_thumbnails`, `/all_thumbnails`, `/storage_info` |
 | [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze`, `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary` |
@@ -92,12 +93,12 @@ diff_zoom_thumbnails.py ─────────┘
 |---|---|
 | [`hourUtils.js`](../frontend/src/components/hour/hourUtils.js) | localStorage keys/defaults, formatters (`formatTime`, `formatBytes`), mode-param load/save, AI request rate tracking |
 | [`PhotoCard.jsx`](../frontend/src/components/hour/PhotoCard.jsx) | Single photo card: thumbnail, fullscreen lightbox, AI icons + description overlay |
-| [`VideoCard.jsx`](../frontend/src/components/hour/VideoCard.jsx) | Single video card; opens VideoModal on click |
-| [`VideoModal.jsx`](../frontend/src/components/hour/VideoModal.jsx) | Fullscreen video player: download, open externally, VLC fallback for unsupported formats |
+| [`VideoCard.jsx`](../frontend/src/components/hour/VideoCard.jsx) | Single video card; shows static/GIF preview thumbnail when `video_preview_mode ≠ none`; opens VideoModal on click |
+| [`VideoModal.jsx`](../frontend/src/components/hour/VideoModal.jsx) | Fullscreen video player: Space = play/pause, ←/→ = skip ±1/5 duration, Escape = close, download, open externally, VLC fallback |
 | [`DistributionChart.jsx`](../frontend/src/components/hour/DistributionChart.jsx) | 60-bar per-minute distribution chart; click a bar to jump to its page |
 | [`SelectionBar.jsx`](../frontend/src/components/hour/SelectionBar.jsx) | Selection-mode toolbar: select all/none, selection stats, delete |
 | [`ModeSettingsPanel.jsx`](../frontend/src/components/hour/ModeSettingsPanel.jsx) | Slider panel for non-AI view modes with tunable params (e.g. motion threshold) |
-| [`AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx) | AI mode panel: provider/model selectors (`AI_PROVIDER_CONFIG`), run button, per-page emoji object summary, request stats |
+| [`AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx) | AI mode panel: compact 2-row layout — label+model+run on row 1, threshold (OpenVINO)/stats/emojis on row 2. Exports `AI_PROVIDER_CONFIG` |
 | [`useHourKeyboard.js`](../frontend/src/components/hour/useHourKeyboard.js) | Custom hook holding all keyboard handling: peek original, browse-mode keys, selection-mode keys |
 
 ### View modes (`frontend/src/components/viewModes/`)

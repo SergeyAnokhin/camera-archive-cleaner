@@ -25,6 +25,7 @@ Defined in [`frontend/src/components/ToolsModal.jsx`](../frontend/src/components
 | `thumb_width` | `140` | 80–400 px | Minimum column width of photo cards in the grid |
 | `hover_zoom` | `1.5` | 1.0–3.0 | Photo scale factor on mouse hover. `1.0` disables zoom |
 | `diff_threshold` | `20` | 0–100 | Motion sensitivity threshold. Used as the default for all motion modes |
+| `video_preview_mode` | `none` | — | Preview mode for video cards: `none` (camera icon), `first_frame`, `last_frame`, `four_frames` (2×2 grid), `max_change_gif` (animated GIF). Thumbnail generated and cached by `/video_thumbnail` |
 
 ---
 

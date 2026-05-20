@@ -45,6 +45,7 @@ All thumbnail endpoints generate and cache on first request.
 | `GET` | `/diff_zoom_thumbnail/{file_id}` | Diff Zoom: crop to the most active 1/9 tile. Same params |
 | `GET` | `/erosion_thumbnail/{file_id}` | Erosion/MOG2: morphological erosion. Same params |
 | `GET` | `/motion_thumbnail/{file_id}` | One of 4 motion modes: `neon_mask` / `mhi` / `bounding_boxes` / `motion_stacking`. Params: `page_ids`, `threshold`, `mode` |
+| `GET` | `/video_thumbnail/{file_id}` | Video preview image. `mode`: `first_frame` / `last_frame` / `four_frames` (2×2 JPEG grid) / `max_change_gif` (2-frame animated GIF). Cache in `video_thumbnails_cache/` |
 
 ---
 

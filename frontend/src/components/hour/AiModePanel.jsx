@@ -77,64 +77,59 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
 
   const confidence = params?.confidence ?? 25
 
+  const hasStats = analyzedCount > 0 || stats.lastMinute > 0 || stats.last24h > 0 || pageIcons.length > 0
+
   return (
     <div className="hv-mode-settings hv-ai-panel">
-      {/* Row 1: label */}
+      {/* Row 1: label · model select · run button */}
       <span className="hv-mode-settings-label">
         <i className={`mdi ${cfg.icon}`} /> {cfg.label}
       </span>
+      <select className="hv-ai-model-select" value={model} onChange={handleModelChange}>
+        {cfg.models.map(m => (
+          <option key={m.value} value={m.value}>{m.label}</option>
+        ))}
+      </select>
+      <button className="hv-ai-run-btn" onClick={onRun}>
+        <i className="mdi mdi-play" />
+        {selectedIds.size > 0
+          ? `Анализ выбранных (${targetCount})`
+          : `Анализ страницы (${photoFiles.length})`
+        }
+      </button>
 
-      {/* Row 2: model selector + run button */}
-      <div className="hv-ai-model-row">
-        <select className="hv-ai-model-select" value={model} onChange={handleModelChange}>
-          {cfg.models.map(m => (
-            <option key={m.value} value={m.value}>{m.label}</option>
-          ))}
-        </select>
-        <button className="hv-ai-run-btn" onClick={onRun}>
-          <i className="mdi mdi-play" />
-          {selectedIds.size > 0
-            ? `Анализ выбранных (${targetCount})`
-            : `Анализ страницы (${photoFiles.length})`
-          }
-        </button>
-      </div>
-
-      {/* Row 3 (OpenVINO only): threshold inline */}
-      {provider === 'openvino' && (
-        <div className="hv-ai-confidence-row">
-          <span className="hv-ai-confidence-label">
-            <i className="mdi mdi-tune-variant" /> Порог: {confidence}%
-          </span>
-          <input
-            type="range"
-            className="hv-ai-confidence-slider"
-            min={10} max={80} step={5}
-            value={confidence}
-            onChange={e => onParamChange?.('confidence', +e.target.value)}
-          />
-        </div>
-      )}
-
-      {/* Row 4: stats + analyzed count + emojis */}
-      {(analyzedCount > 0 || stats.lastMinute > 0 || stats.last24h > 0 || pageIcons.length > 0) && (
-        <div className="hv-ai-bottom-row">
-          {analyzedCount > 0 && (
-            <span className="hv-ai-panel-info">
-              <i className="mdi mdi-check-circle-outline" style={{color:'#86efac'}} />
-              {analyzedCount}/{photoFiles.length}
+      {/* Row 2: threshold (openvino) + stats/analyzed/emojis */}
+      {(provider === 'openvino' || hasStats) && (
+        <div className="hv-ai-row2">
+          {provider === 'openvino' && (
+            <span className="hv-ai-confidence-inline">
+              <i className="mdi mdi-tune-variant" />
+              <span className="hv-ai-confidence-pct">{confidence}%</span>
+              <input
+                type="range"
+                className="hv-ai-confidence-slider"
+                min={10} max={80} step={5}
+                value={confidence}
+                onChange={e => onParamChange?.('confidence', +e.target.value)}
+              />
             </span>
           )}
-          {(stats.lastMinute > 0 || stats.last24h > 0) && (
-            <span className="hv-ai-stats">
-              <i className="mdi mdi-chart-timeline-variant" />
-              {stats.lastMinute > 0 && <span>{stats.lastMinute}/мин</span>}
-              <span>{stats.last24h}/24ч</span>
-            </span>
-          )}
-          {pageIcons.length > 0 && (
-            <span className="hv-ai-page-objects-inline">
-              {pageIcons.map((ic, i) => (
+          {hasStats && (
+            <span className="hv-ai-info-group">
+              {analyzedCount > 0 && (
+                <span className="hv-ai-panel-info">
+                  <i className="mdi mdi-check-circle-outline" style={{color:'#86efac'}} />
+                  {analyzedCount}/{photoFiles.length}
+                </span>
+              )}
+              {(stats.lastMinute > 0 || stats.last24h > 0) && (
+                <span className="hv-ai-stats">
+                  <i className="mdi mdi-chart-timeline-variant" />
+                  {stats.lastMinute > 0 && <span>{stats.lastMinute}/мин</span>}
+                  <span>{stats.last24h}/24ч</span>
+                </span>
+              )}
+              {pageIcons.length > 0 && pageIcons.map((ic, i) => (
                 <span key={i} className="hv-ai-page-emoji" title={ic.label}>{ic.emoji}</span>
               ))}
             </span>
