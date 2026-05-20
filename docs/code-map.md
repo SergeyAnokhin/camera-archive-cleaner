@@ -8,7 +8,11 @@ Map of all project files — what each file contains and what it is responsible 
 
 | File | Role |
 |---|---|
-| [`main.py`](../backend/main.py) | FastAPI app. All HTTP endpoints, logging setup (ANSI colours, TRACE/DEBUG/INFO levels), CORS, startup hook |
+| [`main.py`](../backend/main.py) | FastAPI app factory — CORS, global exception handler, startup hook, mounts the routers. No endpoint logic |
+| [`logging_setup.py`](../backend/logging_setup.py) | Logging config: ANSI colours, TRACE/DEBUG/INFO levels, custom formatter, uvicorn access filter. Configures the root logger on import |
+| [`api_helpers.py`](../backend/api_helpers.py) | Shared router helpers: `fmt_range()` (log date ranges), `row_to_dict()` (stats-row → dict) |
+| [`ai_pricing.py`](../backend/ai_pricing.py) | Per-million-token USD pricing tables for Gemini and Claude models |
+| [`yolo_detect.py`](../backend/yolo_detect.py) | Local YOLO/OpenVINO detection: lazy model loading, COCO→Russian names, OpenVINO thumbnail cache paths |
 | [`database.py`](../backend/database.py) | SQLite: table schema, all SQL queries (upsert, aggregations, pagination, AI analysis). The only file that touches the DB |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames (Foscam patterns + mtime fallback); writes to DB |
 | [`config.py`](../backend/config.py) | Parses `cameras.yaml` → `Camera` dataclass (id, name, path_snapshots, path_videos) |
@@ -20,6 +24,19 @@ Map of all project files — what each file contains and what it is responsible 
 | `cameras.yaml` | Camera config. Edit manually before running |
 | `snapshots.db` | SQLite database (auto-created on startup) |
 
+### Backend routers (`backend/routers/`)
+
+Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All routers are mounted in `main.py`.
+
+| File | Endpoints |
+|---|---|
+| [`catalog.py`](../backend/routers/catalog.py) | `/cameras`, `/scan` |
+| [`stats.py`](../backend/routers/stats.py) | `/stats`, `/files`, `/distribution`, `/previews` |
+| [`thumbnails_api.py`](../backend/routers/thumbnails_api.py) | `/thumbnail`, `/diff_thumbnail`, `/diff_zoom_thumbnail`, `/erosion_thumbnail`, `/motion_thumbnail`, `/openvino_thumbnail`, `/media` |
+| [`delete.py`](../backend/routers/delete.py) | `/delete/preview`, `/delete/confirm`, `/delete/preview_range`, `/delete/by_range` |
+| [`maintenance.py`](../backend/routers/maintenance.py) | `/database`, per-type `/*_thumbnails`, `/all_thumbnails`, `/storage_info` |
+| [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze`, `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary` |
+
 ### Backend dependency graph
 
 ```
@@ -29,7 +46,7 @@ cameras.yaml
 config.py ──► scanner.py ──► database.py
                                   ▲
 thumbnails.py ───────────────────┤
-diff_thumbnails.py ──────────────┤  (all called from main.py)
+diff_thumbnails.py ──────────────┤  (all called from routers/)
 erosion_thumbnails.py ───────────┤
 motion_thumbnails.py ────────────┤
 diff_zoom_thumbnails.py ─────────┘
@@ -52,7 +69,7 @@ diff_zoom_thumbnails.py ─────────┘
 
 | File | Role |
 |---|---|
-| [`HourViewer.jsx`](../frontend/src/components/HourViewer.jsx) | Hour viewer: photo/video grid with pagination, distribution chart (60 minute bars), keyboard navigation, AI analysis button |
+| [`HourViewer.jsx`](../frontend/src/components/HourViewer.jsx) | Hour viewer orchestrator: owns state and data loading, composes the `hour/` subcomponents. See the Hour viewer parts table below |
 | [`HeatmapGrid.jsx`](../frontend/src/components/HeatmapGrid.jsx) | CSS grid of heatmap cells. Skeleton loading state |
 | [`HeatmapCell.jsx`](../frontend/src/components/HeatmapCell.jsx) | Single heatmap cell: intensity colour, photo/video count badges, thumbnail strip, AI icons, tooltip |
 | [`GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) | Gemini AI analysis modal: scene description, objects, token/cost/time stats |
@@ -65,6 +82,22 @@ diff_zoom_thumbnails.py ─────────┘
 | [`StatsBar.jsx`](../frontend/src/components/StatsBar.jsx) | Recharts bar chart below the heatmap (size per period) |
 | [`ScanButton.jsx`](../frontend/src/components/ScanButton.jsx) | Scan button, spinner, data refresh on completion |
 | [`ToolsButton.jsx`](../frontend/src/components/ToolsButton.jsx) | Button that opens ToolsModal |
+
+### Hour viewer parts (`frontend/src/components/hour/`)
+
+`HourViewer.jsx` is split into focused files under `hour/`.
+
+| File | Role |
+|---|---|
+| [`hourUtils.js`](../frontend/src/components/hour/hourUtils.js) | localStorage keys/defaults, formatters (`formatTime`, `formatBytes`), mode-param load/save, AI request rate tracking |
+| [`PhotoCard.jsx`](../frontend/src/components/hour/PhotoCard.jsx) | Single photo card: thumbnail, fullscreen lightbox, AI icons + description overlay |
+| [`VideoCard.jsx`](../frontend/src/components/hour/VideoCard.jsx) | Single video card; opens VideoModal on click |
+| [`VideoModal.jsx`](../frontend/src/components/hour/VideoModal.jsx) | Fullscreen video player: download, open externally, VLC fallback for unsupported formats |
+| [`DistributionChart.jsx`](../frontend/src/components/hour/DistributionChart.jsx) | 60-bar per-minute distribution chart; click a bar to jump to its page |
+| [`SelectionBar.jsx`](../frontend/src/components/hour/SelectionBar.jsx) | Selection-mode toolbar: select all/none, selection stats, delete |
+| [`ModeSettingsPanel.jsx`](../frontend/src/components/hour/ModeSettingsPanel.jsx) | Slider panel for non-AI view modes with tunable params (e.g. motion threshold) |
+| [`AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx) | AI mode panel: provider/model selectors, run button, request stats (`AI_PROVIDER_CONFIG`) |
+| [`useHourKeyboard.js`](../frontend/src/components/hour/useHourKeyboard.js) | Custom hook holding all keyboard handling: peek original, browse-mode keys, selection-mode keys |
 
 ### View modes (`frontend/src/components/viewModes/`)
 

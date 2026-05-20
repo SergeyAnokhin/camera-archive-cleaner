@@ -148,3 +148,4 @@ vite.config.ts.timestamp-*
 /backend/*_cache/*
 /backend/models/*
 /backend/yolo**.pt
+/backend/routers/__pycache__/*
