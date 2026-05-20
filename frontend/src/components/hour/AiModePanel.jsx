@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getAiRequestStats } from './hourUtils.js'
+import { resolveAiIcons } from '../../aiHelpers.js'
 
 export const AI_PROVIDER_CONFIG = {
   gemini: {
@@ -10,6 +11,7 @@ export const AI_PROVIDER_CONFIG = {
       { value: 'gemini-2.5-flash-lite',    label: '🟢 gemini-2.5-flash-lite ($0.10/$0.40)' },
       { value: 'gemini-2.5-flash',         label: '🟡 gemini-2.5-flash ($0.30/$2.50)' },
       { value: 'gemini-3.1-flash-preview', label: '🟡 gemini-3.1-flash-preview ($0.50/$3.00)' },
+      { value: 'gemini-3.5-flash',         label: '🔴 gemini-3.5-flash ($1.50/$9.00)' },
       { value: 'gemini-2.5-pro',           label: '🔴 gemini-2.5-pro ($1.25/$10.00)' },
       { value: 'gemini-3.1-pro-preview',   label: '🔴 gemini-3.1-pro-preview ($2.00/$12.00)' },
     ],
@@ -46,7 +48,6 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
     localStorage.getItem(cfg.modelKey) || cfg.defaultModel
   )
 
-  // Re-sync model when provider changes
   useEffect(() => {
     setModel(localStorage.getItem(cfg.modelKey) || cfg.defaultModel)
   }, [provider])
@@ -60,10 +61,18 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
   const analyzedCount = photoFiles.filter(f => aiAnalysisMap.has(f.id)).length
   const sceneEntry = [...aiAnalysisMap.values()][0]
 
+  // Aggregate all detected objects across the current page
+  const pageIcons = useMemo(() => {
+    const allWords = []
+    for (const entry of aiAnalysisMap.values()) {
+      if (entry.objects) allWords.push(...entry.objects.split(/\s+/).filter(Boolean))
+    }
+    return resolveAiIcons(allWords.join(' '))
+  }, [aiAnalysisMap])
+
   function handleModelChange(e) {
     setModel(e.target.value)
     localStorage.setItem(cfg.modelKey, e.target.value)
-    // Force photo URLs to update (getImageUrl reads model from localStorage)
     onParamChange?.('_refresh', Date.now())
   }
 
@@ -111,6 +120,14 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
           <i className="mdi mdi-chart-timeline-variant" />
           {stats.lastMinute > 0 && <span>{stats.lastMinute}/мин</span>}
           <span>{stats.last24h}/24ч</span>
+        </div>
+      )}
+      {/* Page-level objects summary */}
+      {pageIcons.length > 0 && (
+        <div className="hv-ai-page-objects">
+          {pageIcons.map((ic, i) => (
+            <span key={i} className="hv-ai-page-emoji" title={ic.label}>{ic.emoji}</span>
+          ))}
         </div>
       )}
       {sceneEntry?.scene_description && (

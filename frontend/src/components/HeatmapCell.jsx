@@ -132,7 +132,7 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
         return (
           <div className="cell-ai-icons">
             {shown.map((ic, i) => (
-              <i key={i} className={`mdi ${ic.mdi}`} style={{ color: ic.color }} title={ic.label} />
+              <span key={i} className="cell-ai-emoji" title={ic.label}>{ic.emoji}</span>
             ))}
             {allIcons.length > 5 && <span className="cell-ai-more">+{allIcons.length - 5}</span>}
           </div>

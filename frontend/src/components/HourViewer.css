@@ -708,6 +708,20 @@
 }
 .hv-ai-stats .mdi { color: var(--accent); }
 
+.hv-ai-page-objects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 3px 0 1px;
+  width: 100%;
+  pointer-events: auto;
+}
+.hv-ai-page-emoji {
+  font-size: calc(var(--font-base) * 1.1);
+  cursor: default;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+}
+
 .hv-ai-scene {
   width: 100%;
   font-size: calc(var(--font-base) * 0.78);
@@ -746,15 +760,16 @@
   flex-wrap: wrap;
   max-width: 80%;
   z-index: 3;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
-.hv-card-ai-icons .mdi {
-  font-size: 14px;
+.hv-card-ai-emoji {
+  font-size: 13px;
+  line-height: 1;
   background: rgba(0, 0, 0, 0.55);
   border-radius: 3px;
   padding: 1px 2px;
-  line-height: 1;
+  cursor: default;
 }
 
 .hv-card-ai-more {
@@ -765,6 +780,29 @@
   border-radius: 3px;
   padding: 1px 4px;
   line-height: 14px;
+}
+
+/* Objects text overlay — shown on hover */
+.hv-card-objects-hover {
+  position: absolute;
+  bottom: 22px;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.72);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: calc(var(--font-base) * 0.60);
+  padding: 2px 5px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  z-index: 4;
+}
+.hv-card-photo:hover .hv-card-objects-hover {
+  opacity: 1;
 }
 
 /* ── AI description tooltip (shown on card hover) ── */

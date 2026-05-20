@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { clearDatabase, clearAllThumbnails, getStorageInfo } from '../api.js'
+import { OBJECT_EMOJI_DEFAULTS } from '../aiHelpers.js'
 import * as yaml from 'js-yaml'
 import './ToolsModal.css'
 
@@ -75,6 +76,7 @@ const GEMINI_MODELS = [
   { value: 'gemini-2.5-flash-lite',    label: 'gemini-2.5-flash-lite',    tier: '🟢 lite' },
   { value: 'gemini-2.5-flash',         label: 'gemini-2.5-flash',         tier: '🟡 base' },
   { value: 'gemini-3.1-flash-preview', label: 'gemini-3.1-flash-preview', tier: '🟡 base' },
+  { value: 'gemini-3.5-flash',         label: 'gemini-3.5-flash',         tier: '🔴 pro'  },
   { value: 'gemini-2.5-pro',           label: 'gemini-2.5-pro',           tier: '🔴 pro'  },
   { value: 'gemini-3.1-pro-preview',   label: 'gemini-3.1-pro-preview',   tier: '🔴 pro'  },
 ]
@@ -84,8 +86,49 @@ const GEMINI_PRICING = {
   'gemini-2.5-flash-lite':    { input: 0.10,  output: 0.40  },
   'gemini-2.5-flash':         { input: 0.30,  output: 2.50  },
   'gemini-3.1-flash-preview': { input: 0.50,  output: 3.00  },
+  'gemini-3.5-flash':         { input: 1.50,  output: 9.00  },
   'gemini-2.5-pro':           { input: 1.25,  output: 10.00 },
   'gemini-3.1-pro-preview':   { input: 2.00,  output: 12.00 },
+}
+
+const OV_CONFIDENCE_KEY = 'mode_params_openvino'
+const OV_CONFIDENCE_DEFAULT = 25
+const EXCLUDED_OBJECTS_KEY = 'detection_excluded_objects'
+const EMOJI_OVERRIDES_KEY  = 'detection_emoji_overrides'
+
+function loadOvConfidence() {
+  try {
+    const raw = localStorage.getItem(OV_CONFIDENCE_KEY)
+    return raw ? (JSON.parse(raw).confidence ?? OV_CONFIDENCE_DEFAULT) : OV_CONFIDENCE_DEFAULT
+  } catch { return OV_CONFIDENCE_DEFAULT }
+}
+
+function loadExcludedText() {
+  try {
+    const raw = localStorage.getItem(EXCLUDED_OBJECTS_KEY)
+    return raw ? JSON.parse(raw).join(', ') : ''
+  } catch { return '' }
+}
+
+function loadEmojiOverridesText() {
+  try {
+    const raw = localStorage.getItem(EMOJI_OVERRIDES_KEY)
+    if (!raw) return ''
+    const obj = JSON.parse(raw)
+    return Object.entries(obj).map(([k, v]) => `${k} = ${v}`).join('\n')
+  } catch { return '' }
+}
+
+function parseEmojiOverridesText(text) {
+  const result = {}
+  for (const line of text.split('\n')) {
+    const idx = line.indexOf('=')
+    if (idx < 1) continue
+    const key = line.slice(0, idx).trim().toLowerCase()
+    const val = line.slice(idx + 1).trim()
+    if (key && val) result[key] = val
+  }
+  return result
 }
 
 const MOTION_MODE_KEYS = [
@@ -181,6 +224,10 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
   const [geminiPrompt, setGeminiPrompt] = useState(() => localStorage.getItem(GEMINI_PROMPT_KEY) || GEMINI_DEFAULT_PROMPT)
   const [claudeApiKey, setClaudeApiKey] = useState(() => localStorage.getItem(CLAUDE_API_KEY_KEY) || '')
   const [claudeModel, setClaudeModel]   = useState(() => localStorage.getItem(CLAUDE_MODEL_KEY) || CLAUDE_DEFAULT_MODEL)
+
+  const [ovConfidence, setOvConfidence]   = useState(loadOvConfidence)
+  const [excludedText, setExcludedText]   = useState(loadExcludedText)
+  const [emojiText, setEmojiText]         = useState(loadEmojiOverridesText)
 
   const importRef = useRef(null)
   const [importResult, setImportResult] = useState(null)
@@ -351,6 +398,30 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     }
   }
 
+  function handleOvConfidenceChange(e) {
+    const v = Number(e.target.value)
+    setOvConfidence(v)
+    const existing = (() => { try { return JSON.parse(localStorage.getItem(OV_CONFIDENCE_KEY) || '{}') } catch { return {} } })()
+    localStorage.setItem(OV_CONFIDENCE_KEY, JSON.stringify({ ...existing, confidence: v }))
+  }
+
+  function handleExcludedChange(e) {
+    setExcludedText(e.target.value)
+    const arr = e.target.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    localStorage.setItem(EXCLUDED_OBJECTS_KEY, JSON.stringify(arr))
+  }
+
+  function handleEmojiTextChange(e) {
+    setEmojiText(e.target.value)
+    const obj = parseEmojiOverridesText(e.target.value)
+    localStorage.setItem(EMOJI_OVERRIDES_KEY, JSON.stringify(obj))
+  }
+
+  function handleResetEmojiOverrides() {
+    setEmojiText('')
+    localStorage.removeItem(EMOJI_OVERRIDES_KEY)
+  }
+
   const [activeTab, setActiveTab] = useState('general')
 
   useEffect(() => {
@@ -395,6 +466,7 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
   const TABS = [
     { id: 'general',     label: 'General' },
     { id: 'hour_view',   label: 'Hour view' },
+    { id: 'detection',   label: 'Detection' },
     { id: 'google_ai',   label: 'Google AI' },
     { id: 'claude_ai',   label: 'Claude AI' },
     { id: 'maintenance', label: 'Maintenance' },
@@ -516,6 +588,65 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
                 <span className="font-size-value">{diffThreshold}</span>
               </div>
               <div className="modal-setting-hint">Pixels with a channel delta below this value are darkened in Motion diff mode. Higher = only significant changes shown.</div>
+            </div>
+          </>}
+
+          {activeTab === 'detection' && <>
+            {/* OpenVINO confidence */}
+            <div className="modal-section">
+              <div className="modal-section-title">OpenVINO — default confidence threshold</div>
+              <div className="font-slider-row">
+                <span className="font-size-label">10%</span>
+                <input type="range" min={10} max={80} step={5}
+                  value={ovConfidence} onChange={handleOvConfidenceChange} className="font-slider" />
+                <span className="font-size-label">80%</span>
+                <span className="font-size-value">{ovConfidence}%</span>
+              </div>
+              <div className="modal-setting-hint">Минимальная уверенность детекции объекта. Применяется при следующем открытии режима OpenVINO.</div>
+            </div>
+
+            {/* Excluded objects */}
+            <div className="modal-section">
+              <div className="modal-section-title">Исключённые объекты</div>
+              <input
+                type="text"
+                className="modal-text-input"
+                placeholder="человек, машина, птица"
+                value={excludedText}
+                onChange={handleExcludedChange}
+              />
+              <div className="modal-setting-hint">Объекты через запятую. Совпадения игнорируются при отображении и сводке страницы. Регистр не важен.</div>
+            </div>
+
+            {/* Emoji overrides */}
+            <div className="modal-section">
+              <div className="modal-section-title">Emoji для объектов</div>
+              <textarea
+                className="modal-textarea"
+                rows={7}
+                placeholder={'собака = 🐩\nмашина = 🏎️\nperson = 🧑'}
+                value={emojiText}
+                onChange={handleEmojiTextChange}
+              />
+              <div className="modal-setting-hint">
+                Формат: <code style={{fontFamily:'monospace'}}>метка = emoji</code>, по одному на строку. Переопределяет стандартные emoji только для указанных объектов.
+              </div>
+              <button className="modal-btn neutral" style={{marginTop:6}} onClick={handleResetEmojiOverrides}>
+                <i className="mdi mdi-restore" /> Сбросить переопределения
+              </button>
+            </div>
+
+            {/* Default emoji reference */}
+            <div className="modal-section">
+              <div className="modal-section-title">Стандартные emoji (справочник)</div>
+              <div className="detection-emoji-grid">
+                {Object.entries(OBJECT_EMOJI_DEFAULTS).map(([label, emoji]) => (
+                  <div key={label} className="detection-emoji-row" title={label}>
+                    <span className="detection-emoji-char">{emoji}</span>
+                    <span className="detection-emoji-label">{label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </>}
 

@@ -29,8 +29,6 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
   useEffect(() => {
     setLoaded(false)
     setError(false)
-    // If image was already in browser cache, `load` fires before React attaches
-    // onLoad, leaving the image hidden forever. Check `complete` as a fallback.
     const img = imgRef.current
     if (img?.complete) {
       if (img.naturalWidth > 0) setLoaded(true)
@@ -41,6 +39,8 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
   function handleClick(e) {
     if (selectionMode) { onToggle(file, index, e.shiftKey) } else { setFullscreen(true) }
   }
+
+  const aiIcons = aiData?.objects ? resolveAiIcons(aiData.objects) : []
 
   return (
     <>
@@ -71,19 +71,22 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
         }
         <span className="hv-card-time">{formatTime(file.timestamp)}</span>
 
-        {/* AI analysis icons — top-left corner */}
-        {aiData?.objects && (() => {
-          const icons = resolveAiIcons(aiData.objects)
-          if (!icons.length) return null
-          return (
-            <div className="hv-card-ai-icons">
-              {icons.slice(0, 4).map((ic, i) => (
-                <i key={i} className={`mdi ${ic.mdi}`} style={{ color: ic.color }} title={ic.label} />
-              ))}
-              {icons.length > 4 && <span className="hv-card-ai-more">+{icons.length - 4}</span>}
-            </div>
-          )
-        })()}
+        {/* AI analysis emoji — top-left corner */}
+        {aiIcons.length > 0 && (
+          <div className="hv-card-ai-icons">
+            {aiIcons.slice(0, 5).map((ic, i) => (
+              <span key={i} className="hv-card-ai-emoji" title={ic.label}>{ic.emoji}</span>
+            ))}
+            {aiIcons.length > 5 && <span className="hv-card-ai-more">+{aiIcons.length - 5}</span>}
+          </div>
+        )}
+
+        {/* Objects text overlay — visible on hover (zoom) */}
+        {aiIcons.length > 0 && !selectionMode && (
+          <div className="hv-card-objects-hover">
+            {aiIcons.map(ic => ic.label).join(' · ')}
+          </div>
+        )}
 
         {/* AI description tooltip on hover — only in AI mode */}
         {aiData?.image_description && !selectionMode && mode.isAiMode && (
