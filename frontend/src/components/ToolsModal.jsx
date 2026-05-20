@@ -101,7 +101,7 @@ const GEMINI_PRICING = {
   'gemini-3.1-pro-preview':   { input: 2.00,  output: 12.00 },
 }
 
-const OV_CONFIDENCE_KEY = 'mode_params_openvino'
+const OV_CONFIDENCE_KEY = 'mode_params_openvino_detection'
 const OV_CONFIDENCE_DEFAULT = 25
 const EXCLUDED_OBJECTS_KEY = 'detection_excluded_objects'
 const EMOJI_OVERRIDES_KEY  = 'detection_emoji_overrides'

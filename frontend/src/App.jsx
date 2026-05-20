@@ -145,7 +145,13 @@ function CellSelBar({ level, periods, selectedMap, onSelectAll, onSelectNone, on
     for (const p of CELL_PROVIDERS) m[p.key] = localStorage.getItem(p.modelKey) || p.defaultModel
     return m
   })
-  const [ovConf, setOvConf] = useState(25)
+  const [ovConf, setOvConf] = useState(() => {
+    try {
+      const raw = localStorage.getItem('mode_params_openvino_detection')
+      if (raw) return JSON.parse(raw).confidence ?? 25
+    } catch {}
+    return 25
+  })
 
   const providerCfg = CELL_PROVIDERS.find(p => p.key === providerKey)
   const currentModel = modelMap[providerKey]
@@ -256,7 +262,13 @@ function CellSelBar({ level, periods, selectedMap, onSelectAll, onSelectNone, on
           <>
             <span style={dim}><i className="mdi mdi-tune-variant" /> Threshold: {ovConf}%</span>
             <input type="range" min={10} max={80} step={5} value={ovConf}
-              onChange={e => setOvConf(+e.target.value)}
+              onChange={e => {
+                const v = +e.target.value
+                setOvConf(v)
+                const key = 'mode_params_openvino_detection'
+                const existing = (() => { try { return JSON.parse(localStorage.getItem(key) || '{}') } catch { return {} } })()
+                localStorage.setItem(key, JSON.stringify({ ...existing, confidence: v }))
+              }}
               style={{ width: 90, accentColor: '#0ea5e9', cursor: 'pointer' }}
             />
           </>
