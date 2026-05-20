@@ -181,8 +181,17 @@ export function openvinoAnalyzeBatch({ fileIds, modelName, confidence }) {
   return postJson('/openvino_analyze_batch', { file_ids: fileIds, model_name: modelName, confidence })
 }
 
-export function getOpenVinoBboxThumbnailUrl(fileId, model, confidence) {
-  return `${BASE}/openvino_thumbnail/${fileId}?model=${encodeURIComponent(model)}&confidence=${confidence}`
+export function getOpenVinoBboxThumbnailUrl(fileId, model, confidence, excluded = '') {
+  let url = `${BASE}/openvino_thumbnail/${fileId}?model=${encodeURIComponent(model)}&confidence=${confidence}`
+  if (excluded) url += `&excluded=${encodeURIComponent(excluded)}`
+  return url
+}
+
+export function getExcludedParam() {
+  try {
+    const raw = localStorage.getItem('detection_excluded_objects')
+    return raw ? JSON.parse(raw).join(',') : ''
+  } catch { return '' }
 }
 
 export function openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName, confidence }) {

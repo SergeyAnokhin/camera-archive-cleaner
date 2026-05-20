@@ -15,7 +15,7 @@ from diff_thumbnails import get_or_create_diff_thumbnail
 from erosion_thumbnails import get_or_create_erosion_thumbnail
 from motion_thumbnails import get_or_create_motion_thumbnail, VALID_MODES as MOTION_VALID_MODES
 from diff_zoom_thumbnails import get_or_create_diff_zoom_thumbnail
-from yolo_detect import COCO_TO_RUSSIAN, OV_THUMB_DIR, load_yolo, ov_cache_path
+from yolo_detect import COCO_TO_RUSSIAN, OV_THUMB_DIR, load_yolo, ov_cache_path, excluded_to_en
 
 router = APIRouter()
 logger = logging.getLogger("api")
@@ -166,10 +166,14 @@ def get_openvino_thumbnail(
     file_id: int,
     model: str = Query(default="yolov8n"),
     confidence: float = Query(default=0.25, ge=0.05, le=0.95),
+    excluded: str = Query(default=""),  # comma-separated Russian/English labels
 ):
     from PIL import Image as PILImage
 
-    cache_path = ov_cache_path(file_id, model, confidence)
+    excluded_labels = frozenset(e.strip().lower() for e in excluded.split(',') if e.strip())
+    excluded_en     = frozenset(excluded_to_en(set(excluded_labels)))
+
+    cache_path = ov_cache_path(file_id, model, confidence, excluded_en)
     if cache_path.exists():
         return FileResponse(str(cache_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
@@ -189,7 +193,7 @@ def get_openvino_thumbnail(
         img = PILImage.open(src).convert("RGB")
         results = yolo(img, conf=confidence, verbose=False)
 
-        # Extract detected Russian object names for ai_analysis
+        # Extract ALL detected Russian object names for ai_analysis (save before filtering)
         seen: set[str] = set()
         objects_ru: list[str] = []
         for cls_id in results[0].boxes.cls.tolist():
@@ -199,6 +203,14 @@ def get_openvino_thumbnail(
                 seen.add(ru)
                 objects_ru.append(ru)
 
+        # Filter out excluded classes from bounding boxes before drawing
+        if excluded_en and len(results[0].boxes):
+            keep = [
+                yolo.names[int(cls_id)].lower() not in excluded_en
+                for cls_id in results[0].boxes.cls.tolist()
+            ]
+            results[0].boxes = results[0].boxes[keep]
+
         # Draw bounding boxes (results[0].plot() returns BGR numpy array)
         annotated_bgr = results[0].plot(line_width=2, font_size=10)
         annotated_rgb = annotated_bgr[:, :, ::-1]   # BGR → RGB
@@ -207,7 +219,7 @@ def get_openvino_thumbnail(
         OV_THUMB_DIR.mkdir(exist_ok=True)
         out_img.save(str(cache_path), format="JPEG", quality=88)
 
-        # Save detected objects to ai_analysis so icons appear at all levels
+        # Save ALL detected objects to ai_analysis (including excluded — icons/display filters them)
         with get_connection() as conn:
             save_ai_analysis(conn, file_id, "openvino", model, "", "", " ".join(objects_ru))
     except Exception as e:

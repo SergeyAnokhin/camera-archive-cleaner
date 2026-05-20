@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { openvinoAnalyzeBatch } from '../api.js'
+import { resolveAiIcons } from '../aiHelpers.js'
 import './GeminiAnalysisModal.css'
 
 const CONFIDENCE_KEY = 'openvino_confidence'
@@ -114,23 +115,28 @@ export default function OpenVinoAnalysisModal({ fileIds, model, onClose, onCompl
             <div className="gai-section">
               <div className="gai-response-label">Результаты по фото</div>
               <div className="gai-images-list">
-                {Object.entries(result.results).map(([fid, objs], idx) => (
-                  <div key={fid} className="gai-image-entry">
-                    <div className="gai-image-idx">#{idx + 1}</div>
-                    <div className="gai-image-content">
-                      {objs.length > 0
-                        ? (
-                          <div className="gai-image-objects">
-                            {objs.map(o => (
-                              <span key={o} className="gai-obj-tag">{o}</span>
-                            ))}
-                          </div>
-                        )
-                        : <div className="gai-image-desc" style={{ color: 'var(--text-dim)' }}>объекты не обнаружены</div>
-                      }
+                {Object.entries(result.results).map(([fid, objs], idx) => {
+                  const icons = resolveAiIcons(objs.join(' '))
+                  return (
+                    <div key={fid} className="gai-image-entry">
+                      <div className="gai-image-idx">#{idx + 1}</div>
+                      <div className="gai-image-content">
+                        {icons.length > 0
+                          ? (
+                            <div className="gai-image-objects">
+                              {icons.map(ic => (
+                                <span key={ic.label} className="gai-obj-tag">
+                                  {ic.emoji} {ic.label}
+                                </span>
+                              ))}
+                            </div>
+                          )
+                          : <div className="gai-image-desc" style={{ color: 'var(--text-dim)' }}>объекты не обнаружены</div>
+                        }
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

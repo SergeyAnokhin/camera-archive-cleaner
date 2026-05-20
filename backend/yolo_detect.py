@@ -43,8 +43,24 @@ COCO_TO_RUSSIAN: dict[str, str] = {
 _yolo_models: dict = {}
 
 
-def ov_cache_path(file_id: int, model: str, confidence: float) -> Path:
-    key = f"{OV_THUMB_VERSION}:{file_id}:{model}:{confidence:.2f}"
+# Reverse map: Russian label → COCO English class name
+RUSSIAN_TO_COCO: dict[str, str] = {v: k for k, v in COCO_TO_RUSSIAN.items()}
+
+
+def excluded_to_en(excluded_labels: set[str]) -> set[str]:
+    """Convert a set of excluded labels (Russian or English) → COCO English class names."""
+    result = set()
+    for label in excluded_labels:
+        lo = label.lower()
+        en = RUSSIAN_TO_COCO.get(lo)
+        result.add(en if en else lo)
+    return result
+
+
+def ov_cache_path(file_id: int, model: str, confidence: float,
+                  excluded: frozenset[str] = frozenset()) -> Path:
+    excl_str = ','.join(sorted(excluded))
+    key = f"{OV_THUMB_VERSION}:{file_id}:{model}:{confidence:.2f}:{excl_str}"
     h = hashlib.sha256(key.encode()).hexdigest()[:16]
     return OV_THUMB_DIR / f"{h}.jpg"
 

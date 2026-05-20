@@ -84,7 +84,7 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
         {/* Objects text overlay — visible on hover (zoom) */}
         {aiIcons.length > 0 && !selectionMode && (
           <div className="hv-card-objects-hover">
-            {aiIcons.map(ic => ic.label).join(' · ')}
+            {aiIcons.map(ic => `${ic.emoji} ${ic.label}`).join('  ')}
           </div>
         )}
 
