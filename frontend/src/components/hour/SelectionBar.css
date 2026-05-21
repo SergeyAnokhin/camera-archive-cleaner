@@ -1,0 +1,43 @@
+/* SelectionBar — horizontal toolbar shown below the distribution chart in selection mode. */
+
+.hv-select-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  flex-wrap: wrap;
+}
+
+.hv-sbar-spacer { flex: 1; }
+
+.hv-sbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: calc(var(--font-base) * 0.88);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  white-space: nowrap;
+}
+.hv-sbar-btn:hover:not(:disabled) { background: rgba(255,255,255,0.07); color: var(--text-primary); }
+.hv-sbar-btn:disabled { opacity: 0.4; cursor: default; }
+.hv-sbar-danger { color: #f87171; }
+.hv-sbar-danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.15) !important; color: #f87171; }
+.hv-sbar-cancel { color: var(--text-dim); }
+
+.hv-sbar-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--accent);
+  padding: 0 6px;
+}

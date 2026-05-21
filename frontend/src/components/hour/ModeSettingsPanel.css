@@ -1,0 +1,32 @@
+/* ModeSettingsPanel — tunable param sliders for non-AI view modes.
+   Extends .hv-mode-settings / .hv-mode-settings-label (HourViewer.css). */
+
+.hv-mode-param {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.hv-mode-param-name {
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.hv-mode-param-slider {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+  min-width: 80px;
+}
+
+.hv-mode-param-value {
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--text-primary);
+  min-width: 24px;
+  text-align: right;
+  flex-shrink: 0;
+}

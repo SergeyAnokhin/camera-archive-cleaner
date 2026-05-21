@@ -110,9 +110,11 @@ Opens `OpenVinoAnalysisModal` → `POST /openvino_analyze_batch` → saves to DB
 
 ## Backend endpoints
 
+> Endpoints are declared in [`backend/routers/ai.py`](../backend/routers/ai.py) (request models + delegation only). The actual analysis logic lives in the [`backend/ai_providers/`](../backend/ai_providers/) package, with shared image-loading / JSON-parsing / cost / DB-save helpers in `ai_providers/common.py`.
+
 ### `POST /gemini_analyze_batch`
 
-[`backend/main.py`](../backend/main.py) — `gemini_analyze_batch()`
+[`ai_providers/gemini.py`](../backend/ai_providers/gemini.py) — `analyze_batch()`
 
 1. Loads photo files from DB by `file_ids`
 2. Reads each file from disk with Pillow, resizes to 1024 × 1024
@@ -123,19 +125,19 @@ Opens `OpenVinoAnalysisModal` → `POST /openvino_analyze_batch` → saves to DB
 
 ### `POST /claude_analyze_batch`
 
-[`backend/main.py`](../backend/main.py) — `claude_analyze_batch()`
+[`ai_providers/claude.py`](../backend/ai_providers/claude.py) — `analyze_batch()`
 
 Same flow, but converts images to base64 JPEG and sends via `anthropic` SDK (`client.messages.create()`).
 
 ### `POST /openvino_analyze_batch`
 
-[`backend/main.py`](../backend/main.py) — `openvino_analyze_batch()`
+[`ai_providers/openvino.py`](../backend/ai_providers/openvino.py) — `analyze_batch()`
 
 Request: `{ file_ids, model_name, confidence }`
 
-1. Loads YOLOv8 model lazily via `_load_yolo()` — tries `backend/models/{model}_openvino_model/` first, falls back to `.pt` download
+1. Loads YOLOv8 model lazily via `load_yolo()` — tries `backend/models/{model}_openvino_model/` first, falls back to `.pt` download
 2. Runs detection on each photo at the given confidence threshold
-3. Maps COCO English class names → Russian via `_COCO_TO_RUSSIAN` dict
+3. Maps COCO English class names → Russian via `COCO_TO_RUSSIAN` dict
 4. Saves each result via `save_ai_analysis()` with `provider='openvino'`, empty `scene_description`/`image_description`
 5. Returns: `{ elapsed_ms, images_used, saved_count, results: { file_id: [ru_word, ...] } }`
 
@@ -143,7 +145,7 @@ Objects are stored as Russian words so they match the existing `AI_ICON_MAP` in 
 
 ### `POST /openvino_analyze_range`
 
-[`backend/main.py`](../backend/main.py) — `openvino_analyze_range()`
+[`ai_providers/openvino.py`](../backend/ai_providers/openvino.py) — `analyze_range()`
 
 Request: `{ camera_id, date_from, date_to, model_name, confidence }`
 
@@ -500,7 +502,7 @@ Displayed in `AiModePanel` after each completed analysis.
 
 ## Settings (Tools modal)
 
-**File:** [`frontend/src/components/ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx)
+**Files:** [`tools/DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx), [`tools/GoogleAiTab.jsx`](../frontend/src/components/tools/GoogleAiTab.jsx), [`tools/ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx) — keys/defaults in [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js)
 
 | Tab | Setting | localStorage key |
 |-----|---------|-----------------|

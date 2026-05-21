@@ -9,60 +9,18 @@ import HourViewer from './components/HourViewer.jsx'
 import StatsBar from './components/StatsBar.jsx'
 import ScanButton from './components/ScanButton.jsx'
 import ToolsButton from './components/ToolsButton.jsx'
-import { initFontSize } from './components/ToolsModal.jsx'
+import { initFontSize } from './components/tools/settingsIO.js'
+import CellSelBar from './components/CellSelBar.jsx'
+import { useHeatmapKeyboard } from './components/useHeatmapKeyboard.js'
+import {
+  LEVELS, dateRangeForPeriod, computeIntensity, getPreviewsPerCell,
+  loadNavState, saveNavState,
+} from './components/navUtils.js'
 
 const CELL_ANALYSIS_PROMPT = (n) =>
   `You are analyzing ${n} photos from a security camera. Return ONLY valid JSON:\n{"scene":"one sentence","images":[{"description":"1-2 sentences","objects":["мужчина","кошка"]}]}\nUse Russian words for people and animals (человек, мужчина, женщина, ребёнок, кошка, собака, птица, машина, велосипед, etc.).`
 
-const LEVELS = ['year', 'month', 'day', 'hour']
-const PREVIEWS_PER_CELL_KEY = 'previews_per_cell'
-const PREVIEWS_PER_CELL_DEFAULT = 3
-const NAV_STATE_KEY = 'nav_state'
-const GRID_COLS = { year: 4, month: 4, day: 7, hour: 6 }
-
-function loadNavState() {
-  try { return JSON.parse(localStorage.getItem(NAV_STATE_KEY) || 'null') ?? {} } catch { return {} }
-}
-function saveNavState(s) { localStorage.setItem(NAV_STATE_KEY, JSON.stringify(s)) }
-
 const _nav = loadNavState()
-
-function dateRangeForPeriod(period, level) {
-  if (level === 'year') {
-    return { dateFrom: `${period}-01-01T00:00:00`, dateTo: `${period}-12-31T23:59:59` }
-  }
-  if (level === 'month') {
-    const [y, m] = period.split('-')
-    const lastDay = new Date(+y, +m, 0).getDate()
-    return {
-      dateFrom: `${period}-01T00:00:00`,
-      dateTo: `${period}-${String(lastDay).padStart(2, '0')}T23:59:59`,
-    }
-  }
-  if (level === 'day') {
-    return { dateFrom: `${period}T00:00:00`, dateTo: `${period}T23:59:59` }
-  }
-  return {}
-}
-
-function computeIntensity(periods) {
-  const max = Math.max(...periods.map(p => p.total_size_bytes), 1)
-  return periods.map(p => ({
-    ...p,
-    bucket: p.total_size_bytes === 0 ? 0 : Math.ceil((p.total_size_bytes / max) * 9),
-  }))
-}
-
-function getPreviewsPerCell() {
-  return Number(localStorage.getItem(PREVIEWS_PER_CELL_KEY)) || PREVIEWS_PER_CELL_DEFAULT
-}
-
-function formatBytes(b) {
-  if (!b) return '0 B'
-  if (b >= 1e9) return `${(b / 1e9).toFixed(1)} GB`
-  if (b >= 1e6) return `${(b / 1e6).toFixed(0)} MB`
-  return `${(b / 1e3).toFixed(0)} KB`
-}
 
 function DayDeleteBar({ label, onPreview, loading }) {
   return (
@@ -102,200 +60,6 @@ function KeyboardHints({ hints }) {
           {h.label}
         </span>
       ))}
-    </div>
-  )
-}
-
-const CELL_PROVIDERS = [
-  {
-    key: 'openvino', label: 'OpenVINO Detection', icon: 'mdi-chip',
-    modelKey: 'openvino_model', defaultModel: 'yolov8n',
-    models: [
-      { value: 'yolov8n', label: '🟢 YOLOv8n — Nano (быстро)' },
-      { value: 'yolov8s', label: '🟡 YOLOv8s — Small (точнее)' },
-      { value: 'yolov8m', label: '🔴 YOLOv8m — Medium (медленно)' },
-    ],
-  },
-  {
-    key: 'gemini', label: 'Gemini Analysis', icon: 'mdi-google',
-    modelKey: 'gemini_model', defaultModel: 'gemini-3.1-flash-lite',
-    models: [
-      { value: 'gemini-3.1-flash-lite',    label: '🟢 gemini-3.1-flash-lite' },
-      { value: 'gemini-2.5-flash',         label: '🟡 gemini-2.5-flash' },
-      { value: 'gemini-2.5-pro',           label: '🔴 gemini-2.5-pro' },
-    ],
-  },
-  {
-    key: 'claude', label: 'Claude Analysis', icon: 'mdi-robot',
-    modelKey: 'claude_model', defaultModel: 'claude-haiku-4-5-20251001',
-    models: [
-      { value: 'claude-haiku-4-5-20251001', label: '🟢 claude-haiku-4-5' },
-      { value: 'claude-sonnet-4-6',         label: '🟡 claude-sonnet-4-6' },
-      { value: 'claude-opus-4-7',           label: '🔴 claude-opus-4-7' },
-    ],
-  },
-]
-
-function CellSelBar({ level, periods, selectedMap, onSelectAll, onSelectNone, onClose,
-                       onDelete, loading, error, confirmOpen, onSetConfirmOpen,
-                       onAnalyze, analyzing, analyzeProgress, analyzeError }) {
-  const [providerKey, setProviderKey] = useState('openvino')
-  const [modelMap, setModelMap] = useState(() => {
-    const m = {}
-    for (const p of CELL_PROVIDERS) m[p.key] = localStorage.getItem(p.modelKey) || p.defaultModel
-    return m
-  })
-  const [ovConf, setOvConf] = useState(() => {
-    try {
-      const raw = localStorage.getItem('mode_params_openvino_detection')
-      if (raw) return JSON.parse(raw).confidence ?? 25
-    } catch {}
-    return 25
-  })
-
-  const providerCfg = CELL_PROVIDERS.find(p => p.key === providerKey)
-  const currentModel = modelMap[providerKey]
-
-  function handleModelChange(val) {
-    setModelMap(prev => ({ ...prev, [providerKey]: val }))
-    localStorage.setItem(providerCfg.modelKey, val)
-  }
-
-  const count = selectedMap.size
-  const isHour = level === 'hour'
-  const unitLabel = isHour ? 'hour' : 'day'
-  const unitLabelPlural = isHour ? 'hours' : 'days'
-
-  const stats = [...selectedMap.values()].reduce(
-    (acc, p) => ({
-      photos: acc.photos + (p.photo_count || 0),
-      videos: acc.videos + (p.video_count || 0),
-      bytes:  acc.bytes  + (p.total_size_bytes || 0),
-    }),
-    { photos: 0, videos: 0, bytes: 0 }
-  )
-
-  if (confirmOpen) {
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-        background: '#450a0a', border: '1px solid #7f1d1d',
-        borderRadius: 'var(--radius)', padding: '10px 14px',
-      }}>
-        <i className="mdi mdi-alert-outline" style={{ color: '#f87171' }} />
-        <span style={{ color: '#fca5a5', fontSize: 'calc(var(--font-base) * 0.88)', flex: 1 }}>
-          Delete {count} {count === 1 ? unitLabel : unitLabelPlural}?
-          &ensp;{stats.photos.toLocaleString()} photos · {stats.videos.toLocaleString()} videos · {formatBytes(stats.bytes)}
-        </span>
-        {error && <span style={{ color: '#fca5a5', fontSize: 'calc(var(--font-base) * 0.82)' }}>{error}</span>}
-        <button className="modal-btn danger" disabled={loading} onClick={onDelete}>
-          {loading ? <i className="mdi mdi-loading mdi-spin" /> : <><i className="mdi mdi-delete-outline" /> Delete</>}
-        </button>
-        <button className="modal-btn neutral" disabled={loading} onClick={() => onSetConfirmOpen(false)}>Cancel</button>
-      </div>
-    )
-  }
-
-  // Use explicit hex colors — CSS vars don't resolve inside native <select> dropdowns
-  const selStyle = {
-    colorScheme: 'dark',
-    background: '#1f2937', color: '#f1f5f9',
-    border: '1px solid #374151', borderRadius: 6,
-    padding: '4px 8px', fontSize: 'calc(var(--font-base) * 0.85)', cursor: 'pointer',
-  }
-  const dim = { fontSize: 'calc(var(--font-base) * 0.82)', color: '#64748b', whiteSpace: 'nowrap' }
-
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', gap: 0,
-      background: '#1f2937', border: '1px solid #374151', borderRadius: 'var(--radius)',
-      overflow: 'hidden',
-    }}>
-      {/* Row 1: selection info + actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '8px 12px' }}>
-        <button className="modal-btn neutral" onClick={onSelectAll}>
-          <i className="mdi mdi-select-all" /> All ({periods.filter(p => p.total_size_bytes > 0).length})
-        </button>
-        <button className="modal-btn neutral" disabled={count === 0} onClick={onSelectNone}>
-          <i className="mdi mdi-select-off" /> None
-        </button>
-        {count > 0 ? (
-          <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: '#0ea5e9' }}>
-            {count} {count === 1 ? unitLabel : unitLabelPlural} · {stats.photos.toLocaleString()} photos · {stats.videos.toLocaleString()} videos · {formatBytes(stats.bytes)}
-          </span>
-        ) : (
-          <span style={dim}>Select {unitLabelPlural} to analyze</span>
-        )}
-        <div style={{ flex: 1 }} />
-        {isHour && (
-          <button className="modal-btn danger-outline" disabled={count === 0} onClick={() => onSetConfirmOpen(true)}>
-            <i className="mdi mdi-delete-outline" /> Delete selected
-          </button>
-        )}
-        <button className="modal-btn neutral" onClick={onClose}>
-          <i className="mdi mdi-close" /> Cancel
-        </button>
-      </div>
-
-      {/* Row 2: AI analysis panel — styled like HourViewer AiModePanel */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-        padding: '8px 12px', borderTop: '1px solid #374151',
-        background: 'rgba(14,165,233,0.05)',
-      }}>
-        {/* Provider combobox */}
-        <select value={providerKey} onChange={e => setProviderKey(e.target.value)} style={selStyle}>
-          {CELL_PROVIDERS.map(p => (
-            <option key={p.key} value={p.key}>{p.label}</option>
-          ))}
-        </select>
-
-        {/* Model combobox */}
-        <select value={currentModel} onChange={e => handleModelChange(e.target.value)} style={selStyle}>
-          {providerCfg.models.map(m => (
-            <option key={m.value} value={m.value}>{m.label}</option>
-          ))}
-        </select>
-
-        {/* OpenVINO-only: confidence slider */}
-        {providerKey === 'openvino' && (
-          <>
-            <span style={dim}><i className="mdi mdi-tune-variant" /> Threshold: {ovConf}%</span>
-            <input type="range" min={10} max={80} step={5} value={ovConf}
-              onChange={e => {
-                const v = +e.target.value
-                setOvConf(v)
-                const key = 'mode_params_openvino_detection'
-                const existing = (() => { try { return JSON.parse(localStorage.getItem(key) || '{}') } catch { return {} } })()
-                localStorage.setItem(key, JSON.stringify({ ...existing, confidence: v }))
-              }}
-              style={{ width: 90, accentColor: '#0ea5e9', cursor: 'pointer' }}
-            />
-          </>
-        )}
-
-        {/* Analyze button */}
-        <button className="modal-btn accent"
-          disabled={count === 0 || analyzing}
-          onClick={() => onAnalyze(providerKey, currentModel, ovConf / 100)}
-          style={{ marginLeft: 4 }}
-        >
-          {analyzing
-            ? <><i className="mdi mdi-loading mdi-spin" /> {analyzeProgress || 'Analyzing...'}</>
-            : <><i className="mdi mdi-play-circle-outline" /> Analyze {count > 0 ? `(${count})` : ''}</>}
-        </button>
-
-        {analyzeError && (
-          <details style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: '#f87171', maxWidth: 600 }}>
-            <summary style={{ cursor: 'pointer', listStyle: 'none' }}>
-              <i className="mdi mdi-alert-circle-outline" /> Error (click for details)
-            </summary>
-            <pre style={{ marginTop: 6, padding: '6px 8px', background: '#1a0a0a', borderRadius: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '0.9em', maxHeight: 200, overflowY: 'auto' }}>
-              {analyzeError}
-            </pre>
-          </details>
-        )}
-      </div>
     </div>
   )
 }
@@ -427,67 +191,11 @@ export default function App() {
   }, [periods])
 
   // Heatmap keyboard navigation (only active when HourViewer is not open)
-  useEffect(() => {
-    if (selectedHour) return
-    function onKey(e) {
-      const tag = document.activeElement?.tagName
-      if (tag === 'INPUT' || tag === 'SELECT') return
-      const cols = GRID_COLS[currentLevel] ?? 4
-      const idx = Math.max(0, periods.findIndex(p => p.period === focusedPeriod))
-      if (e.key === 'ArrowRight') {
-        e.preventDefault()
-        setFocusedPeriod(periods[Math.min(periods.length - 1, idx + 1)]?.period ?? null)
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault()
-        setFocusedPeriod(periods[Math.max(0, idx - 1)]?.period ?? null)
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setFocusedPeriod(periods[Math.min(periods.length - 1, idx + cols)]?.period ?? null)
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setFocusedPeriod(periods[Math.max(0, idx - cols)]?.period ?? null)
-      } else if (e.key === 'Enter') {
-        e.preventDefault()
-        const cell = periods[idx]
-        if (cell) drillInto(cell)
-      } else if (e.key === 'Escape') {
-        e.preventDefault()
-        if (selMode) {
-          setSelMode(false)
-          setSelectedPeriods(new Map())
-        } else if (drillStack.length > 0) {
-          restorePeriodRef.current = drillStack[drillStack.length - 1].label
-          setDrillStack(prev => prev.slice(0, -1))
-        }
-      } else if (e.key === 'Backspace' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
-        if (currentLevel === 'hour' && drillStack.length > 0 && !selMode) {
-          e.preventDefault()
-          const dayEntry = drillStack[drillStack.length - 1]
-          handleRangeDeletePreview(dayEntry.dateFrom, dayEntry.dateTo, drillStack.length - 2)
-        }
-      } else if (e.key === ' ' && (currentLevel === 'hour' || currentLevel === 'day')) {
-        e.preventDefault()
-        const cell = periods[idx]
-        if (cell && cell.total_size_bytes > 0) {
-          setSelMode(true)
-          setSelectedPeriods(prev => {
-            const next = new Map(prev)
-            next.has(cell.period) ? next.delete(cell.period) : next.set(cell.period, cell)
-            return next
-          })
-        }
-      } else if (e.key === 'Delete' && selMode && selectedPeriods.size > 0 && currentLevel === 'hour') {
-        e.preventDefault()
-        setSelDelConfirm(true)
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 'a' && (currentLevel === 'hour' || currentLevel === 'day')) {
-        e.preventDefault()
-        setSelMode(true)
-        setSelectedPeriods(new Map(periods.filter(p => p.total_size_bytes > 0).map(p => [p.period, p])))
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [selectedHour, periods, focusedPeriod, currentLevel, drillStack, selMode, selectedPeriods])
+  useHeatmapKeyboard({
+    selectedHour, periods, focusedPeriod, currentLevel, drillStack, selMode, selectedPeriods,
+    setFocusedPeriod, setSelMode, setSelectedPeriods, setDrillStack, setSelDelConfirm,
+    restorePeriodRef, drillInto, handleRangeDeletePreview,
+  })
 
   function handleTogglePeriod(cell) {
     setSelectedPeriods(prev => {

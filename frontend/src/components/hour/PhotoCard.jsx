@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getMediaUrl } from '../../api.js'
 import { resolveAiIcons } from '../../aiHelpers.js'
 import { formatTime } from './hourUtils.js'
+import './PhotoCard.css'
 
 export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused, aiData, onImageLoad }) {
   const [loaded, setLoaded]         = useState(false)

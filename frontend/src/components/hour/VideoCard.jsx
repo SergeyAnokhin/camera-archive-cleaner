@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import VideoModal from './VideoModal.jsx'
 import { formatTime } from './hourUtils.js'
 import { getVideoThumbnailUrl } from '../../api.js'
+import './VideoCard.css'
 
 function readPreviewMode() {
   return localStorage.getItem('video_preview_mode') || 'none'

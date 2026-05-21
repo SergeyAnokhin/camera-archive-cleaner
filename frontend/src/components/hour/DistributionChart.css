@@ -1,0 +1,187 @@
+/* DistributionChart — per-minute activity bars, hover tooltip, uniformity badges. */
+
+.hv-dist-root {
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px 6px;
+  user-select: none;
+}
+
+.hv-dist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.hv-dist-title {
+  font-size: calc(var(--font-base) * 0.78);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.hv-dist-title .mdi { margin-right: 4px; color: var(--accent); }
+
+.hv-dist-hint {
+  font-size: calc(var(--font-base) * 0.72);
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* The chart area — key: default align-items is stretch, so cols fill the height */
+.hv-dist-chart {
+  position: relative;
+  display: flex;
+  gap: 1px;
+  height: 80px;
+  cursor: pointer;
+}
+
+/* Background highlight for current page range */
+.hv-dist-highlight {
+  position: absolute;
+  top: 0;
+  bottom: 16px;           /* leave room for labels */
+  background: rgba(14, 165, 233, 0.13);
+  border: 1px solid rgba(14, 165, 233, 0.32);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 0;
+  transition: left 0.15s, width 0.15s;
+}
+
+.hv-dist-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* height = 100% via parent's align-items: stretch (default) */
+  position: relative;
+  z-index: 1;
+}
+
+.hv-dist-bar-wrap {
+  flex: 1;                 /* fills column above the label */
+  width: 100%;
+  display: flex;
+  align-items: flex-end;  /* bar grows from bottom */
+  min-height: 0;
+}
+
+.hv-dist-bar {
+  width: 100%;
+  border-radius: 1px 1px 0 0;
+  min-height: 2px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: opacity 0.12s;
+}
+.hv-dist-chart:hover .hv-dist-col:hover .hv-dist-bar { opacity: 0.85; }
+
+.hv-dist-bar-video {
+  background: rgba(14, 165, 233, 0.40);
+  flex-shrink: 0;
+}
+.hv-dist-bar-photo {
+  background: rgba(14, 165, 233, 0.72);
+  flex: 1;
+}
+
+.hv-dist-col.empty .hv-dist-bar-wrap { opacity: 0; }
+
+/* Hover tooltip */
+.hv-dist-tooltip {
+  position: absolute;
+  bottom: 22px;
+  transform: translateX(-50%);
+  background: #1a2436;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 5px 9px;
+  font-size: calc(var(--font-base) * 0.78);
+  color: var(--text-muted);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 20;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hv-dist-tooltip .mdi { margin-right: 3px; color: var(--text-dim); }
+.hv-dist-tooltip-time {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: calc(var(--font-base) * 0.82);
+  margin-bottom: 2px;
+}
+
+.hv-dist-label {
+  height: 14px;
+  line-height: 14px;
+  font-size: 9px;
+  color: var(--text-dim);
+  margin-top: 2px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* ── Hour stats in distribution header ── */
+.hv-dist-hourstat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.hv-dist-hourstat .mdi {
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.hv-dist-stat-sep {
+  color: var(--text-dim);
+  opacity: 0.5;
+  line-height: 1;
+}
+
+/* ── Uniformity badges (distribution chart header) ── */
+.hv-dist-uniformity-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.hv-dist-uniformity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: calc(var(--font-base) * 0.72);
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  cursor: default;
+  white-space: nowrap;
+}
+.hv-dist-uniformity-badge .mdi { font-size: calc(var(--font-base) * 0.80); }
+.hv-dist-uniformity-ok {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.10);
+  border: 1px solid rgba(74, 222, 128, 0.30);
+}
+.hv-dist-uniformity-warn {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.40);
+}
+.hv-dist-uniformity-alert {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.40);
+}

@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo } from 'react'
 import { formatBytes, computeUniformity } from './hourUtils.js'
+import './DistributionChart.css'
 
 // 60 bars (1 per minute), stacked photo/video by size. Click jumps to the matching page.
 export default function DistributionChart({ buckets, pageSize, page, total, onGoToPage, hourStats }) {

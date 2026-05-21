@@ -1,0 +1,117 @@
+/* AiModePanel — compact 2-row AI controls. Extends .hv-mode-settings (HourViewer.css).
+   Row 1: [label] [model-select flex:1] [run-btn]
+   Row 2: [threshold slider (openvino)] [stats / emojis] */
+
+.hv-ai-panel {
+  flex-wrap: wrap;
+  row-gap: 5px;
+  column-gap: 6px;
+}
+
+/* label stays on row 1, doesn't grow */
+.hv-ai-panel > .hv-mode-settings-label { flex-shrink: 0; }
+
+/* model select fills available width on row 1 */
+.hv-ai-model-select {
+  background: var(--bg-surface);
+  border: var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: calc(var(--font-base) * 0.82);
+  padding: 3px 6px;
+  cursor: pointer;
+  flex: 1 1 80px;
+  min-width: 0;
+}
+.hv-ai-model-select:focus { outline: none; border-color: var(--accent); }
+
+/* run button stays compact, does not grow */
+.hv-ai-run-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  background: rgba(14, 165, 233, 0.15);
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: calc(var(--font-base) * 0.85);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.hv-ai-run-btn:hover { background: rgba(14, 165, 233, 0.25); border-color: var(--accent); }
+
+/* Row 2 wrapper — full width, flex, threshold left + info right */
+.hv-ai-row2 {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Threshold inline (OpenVINO): icon · pct · slider */
+.hv-ai-confidence-inline {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 1 1 120px;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: calc(var(--font-base) * 0.8);
+}
+.hv-ai-confidence-inline .mdi { color: var(--accent); flex-shrink: 0; }
+.hv-ai-confidence-pct { flex-shrink: 0; white-space: nowrap; }
+.hv-ai-confidence-slider {
+  flex: 1;
+  min-width: 40px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Info group: analyzed + stats + emojis inline */
+.hv-ai-info-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.hv-ai-panel-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: calc(var(--font-base) * 0.8);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.hv-ai-stats {
+  font-size: calc(var(--font-base) * 0.78);
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.hv-ai-stats .mdi { color: var(--accent); }
+
+.hv-ai-page-emoji {
+  font-size: calc(var(--font-base) * 1.0);
+  cursor: default;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+}
+
+.hv-ai-scene {
+  width: 100%;
+  font-size: calc(var(--font-base) * 0.78);
+  color: var(--text-dim);
+  font-style: italic;
+  padding: 2px 0 1px;
+  cursor: default;
+}
+.hv-ai-scene .mdi { color: var(--accent); margin-right: 4px; }

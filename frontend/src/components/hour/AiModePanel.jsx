@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { getAiRequestStats } from './hourUtils.js'
 import { resolveAiIcons } from '../../aiHelpers.js'
+import './AiModePanel.css'
 
 export const AI_PROVIDER_CONFIG = {
   gemini: {

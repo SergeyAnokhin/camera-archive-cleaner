@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getMediaUrl } from '../../api.js'
 import { formatTime } from './hourUtils.js'
+import './VideoModal.css'
 
 export default function VideoModal({ file, onClose }) {
   const [videoError, setVideoError] = useState(false)

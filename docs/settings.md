@@ -8,7 +8,7 @@ To inspect or clear them manually: browser DevTools → Application → Local St
 
 ## UI settings (Tools modal → General tab)
 
-Defined in [`frontend/src/components/ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx).
+Keys and defaults are defined in [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js); each Tools tab is its own component under [`tools/`](../frontend/src/components/tools/).
 
 | localStorage key | Default | Range | Description |
 |---|---|---|---|
@@ -206,7 +206,9 @@ After import, all settings take effect immediately without a page reload (UI dis
 
 | If you want to change… | File |
 |---|---|
-| Default values, ranges, key names | [`frontend/src/components/ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) |
+| Default values, ranges, key names | [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js) |
+| A specific tab's UI / change handlers | [`tools/`](../frontend/src/components/tools/) — one component per tab (`GeneralTab.jsx`, `HourViewTab.jsx`, …) |
+| YAML export / import logic | [`tools/settingsIO.js`](../frontend/src/components/tools/settingsIO.js) |
 | Per-mode threshold defaults | [`frontend/src/components/HourViewer.jsx`](../frontend/src/components/HourViewer.jsx) — `buildInitialModeParams()` |
-| Navigation state persistence | [`frontend/src/App.jsx`](../frontend/src/App.jsx) — `NAV_STATE_KEY` |
+| Navigation state persistence | [`frontend/src/components/navUtils.js`](../frontend/src/components/navUtils.js) — `NAV_STATE_KEY`, `loadNavState`/`saveNavState` |
 | AI request stats tracking | [`frontend/src/components/HourViewer.jsx`](../frontend/src/components/HourViewer.jsx) — `recordAiRequest()`, `getAiRequestStats()` |

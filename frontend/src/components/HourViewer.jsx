@@ -1,3 +1,4 @@
+import './HourViewer.css'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { getFiles, getDistribution, getStatsTotal, previewDelete, confirmDelete, previewDeleteRange, getAiAnalysis } from '../api.js'
 import DeleteConfirmModal from './DeleteConfirmModal.jsx'
@@ -16,7 +17,6 @@ import {
   getPageSize, getHoverZoom, getThumbWidth, buildInitialModeParams,
   saveModeParams, formatBytes, recordAiRequest, VIEW_MODE_KEY,
 } from './hour/hourUtils.js'
-import './HourViewer.css'
 
 export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, onBack, onFilesDeleted }) {
   const [files, setFiles]               = useState([])

@@ -1,0 +1,52 @@
+/* VideoCard — video thumbnail card. Base .hv-card lives in HourViewer.css. */
+
+.hv-card-video {
+  background: #0c1322;
+  transition: transform 0.12s, box-shadow 0.12s;
+  overflow: hidden;
+  position: relative;
+}
+.hv-card-video:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+.hv-video-icon {
+  font-size: calc(var(--font-base) * 3);
+  color: var(--accent);
+  margin-bottom: 20px;
+}
+
+/* Thumbnail image that fills the card */
+.hv-video-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Timestamp overlay on thumbnail cards */
+.hv-video-time-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 6px 3px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.75));
+  text-align: center;
+}
+
+/* Small video badge icon (top-right corner) on thumbnail cards */
+.hv-video-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: calc(var(--font-base) * 0.9);
+  color: var(--accent);
+  background: rgba(0,0,0,0.55);
+  border-radius: 3px;
+  padding: 1px 3px;
+  line-height: 1;
+}

@@ -150,3 +150,8 @@ vite.config.ts.timestamp-*
 /backend/yolo**.pt
 /backend/routers/__pycache__/*
 /.claude/settings.local.json
+**/__pycache__/*
+/backend/ai_providers/__pycache__/claude.cpython-312.pyc
+/backend/ai_providers/__pycache__/common.cpython-312.pyc
+/backend/ai_providers/__pycache__/gemini.cpython-312.pyc
+/backend/ai_providers/__pycache__/openvino.cpython-312.pyc

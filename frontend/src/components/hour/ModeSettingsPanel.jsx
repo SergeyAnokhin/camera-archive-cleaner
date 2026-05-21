@@ -1,3 +1,5 @@
+import './ModeSettingsPanel.css'
+
 // Slider panel for non-AI view modes that expose tunable params (e.g. motion threshold).
 export default function ModeSettingsPanel({ mode, params, onChange }) {
   if (!mode.params?.length) return null

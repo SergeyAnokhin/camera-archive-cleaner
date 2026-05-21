@@ -1,4 +1,5 @@
 import { formatBytes } from './hourUtils.js'
+import './SelectionBar.css'
 
 // Horizontal toolbar shown below the distribution chart while in selection mode.
 export default function SelectionBar({ files, selectedCount, selectionStats, onSelectAll, onSelectNone, onDelete, onCancel, loading }) {
