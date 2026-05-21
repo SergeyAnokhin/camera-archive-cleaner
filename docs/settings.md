@@ -98,6 +98,37 @@ Initial value for motion modes is taken from `diff_threshold` (the global defaul
 
 ---
 
+## Distribution uniformity settings (Tools modal → Hour view tab)
+
+Warns when recordings in an hour are suspiciously evenly spread (wind/rain false triggers).
+Three metrics, each 0 = single concentrated event, 100 = recording every minute.
+
+| localStorage key | Default | Description |
+|---|---|---|
+| `uniformity_method` | `combined` | Which metric shows in day-view hour cells: `combined`, `active`, `entropy`, `bc` |
+| `uniformity_af_warn` | `40` | AF warn threshold (yellow badge) |
+| `uniformity_af_alert` | `65` | AF alert threshold (red badge) |
+| `uniformity_se_warn` | `55` | SE warn threshold |
+| `uniformity_se_alert` | `80` | SE alert threshold |
+| `uniformity_bc_warn` | `40` | BC warn threshold |
+| `uniformity_bc_alert` | `65` | BC alert threshold |
+| `uniformity_combined_warn` | `50` | Combined score warn threshold |
+| `uniformity_combined_alert` | `72` | Combined score alert threshold |
+
+**Three metrics computed by `computeUniformity()` in `hourUtils.js`:**
+
+| Key | Label | Formula | 0 = … | 100 = … |
+|---|---|---|---|---|
+| `active` | AF | `nActive / 60 × 100` | 1 recording in 1 minute | every minute has a recording |
+| `entropy` | SE | `H / log₂(60) × 100` | all in one minute (H=0) | perfectly uniform across hour |
+| `bc` | BC | `activeBlocks / 12 × 100` | 1 of 12 five-minute blocks active | all 12 blocks active |
+
+Combined score = `0.40×AF + 0.35×SE + 0.25×BC`.
+
+Badges appear: in `DistributionChart` header (all three, always, green/yellow/red); in `HeatmapCell` at hour level (only selected method, only when warn or alert).
+
+---
+
 ## Navigation state
 
 | localStorage key | Description |

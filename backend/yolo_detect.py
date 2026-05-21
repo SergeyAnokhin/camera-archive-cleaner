@@ -11,7 +11,7 @@ from fastapi import HTTPException
 logger = logging.getLogger("api")
 
 OV_THUMB_DIR = Path(__file__).parent / "openvino_thumbnails_cache"
-OV_THUMB_VERSION = "v1"
+OV_THUMB_VERSION = "v2"
 
 # Maps COCO English class names → Russian keywords (matching aiHelpers.js vocabulary)
 COCO_TO_RUSSIAN: dict[str, str] = {

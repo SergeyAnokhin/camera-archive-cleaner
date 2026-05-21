@@ -213,7 +213,7 @@ def get_openvino_thumbnail(
             results[0].boxes = results[0].boxes[keep]
 
         # Draw bounding boxes (results[0].plot() returns BGR numpy array)
-        annotated_bgr = results[0].plot(line_width=2, font_size=10)
+        annotated_bgr = results[0].plot(line_width=3, font_size=12)
         annotated_rgb = annotated_bgr[:, :, ::-1]   # BGR → RGB
         out_img = PILImage.fromarray(annotated_rgb)
         out_img.thumbnail((640, 640), PILImage.LANCZOS)

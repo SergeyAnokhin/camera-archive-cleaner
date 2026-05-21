@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { getPreviews, getThumbnailUrl, getAiObjectsSummary } from '../api.js'
+import { getPreviews, getThumbnailUrl, getAiObjectsSummary, getDistribution } from '../api.js'
 import { resolveAiIcons } from '../aiHelpers.js'
+import { computeUniformity, getUniformityMethod } from './hour/hourUtils.js'
 import './HeatmapCell.css'
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -47,9 +48,17 @@ function dateRangeForCell(period, level, contextDateFrom) {
 }
 
 export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selected, onToggle, isFocused, aiRefreshKey }) {
-  const [previewIds, setPreviewIds] = useState([])
-  const [aiObjects, setAiObjects]   = useState([])
+  const [previewIds, setPreviewIds]   = useState([])
+  const [aiObjects, setAiObjects]     = useState([])
+  const [uniformity, setUniformity]   = useState(null)
+  const [uMethod, setUMethod]         = useState(getUniformityMethod)
   const cellRef = useRef(null)
+
+  useEffect(() => {
+    function onMethodChange() { setUMethod(getUniformityMethod()) }
+    document.addEventListener('uniformity-method-change', onMethodChange)
+    return () => document.removeEventListener('uniformity-method-change', onMethodChange)
+  }, [])
 
   useEffect(() => {
     if (isFocused) cellRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
@@ -67,6 +76,17 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
       .catch(() => {})
     return () => { cancelled = true }
   }, [cell.period, level, cameraId, contextDateFrom, cell.bucket, aiRefreshKey])
+
+  useEffect(() => {
+    if (level !== 'hour' || cell.bucket === 0) { setUniformity(null); return }
+    const range = dateRangeForCell(cell.period, level, contextDateFrom)
+    if (!range) return
+    let cancelled = false
+    getDistribution(cameraId, range.dateFrom, range.dateTo)
+      .then(data => { if (!cancelled) setUniformity(computeUniformity(data.buckets ?? [])) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [cell.period, level, cameraId, contextDateFrom, cell.bucket])
 
   useEffect(() => {
     if (!showPreviews) { setPreviewIds([]); return }
@@ -103,6 +123,21 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
       {!isEmpty && (
         <span className="cell-sublabel">{formatSize(cell.total_size_gb)}</span>
       )}
+      {uniformity && (() => {
+        const score = uniformity.methods?.[uMethod] ?? uniformity.score
+        const level = uniformity.levelByMethod?.[uMethod] ?? uniformity.level
+        if (!level) return null
+        const icon = level === 'alert' ? 'mdi-alert-circle-outline' : 'mdi-alert-outline'
+        const hint = level === 'alert' ? 'Ложные срабатывания (дождь?)' : 'Подозрительно равномерно (ветер?)'
+        return (
+          <span
+            className={`cell-uniformity-badge cell-uniformity-${level}`}
+            title={`Равномерность [${uMethod}]: ${score}/100 — ${hint}`}
+          >
+            <i className={`mdi ${icon}`} />{score}
+          </span>
+        )
+      })()}
       {!isEmpty && cell.photo_count > 0 && (
         <span className="cell-corner cell-corner-tl">
           <i className="mdi mdi-image-outline" />{fmtCount(cell.photo_count)}

@@ -68,3 +68,82 @@ export function getAiRequestStats(provider) {
     last24h:    arr.filter(t => t > now - 86_400_000).length,
   }
 }
+
+// ── Distribution uniformity analysis ──────────────────────────────────────────
+export const UNIFORMITY_METHOD_KEY     = 'uniformity_method'
+export const UNIFORMITY_METHOD_DEFAULT = 'combined'
+
+// Per-metric defaults { warn, alert }
+const METRIC_DEFAULTS = {
+  af:       { warn: 40, alert: 65 },
+  se:       { warn: 55, alert: 80 },
+  bc:       { warn: 40, alert: 65 },
+  combined: { warn: 50, alert: 72 },
+}
+
+export function getMetricThresholds(metric) {
+  const def = METRIC_DEFAULTS[metric] ?? METRIC_DEFAULTS.combined
+  const w = Number(localStorage.getItem(`uniformity_${metric}_warn`))
+  const a = Number(localStorage.getItem(`uniformity_${metric}_alert`))
+  return { warn: w > 0 ? w : def.warn, alert: a > 0 ? a : def.alert }
+}
+
+export function getUniformityMethod() {
+  return localStorage.getItem(UNIFORMITY_METHOD_KEY) || UNIFORMITY_METHOD_DEFAULT
+}
+
+function levelFor(score, metric) {
+  const { warn, alert: alertThresh } = getMetricThresholds(metric)
+  return score >= alertThresh ? 'alert' : score >= warn ? 'warn' : null
+}
+
+/**
+ * Compute three uniformity metrics from per-minute distribution buckets.
+ * 0 = one concentrated event, 100 = recording every minute (noise/rain).
+ *
+ * AF — Active Fraction:   nActive / 60 × 100
+ * SE — Shannon Entropy:   H / log2(60) × 100  (normalized to full hour)
+ * BC — Block Coverage:    active 5-min blocks / 12 × 100
+ */
+export function computeUniformity(buckets) {
+  if (!buckets?.length) return null
+  const counts = buckets.map(b => b.total_count ?? 0)
+  const total = counts.reduce((s, c) => s + c, 0)
+  if (total === 0) return null
+
+  const nActive = counts.filter(c => c > 0).length
+
+  // AF: fraction of 60 minutes with any recording
+  const af = Math.round((nActive / 60) * 100)
+
+  // SE: Shannon entropy normalised to max possible over all 60 slots
+  let entropy = 0
+  for (const c of counts) {
+    if (c > 0) { const p = c / total; entropy -= p * Math.log2(p) }
+  }
+  const se = Math.round((entropy / Math.log2(60)) * 100)
+
+  // BC: how many of 12 five-minute blocks have ≥1 recording
+  let activeBlocks = 0
+  for (let b = 0; b < 12; b++) {
+    if (counts.slice(b * 5, b * 5 + 5).some(c => c > 0)) activeBlocks++
+  }
+  const bc = Math.round((activeBlocks / 12) * 100)
+
+  const combined = Math.round(0.40 * af + 0.35 * se + 0.25 * bc)
+
+  return {
+    activeFraction:    af,
+    normalizedEntropy: se,
+    blockCoverage:     bc,
+    score:    combined,
+    level:    levelFor(combined, 'combined'),
+    methods:  { combined, active: af, entropy: se, bc },
+    levelByMethod: {
+      combined: levelFor(combined, 'combined'),
+      active:   levelFor(af, 'af'),
+      entropy:  levelFor(se, 'se'),
+      bc:       levelFor(bc, 'bc'),
+    },
+  }
+}

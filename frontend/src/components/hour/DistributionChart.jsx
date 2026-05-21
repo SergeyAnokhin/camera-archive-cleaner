@@ -1,11 +1,12 @@
 import { useState, useRef, useMemo } from 'react'
-import { formatBytes } from './hourUtils.js'
+import { formatBytes, computeUniformity } from './hourUtils.js'
 
 // 60 bars (1 per minute), stacked photo/video by size. Click jumps to the matching page.
 export default function DistributionChart({ buckets, pageSize, page, total, onGoToPage, hourStats }) {
   const chartRef   = useRef(null)
   const [hoveredIdx, setHoveredIdx] = useState(null)
   const maxSize    = useMemo(() => Math.max(...buckets.map(b => b.total_size_bytes ?? 0), 1), [buckets])
+  const uniformity = useMemo(() => computeUniformity(buckets), [buckets])
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   const cumulative = useMemo(() => {
@@ -63,6 +64,29 @@ export default function DistributionChart({ buckets, pageSize, page, total, onGo
             <span className="hv-dist-stat-sep">·</span>
             <span>{formatBytes(hourStats.total_size_bytes)}</span>
           </span>
+        )}
+        {uniformity && (
+          <div className="hv-dist-uniformity-group">
+            {[
+              { key: 'active',  label: 'AF', score: uniformity.activeFraction,    tip: 'Active Fraction: доля из 60 мин с записями' },
+              { key: 'entropy', label: 'SE', score: uniformity.normalizedEntropy, tip: 'Shannon Entropy: равномерность нагрузки' },
+              { key: 'bc',      label: 'BC', score: uniformity.blockCoverage,     tip: 'Block Coverage: сколько из 12 блоков по 5 мин активны' },
+            ].map(({ key, label, score, tip }) => {
+              const lvl = uniformity.levelByMethod[key]
+              const icon = lvl === 'alert' ? 'mdi-alert-circle-outline'
+                         : lvl === 'warn'  ? 'mdi-alert-outline'
+                         :                   'mdi-check-circle-outline'
+              return (
+                <span
+                  key={key}
+                  className={`hv-dist-uniformity-badge hv-dist-uniformity-${lvl ?? 'ok'}`}
+                  title={`${label}: ${score}/100 — ${tip}\n${lvl === 'alert' ? 'Ложные срабатывания (дождь?)' : lvl === 'warn' ? 'Подозрительно равномерно (ветер?)' : 'Норма'}`}
+                >
+                  <i className={`mdi ${icon}`} />{label} {score}
+                </span>
+              )
+            })}
+          </div>
         )}
         <span className="hv-dist-hint">click to jump</span>
       </div>

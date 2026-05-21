@@ -816,6 +816,42 @@
 }
 .hv-ai-scene .mdi { color: var(--accent); margin-right: 4px; }
 
+/* ── Uniformity badges (distribution chart header) ── */
+.hv-dist-uniformity-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.hv-dist-uniformity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: calc(var(--font-base) * 0.72);
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  cursor: default;
+  white-space: nowrap;
+}
+.hv-dist-uniformity-badge .mdi { font-size: calc(var(--font-base) * 0.80); }
+.hv-dist-uniformity-ok {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.10);
+  border: 1px solid rgba(74, 222, 128, 0.30);
+}
+.hv-dist-uniformity-warn {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid rgba(251, 191, 36, 0.40);
+}
+.hv-dist-uniformity-alert {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.40);
+}
+
 /* ── AI icons on photo cards ── */
 .hv-card-ai-icons {
   position: absolute;
@@ -830,12 +866,14 @@
 }
 
 .hv-card-ai-emoji {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1;
-  background: rgba(0, 0, 0, 0.55);
-  border-radius: 3px;
-  padding: 1px 2px;
+  background: rgba(0, 0, 0, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  padding: 1px 3px;
   cursor: default;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9));
 }
 
 .hv-card-ai-more {

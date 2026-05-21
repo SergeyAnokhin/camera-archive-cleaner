@@ -327,6 +327,87 @@
   border: 1px solid rgba(252, 165, 165, 0.25);
 }
 
+/* ── Uniformity thresholds compact grid ── */
+.u-grid {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr;
+  gap: 4px 8px;
+  margin-bottom: 8px;
+}
+
+.u-grid-head {
+  display: contents;
+}
+.u-grid-head > span {
+  font-size: calc(var(--font-base) * 0.72);
+  color: var(--text-dim);
+  padding-bottom: 2px;
+  white-space: nowrap;
+}
+.u-grid-head > span .mdi { font-size: calc(var(--font-base) * 0.78); margin-right: 2px; }
+
+.u-grid-row {
+  display: contents;
+  cursor: default;
+}
+
+.u-metric-label {
+  font-size: calc(var(--font-base) * 0.82);
+  font-weight: 700;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.u-slider-cell {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.u-slider {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.u-val {
+  font-size: calc(var(--font-base) * 0.78);
+  color: var(--text-muted);
+  width: 24px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.u-method-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.u-method-label {
+  font-size: calc(var(--font-base) * 0.8);
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.u-method-select {
+  flex: 1;
+  background: var(--bg-input, #0f172a);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: calc(var(--font-base) * 0.82);
+  padding: 3px 6px;
+  cursor: pointer;
+}
+.u-method-select:focus { outline: none; border-color: var(--accent); }
+
 /* ── Detection tab — emoji reference grid ── */
 .detection-emoji-grid {
   display: grid;

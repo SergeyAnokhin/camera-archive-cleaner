@@ -156,8 +156,12 @@
 }
 
 .cell-ai-emoji {
-  font-size: calc(var(--font-base) * 1.05);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+  font-size: calc(var(--font-base) * 1.15);
+  background: rgba(0, 0, 0, 0.60);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  padding: 1px 3px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9));
   cursor: default;
 }
 
@@ -165,4 +169,32 @@
   font-size: calc(var(--font-base) * 0.68);
   color: rgba(255, 255, 255, 0.55);
   align-self: center;
+}
+
+/* ── Uniformity badge (hour-level cells only) ── */
+.cell-uniformity-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: calc(var(--font-base) * 0.68);
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 8px;
+  cursor: default;
+  white-space: nowrap;
+}
+.cell-uniformity-badge .mdi { font-size: calc(var(--font-base) * 0.75); }
+.cell-uniformity-warn {
+  color: #fbbf24;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+}
+.cell-uniformity-alert {
+  color: #f87171;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(239, 68, 68, 0.55);
+}
+.heatmap-cell.light .cell-uniformity-warn,
+.heatmap-cell.light .cell-uniformity-alert {
+  background: rgba(255, 255, 255, 0.40);
 }

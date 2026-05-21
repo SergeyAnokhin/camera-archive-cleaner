@@ -106,6 +106,17 @@ const OV_CONFIDENCE_DEFAULT = 25
 const EXCLUDED_OBJECTS_KEY = 'detection_excluded_objects'
 const EMOJI_OVERRIDES_KEY  = 'detection_emoji_overrides'
 
+const UNIFORMITY_METHOD_KEY     = 'uniformity_method'
+const UNIFORMITY_METHOD_DEFAULT = 'combined'
+
+const U_METRICS = [
+  { key: 'af',       label: 'AF', desc: 'Active Fraction — доля активных минут' },
+  { key: 'se',       label: 'SE', desc: 'Shannon Entropy — равномерность нагрузки' },
+  { key: 'bc',       label: 'BC', desc: 'Block Coverage — активные блоки 5 мин' },
+  { key: 'combined', label: '∑',  desc: 'Комбинированный (40AF+35SE+25BC)' },
+]
+const U_DEFAULTS = { af: [40, 65], se: [55, 80], bc: [40, 65], combined: [50, 72] }
+
 function loadOvConfidence() {
   try {
     const raw = localStorage.getItem(OV_CONFIDENCE_KEY)
@@ -241,6 +252,20 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
   const [ovConfidence, setOvConfidence]   = useState(loadOvConfidence)
   const [excludedText, setExcludedText]   = useState(loadExcludedText)
   const [emojiText, setEmojiText]         = useState(loadEmojiOverridesText)
+  const [uniformityThresholds, setUniformityThresholds] = useState(() => {
+    const t = {}
+    for (const { key } of U_METRICS) {
+      const [dw, da] = U_DEFAULTS[key]
+      t[key] = {
+        warn:  Number(localStorage.getItem(`uniformity_${key}_warn`))  || dw,
+        alert: Number(localStorage.getItem(`uniformity_${key}_alert`)) || da,
+      }
+    }
+    return t
+  })
+  const [uniformityMethod, setUniformityMethod] = useState(
+    () => localStorage.getItem(UNIFORMITY_METHOD_KEY) || UNIFORMITY_METHOD_DEFAULT
+  )
 
   const importRef = useRef(null)
   const [importResult, setImportResult] = useState(null)
@@ -442,6 +467,18 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
     localStorage.removeItem(EMOJI_OVERRIDES_KEY)
   }
 
+  function handleUniformityThreshold(metric, type, v) {
+    setUniformityThresholds(prev => ({ ...prev, [metric]: { ...prev[metric], [type]: v } }))
+    localStorage.setItem(`uniformity_${metric}_${type}`, v)
+  }
+
+  function handleUniformityMethodChange(e) {
+    const v = e.target.value
+    setUniformityMethod(v)
+    localStorage.setItem(UNIFORMITY_METHOD_KEY, v)
+    document.dispatchEvent(new CustomEvent('uniformity-method-change'))
+  }
+
   const [activeTab, setActiveTab] = useState('general')
 
   useEffect(() => {
@@ -621,6 +658,45 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
               <div className="modal-setting-hint">
                 Режим отображения превью для видеофайлов на карточках. GIF генерируется дольше и кешируется.
               </div>
+            </div>
+
+            {/* Uniformity analysis */}
+            <div className="modal-section">
+              <div className="modal-section-title">Равномерность записи</div>
+              <div className="u-grid">
+                <div className="u-grid-head">
+                  <span />
+                  <span><i className="mdi mdi-alert-outline" style={{color:'#fbbf24'}} /> жёлтый</span>
+                  <span><i className="mdi mdi-alert-circle-outline" style={{color:'#f87171'}} /> красный</span>
+                </div>
+                {U_METRICS.map(({ key, label, desc }) => (
+                  <div key={key} className="u-grid-row" title={desc}>
+                    <span className="u-metric-label">{label}</span>
+                    <div className="u-slider-cell">
+                      <input type="range" min={5} max={95} step={5} className="u-slider"
+                        value={uniformityThresholds[key].warn}
+                        onChange={e => handleUniformityThreshold(key, 'warn', Number(e.target.value))} />
+                      <span className="u-val">{uniformityThresholds[key].warn}</span>
+                    </div>
+                    <div className="u-slider-cell">
+                      <input type="range" min={5} max={95} step={5} className="u-slider"
+                        value={uniformityThresholds[key].alert}
+                        onChange={e => handleUniformityThreshold(key, 'alert', Number(e.target.value))} />
+                      <span className="u-val">{uniformityThresholds[key].alert}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="u-method-row">
+                <span className="u-method-label">Метод для ячеек дня:</span>
+                <select className="u-method-select" value={uniformityMethod} onChange={handleUniformityMethodChange}>
+                  <option value="combined">∑ Комбинированный</option>
+                  <option value="active">AF — активных минут</option>
+                  <option value="entropy">SE — энтропия</option>
+                  <option value="bc">BC — блоки 5 мин</option>
+                </select>
+              </div>
+              <div className="modal-setting-hint">0 = одно событие · 100 = запись весь час. Жёлтый — возможен ветер, красный — дождь/постоянные ложные срабатывания. На экране превьюшек видны все три метода.</div>
             </div>
           </>}
 
