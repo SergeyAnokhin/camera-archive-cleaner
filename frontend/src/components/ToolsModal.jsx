@@ -127,7 +127,7 @@ function loadOvConfidence() {
 function loadExcludedText() {
   try {
     const raw = localStorage.getItem(EXCLUDED_OBJECTS_KEY)
-    return raw ? JSON.parse(raw).join(', ') : ''
+    return raw ? JSON.parse(raw).join('\n') : ''
   } catch { return '' }
 }
 
@@ -452,7 +452,7 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
 
   function handleExcludedChange(e) {
     setExcludedText(e.target.value)
-    const arr = e.target.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    const arr = e.target.value.split(/[\n,]/).map(s => s.trim().toLowerCase()).filter(Boolean)
     localStorage.setItem(EXCLUDED_OBJECTS_KEY, JSON.stringify(arr))
   }
 
@@ -717,14 +717,14 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
             {/* Excluded objects */}
             <div className="modal-section">
               <div className="modal-section-title">Исключённые объекты</div>
-              <input
-                type="text"
-                className="modal-text-input"
-                placeholder="человек, машина, птица"
+              <textarea
+                className="modal-textarea"
+                rows={5}
+                placeholder={'человек\nмашина\nптица'}
                 value={excludedText}
                 onChange={handleExcludedChange}
               />
-              <div className="modal-setting-hint">Объекты через запятую. Совпадения игнорируются при отображении и сводке страницы. Регистр не важен.</div>
+              <div className="modal-setting-hint">По одному объекту на строку (или через запятую). Совпадения игнорируются при отображении и сводке страницы. Регистр не важен.</div>
             </div>
 
             {/* Emoji overrides */}

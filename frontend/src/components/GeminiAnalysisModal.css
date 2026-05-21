@@ -250,6 +250,19 @@
   color: var(--accent);
 }
 
+.gai-obj-exclude {
+  margin-left: 5px;
+  cursor: pointer;
+  opacity: 0.45;
+  font-size: 0.95em;
+  line-height: 1;
+  transition: opacity 0.15s, color 0.15s;
+}
+.gai-obj-exclude:hover {
+  opacity: 1;
+  color: #f87171;
+}
+
 .gai-saved-badge {
   color: #86efac;
   font-weight: 600;

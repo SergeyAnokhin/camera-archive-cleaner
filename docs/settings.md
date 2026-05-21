@@ -81,7 +81,7 @@ Initial value for motion modes is taken from `diff_threshold` (the global defaul
 | localStorage key | Default | Description |
 |---|---|---|
 | `mode_params_openvino` | `{"confidence":25}` | Default OpenVINO confidence % (10–80). Also used by AiModePanel slider. Written by both the Detection tab and the AiModePanel slider |
-| `detection_excluded_objects` | `[]` (JSON array) | Labels to hide from emoji display and hover text. Backend also skips drawing boxes for these classes. E.g. `["стул","bench"]` |
+| `detection_excluded_objects` | `[]` (JSON array) | Labels to hide from emoji display and hover text. Backend also skips drawing boxes for these classes. E.g. `["стул","bench"]`. UI: multi-line textarea (one per line or comma-separated); also addable via **×** on each tag in `OpenVinoAnalysisModal` |
 | `detection_emoji_overrides` | `{}` (JSON object) | Custom emoji per label. Merged over `OBJECT_EMOJI_DEFAULTS` at display time. E.g. `{"машина":"🏎️"}` |
 
 ## OpenVINO (local AI) settings

@@ -103,7 +103,7 @@ Opens `OpenVinoAnalysisModal` → `POST /openvino_analyze_batch` → saves to DB
 **Modal files:**
 - [`frontend/src/components/GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) — editable prompt, token stats, cost estimate
 - [`frontend/src/components/ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) — same format
-- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider (reads `openvino_confidence` from localStorage), per-photo object list, ms/photo timing
+- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider (reads `openvino_confidence` from localStorage), per-photo object list, ms/photo timing. Each object tag has an **×** button: click → confirm dialog → adds that label to `detection_excluded_objects` in localStorage (tag dims to show it was added)
 - Shared CSS: [`frontend/src/components/GeminiAnalysisModal.css`](../frontend/src/components/GeminiAnalysisModal.css)
 
 ---
@@ -505,7 +505,7 @@ Displayed in `AiModePanel` after each completed analysis.
 | Tab | Setting | localStorage key |
 |-----|---------|-----------------|
 | **Detection** | Default OpenVINO confidence | `mode_params_openvino` → `{confidence: N}` (integer %) |
-| **Detection** | Excluded objects (comma-separated) | `detection_excluded_objects` (JSON array) |
+| **Detection** | Excluded objects (one per line or comma-separated) | `detection_excluded_objects` (JSON array) |
 | **Detection** | Emoji overrides (`label = emoji` per line) | `detection_emoji_overrides` (JSON object) |
 | Google AI | API key | `gemini_api_key` |
 | Google AI | Model | `gemini_model` |
