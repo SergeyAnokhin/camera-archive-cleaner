@@ -7,20 +7,32 @@ Dark-mode dashboard to navigate, inspect, and safely delete camera files stored 
 
 ## How to run
 
-**Backend** (terminal 1):
+**First time setup:**
 ```powershell
-cd backend
-pip install -r requirements.txt
-# Edit cameras.yaml — set camera IDs, names, and paths (local or UNC \\server\share\...)
-uvicorn main:app --reload --port 8000
+npm install          # root — installs concurrently (once)
+cd backend && pip install -r requirements.txt
+cd frontend && npm install
+# Edit backend/cameras.yaml — set camera IDs, names, and paths
 ```
 
-**Frontend** (terminal 2):
+**Start both frontend + backend (one command):**
 ```powershell
-cd frontend
-npm install
-npm run dev
-# Open http://localhost:5173
+npm start
+```
+Frontend: http://localhost:5173 · Backend/Swagger: http://localhost:8000/docs  
+Press **Ctrl+C** to stop both.
+
+---
+
+**Or separately (two terminals):**
+
+Backend:
+```powershell
+cd backend && uvicorn main:app --reload --port 8000
+```
+Frontend:
+```powershell
+cd frontend && npm run dev
 ```
 
 Swagger UI at **`http://localhost:8000/docs`**
