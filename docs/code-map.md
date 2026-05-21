@@ -93,7 +93,7 @@ diff_zoom_thumbnails.py ─────────┘
 |---|---|
 | [`hourUtils.js`](../frontend/src/components/hour/hourUtils.js) | localStorage keys/defaults, formatters (`formatTime`, `formatBytes`), mode-param load/save, AI request rate tracking |
 | [`PhotoCard.jsx`](../frontend/src/components/hour/PhotoCard.jsx) | Single photo card: thumbnail, fullscreen lightbox, AI icons + description overlay |
-| [`VideoCard.jsx`](../frontend/src/components/hour/VideoCard.jsx) | Single video card; shows static/GIF preview thumbnail when `video_preview_mode ≠ none`; opens VideoModal on click |
+| [`VideoCard.jsx`](../frontend/src/components/hour/VideoCard.jsx) | Single video card. Default (`video_preview_mode = none`): camera icon + timestamp, no image. With a preview mode set: fetches `/video_thumbnail` and shows a JPEG or animated GIF. Opens VideoModal on click |
 | [`VideoModal.jsx`](../frontend/src/components/hour/VideoModal.jsx) | Fullscreen video player: Space = play/pause, ←/→ = skip ±1/5 duration, Escape = close, download, open externally, VLC fallback |
 | [`DistributionChart.jsx`](../frontend/src/components/hour/DistributionChart.jsx) | 60-bar per-minute distribution chart; click a bar to jump to its page |
 | [`SelectionBar.jsx`](../frontend/src/components/hour/SelectionBar.jsx) | Selection-mode toolbar: select all/none, selection stats, delete |
@@ -123,11 +123,17 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 
 ### Styles
 
-| File | Role |
-|---|---|
-| [`styles/variables.css`](../frontend/src/styles/variables.css) | CSS custom properties: dark palette (Home Assistant), heatmap intensity scale |
-| [`styles/global.css`](../frontend/src/styles/global.css) | Global styles, reset |
-| `*.css` (beside components) | Per-component styles |
+| File | What it styles | Key class prefixes |
+|---|---|---|
+| [`styles/variables.css`](../frontend/src/styles/variables.css) | CSS custom properties | `--font-base`, `--accent`, `--bg-*`, `--heatmap-*` |
+| [`styles/global.css`](../frontend/src/styles/global.css) | Global reset, body, scrollbar | — |
+| [`components/HourViewer.css`](../frontend/src/components/HourViewer.css) | **All** hour-viewer and `hour/` subcomponent styles — this is a monolith, not split per file | `.hv-card`, `.hv-card-photo`, `.hv-card-video`, `.hv-video-*`, `.hv-ai-*`, `.hv-mode-settings`, `.hv-sbar-*`, `.hv-dist-*`, `.hv-lightbox` |
+| [`components/ToolsModal.css`](../frontend/src/components/ToolsModal.css) | Tools modal (all tabs) | `.modal-*` |
+| [`components/HeatmapCell.css`](../frontend/src/components/HeatmapCell.css) | Heatmap cell | `.cell-*` |
+| [`components/DeleteConfirmModal.css`](../frontend/src/components/DeleteConfirmModal.css) | Delete confirmation modal | `.dcm-*` |
+| Other `*.css` beside components | Styles scoped to that one component | — |
+
+> **Search tip:** when looking for a `.hv-*` class, go straight to `HourViewer.css`. All card, video, AI panel, selection bar, and distribution chart styles are there regardless of which `hour/*.jsx` file uses them.
 
 ### Frontend config files
 

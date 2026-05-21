@@ -86,12 +86,15 @@ Initial value for motion modes is taken from `diff_threshold` (the global defaul
 
 ## OpenVINO (local AI) settings
 
-Model is set inline via the AiModePanel dropdown; confidence is in the Detection tab (above) and also in the OpenVINO Run modal.
+> **Two places, one concept — don't confuse them:**
+> - **Default threshold** → Tools modal → Detection tab → writes `mode_params_openvino` (JSON, integer %). This is only the starting value loaded when the hour viewer opens.
+> - **Live threshold** → `AiModePanel` slider in HourViewer → reads and writes the same `mode_params_openvino.confidence` key in real time. The slider in the UI *is* the authoritative value while browsing; the Detection tab just sets its initial default.
+> - **`openvino_confidence`** (float 0–1) is a *separate* key used only by `OpenVinoAnalysisModal` (the standalone "Run" modal). It is **not** the same as `mode_params_openvino.confidence`.
 
 | localStorage key | Default | Description |
 |---|---|---|
-| `openvino_model` | `yolov8n` | Selected YOLO model. Options: `yolov8n`, `yolov8s`, `yolov8m`. Written when the model dropdown changes in HourViewer's AiModePanel or in the heatmap CellSelBar |
-| `openvino_confidence` | `0.25` | Confidence threshold (float 0–1) used **only** by `OpenVinoAnalysisModal` (the "Run" button flow). The AiModePanel slider and the Detection tab both use `mode_params_openvino.confidence` (integer %) |
+| `openvino_model` | `yolov8n` | Selected YOLO model. Options: `yolov8n`, `yolov8s`, `yolov8m`. Written by the AiModePanel dropdown and the heatmap CellSelBar |
+| `openvino_confidence` | `0.25` | Float 0–1. Used **only** by `OpenVinoAnalysisModal` (the standalone "Run" button). Do not confuse with `mode_params_openvino.confidence` (integer %) used by AiModePanel |
 
 ---
 
