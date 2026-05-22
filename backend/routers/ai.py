@@ -10,6 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+import compute_client
 from ai_providers import claude, gemini, openvino
 from database import get_ai_analysis_by_file_ids, get_connection
 
@@ -54,7 +55,12 @@ class OpenVinoAnalyzeRequest(BaseModel):
 
 @router.post("/openvino_analyze_batch", summary="Local object detection via YOLO / OpenVINO (no API key)")
 def openvino_analyze_batch(req: OpenVinoAnalyzeRequest):
-    return openvino.analyze_batch(req.file_ids, req.model_name, req.confidence)
+    try:
+        return openvino.analyze_batch(req.file_ids, req.model_name, req.confidence)
+    except compute_client.ComputeDisabled:
+        raise HTTPException(status_code=503, detail="Compute-service is disabled")
+    except compute_client.ComputeUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 class OpenVinoRangeRequest(BaseModel):
@@ -67,7 +73,12 @@ class OpenVinoRangeRequest(BaseModel):
 
 @router.post("/openvino_analyze_range", summary="Local object detection for all photos in a date range")
 def openvino_analyze_range(req: OpenVinoRangeRequest):
-    return openvino.analyze_range(req.camera_id, req.date_from, req.date_to, req.model_name, req.confidence)
+    try:
+        return openvino.analyze_range(req.camera_id, req.date_from, req.date_to, req.model_name, req.confidence)
+    except compute_client.ComputeDisabled:
+        raise HTTPException(status_code=503, detail="Compute-service is disabled")
+    except compute_client.ComputeUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 
 @router.get("/ai_analysis", summary="Fetch saved AI analysis for given file IDs")

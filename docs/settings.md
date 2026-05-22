@@ -98,6 +98,20 @@ Initial value for motion modes is taken from `diff_threshold` (the global defaul
 
 ---
 
+## Compute service settings (Tools modal → Compute tab)
+
+These keys **cache** the server-side compute-service config (source of truth:
+`backend/compute_config.json`). The frontend reads them synchronously to hide
+heavy view modes; they are refreshed from the backend on each page load and
+whenever the Compute tab saves. See [`compute-service.md`](compute-service.md).
+
+| localStorage key | Default | Description |
+|---|---|---|
+| `compute_mode` | `local` | `off` / `local` / `remote`. When `off`, OpenVINO view modes are hidden in the HourViewer |
+| `compute_remote_url` | `''` | Base URL of the remote compute-service (used when mode is `remote`) |
+
+---
+
 ## Distribution uniformity settings (Tools modal → Hour view tab)
 
 Warns when recordings in an hour are suspiciously evenly spread (wind/rain false triggers).

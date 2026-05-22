@@ -8,7 +8,16 @@ HTTP endpoints are split by responsibility:
   delete         — /delete/*
   maintenance    — /database, /*_thumbnails, /storage_info
   ai             — /gemini_*, /claude_*, /openvino_analyze_*, /ai_*
+  compute        — /compute/config, /compute/status
 """
+import sys
+from pathlib import Path
+
+# Make the repo root importable so the `shared` block resolves regardless of cwd.
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
 # Importing logging_setup configures the root logger as a side effect — keep it first.
 from logging_setup import AccessFilter
 
@@ -20,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from database import init_db
-from routers import ai, catalog, delete, maintenance, stats, thumbnails_api
+from routers import ai, catalog, compute, delete, maintenance, stats, thumbnails_api
 
 logger = logging.getLogger("api")
 
@@ -58,3 +67,4 @@ app.include_router(thumbnails_api.router)
 app.include_router(delete.router)
 app.include_router(maintenance.router)
 app.include_router(ai.router)
+app.include_router(compute.router)

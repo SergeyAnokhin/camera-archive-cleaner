@@ -3,23 +3,23 @@
 Endpoints: /thumbnail, /diff_thumbnail, /diff_zoom_thumbnail, /erosion_thumbnail,
 /motion_thumbnail, /openvino_thumbnail, /video_thumbnail, /media.
 """
-import logging
+import base64
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 
+import compute_client
+from compute_cache import OV_THUMB_DIR, VID_THUMB_DIR, ov_cache_path, video_cache_path
 from database import get_connection, get_file_by_id, save_ai_analysis
+from shared.contract import VIDEO_THUMB_MODES
 from thumbnails import get_or_create_thumbnail
 from diff_thumbnails import get_or_create_diff_thumbnail
 from erosion_thumbnails import get_or_create_erosion_thumbnail
 from motion_thumbnails import get_or_create_motion_thumbnail, VALID_MODES as MOTION_VALID_MODES
 from diff_zoom_thumbnails import get_or_create_diff_zoom_thumbnail
-from yolo_detect import COCO_TO_RUSSIAN, OV_THUMB_DIR, load_yolo, ov_cache_path, excluded_to_en
-from video_thumbnails import get_or_create_video_thumbnail, VALID_MODES as VIDEO_THUMB_MODES
 
 router = APIRouter()
-logger = logging.getLogger("api")
 
 _THUMB_CACHE_HEADERS = {"Cache-Control": "public, max-age=604800"}
 
@@ -169,12 +169,9 @@ def get_openvino_thumbnail(
     confidence: float = Query(default=0.25, ge=0.05, le=0.95),
     excluded: str = Query(default=""),  # comma-separated Russian/English labels
 ):
-    from PIL import Image as PILImage
-
     excluded_labels = frozenset(e.strip().lower() for e in excluded.split(',') if e.strip())
-    excluded_en     = frozenset(excluded_to_en(set(excluded_labels)))
 
-    cache_path = ov_cache_path(file_id, model, confidence, excluded_en)
+    cache_path = ov_cache_path(file_id, model, confidence, excluded_labels)
     if cache_path.exists():
         return FileResponse(str(cache_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
@@ -185,46 +182,23 @@ def get_openvino_thumbnail(
     if file_row["file_type"] != "photo":
         raise HTTPException(status_code=400, detail="Only available for photos")
 
-    src = Path(file_row["file_path"])
-    if not src.exists():
-        raise HTTPException(status_code=404, detail="Source file not found on disk")
-
-    yolo = load_yolo(model)
     try:
-        img = PILImage.open(src).convert("RGB")
-        results = yolo(img, conf=confidence, verbose=False)
+        result = compute_client.detect(
+            file_row["file_path"], model, confidence, excluded_labels, draw=True)
+    except compute_client.ComputeDisabled:
+        raise HTTPException(status_code=503, detail="Compute-service is disabled")
+    except compute_client.ComputeUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
-        # Extract ALL detected Russian object names for ai_analysis (save before filtering)
-        seen: set[str] = set()
-        objects_ru: list[str] = []
-        for cls_id in results[0].boxes.cls.tolist():
-            en = yolo.names[int(cls_id)]
-            ru = COCO_TO_RUSSIAN.get(en, en)
-            if ru not in seen:
-                seen.add(ru)
-                objects_ru.append(ru)
+    if not result.annotated_jpeg_b64:
+        raise HTTPException(status_code=500, detail="Compute-service returned no image")
 
-        # Filter out excluded classes from bounding boxes before drawing
-        if excluded_en and len(results[0].boxes):
-            keep = [
-                yolo.names[int(cls_id)].lower() not in excluded_en
-                for cls_id in results[0].boxes.cls.tolist()
-            ]
-            results[0].boxes = results[0].boxes[keep]
+    OV_THUMB_DIR.mkdir(exist_ok=True)
+    cache_path.write_bytes(base64.b64decode(result.annotated_jpeg_b64))
 
-        # Draw bounding boxes (results[0].plot() returns BGR numpy array)
-        annotated_bgr = results[0].plot(line_width=3, font_size=12)
-        annotated_rgb = annotated_bgr[:, :, ::-1]   # BGR → RGB
-        out_img = PILImage.fromarray(annotated_rgb)
-        out_img.thumbnail((640, 640), PILImage.LANCZOS)
-        OV_THUMB_DIR.mkdir(exist_ok=True)
-        out_img.save(str(cache_path), format="JPEG", quality=88)
-
-        # Save ALL detected objects to ai_analysis (including excluded — icons/display filters them)
-        with get_connection() as conn:
-            save_ai_analysis(conn, file_id, "openvino", model, "", "", " ".join(objects_ru))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Detection error: {e}")
+    # Save ALL detected objects to ai_analysis (including excluded — icons/display filters them)
+    with get_connection() as conn:
+        save_ai_analysis(conn, file_id, "openvino", model, "", "", " ".join(result.objects))
 
     return FileResponse(str(cache_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
@@ -242,15 +216,22 @@ def get_video_thumbnail(
             raise HTTPException(status_code=404, detail="File not found")
         if file_row["file_type"] != "video":
             raise HTTPException(status_code=400, detail="video_thumbnail only available for video files")
-    try:
-        thumb_path = get_or_create_video_thumbnail(file_id, file_row["file_path"], mode)
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        logger.error("[video_thumbnail] file_id=%d mode=%s error=%s", file_id, mode, e)
-        raise HTTPException(status_code=500, detail=f"Thumbnail error: {e}")
+
+    cache_path = video_cache_path(file_id, mode)
     media_type = "image/gif" if mode == "max_change_gif" else "image/jpeg"
-    return FileResponse(str(thumb_path), media_type=media_type, headers=_THUMB_CACHE_HEADERS)
+    if cache_path.exists():
+        return FileResponse(str(cache_path), media_type=media_type, headers=_THUMB_CACHE_HEADERS)
+
+    try:
+        data, media_type = compute_client.video_thumbnail(file_row["file_path"], mode)
+    except compute_client.ComputeDisabled:
+        raise HTTPException(status_code=503, detail="Compute-service is disabled")
+    except compute_client.ComputeUnavailable as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    VID_THUMB_DIR.mkdir(exist_ok=True)
+    cache_path.write_bytes(data)
+    return FileResponse(str(cache_path), media_type=media_type, headers=_THUMB_CACHE_HEADERS)
 
 
 @router.get("/media/{file_id}", summary="Serve the original file")

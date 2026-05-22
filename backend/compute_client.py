@@ -1,0 +1,69 @@
+"""HTTP client for the optional compute-service (object detection + video).
+
+The main backend keeps DB + cache; this client delegates only the heavy
+computation. Routing (off / local / remote) lives in compute_config.py.
+"""
+import logging
+
+import httpx
+
+from compute_config import effective_url
+from shared.contract import DetectRequest, DetectResponse, VideoThumbnailRequest
+
+logger = logging.getLogger("api")
+
+_DETECT_TIMEOUT = 120.0
+_VIDEO_TIMEOUT = 120.0
+_HEALTH_TIMEOUT = 5.0
+
+
+class ComputeDisabled(Exception):
+    """Compute-service routing is set to 'off' (or remote URL is missing)."""
+
+
+class ComputeUnavailable(Exception):
+    """Compute-service is configured but could not be reached / returned an error."""
+
+
+def _base_url() -> str:
+    url = effective_url()
+    if url is None:
+        raise ComputeDisabled("Compute-service is disabled")
+    return url
+
+
+def detect(path: str, model: str, confidence: float,
+           excluded, draw: bool = True) -> DetectResponse:
+    url = _base_url()
+    req = DetectRequest(path=path, model=model, confidence=confidence,
+                        excluded=list(excluded), draw=draw)
+    try:
+        resp = httpx.post(f"{url}/detect", json=req.model_dump(), timeout=_DETECT_TIMEOUT)
+    except httpx.HTTPError as e:
+        raise ComputeUnavailable(f"Compute-service unreachable at {url}: {e}")
+    if resp.status_code != 200:
+        raise ComputeUnavailable(f"Compute-service error {resp.status_code}: {resp.text}")
+    return DetectResponse(**resp.json())
+
+
+def video_thumbnail(path: str, mode: str) -> tuple[bytes, str]:
+    url = _base_url()
+    req = VideoThumbnailRequest(path=path, mode=mode)
+    try:
+        resp = httpx.post(f"{url}/video/thumbnail", json=req.model_dump(), timeout=_VIDEO_TIMEOUT)
+    except httpx.HTTPError as e:
+        raise ComputeUnavailable(f"Compute-service unreachable at {url}: {e}")
+    if resp.status_code != 200:
+        raise ComputeUnavailable(f"Compute-service error {resp.status_code}: {resp.text}")
+    return resp.content, resp.headers.get("content-type", "image/jpeg")
+
+
+def health() -> dict:
+    """Ping the compute-service /health. Raises ComputeDisabled / ComputeUnavailable."""
+    url = _base_url()
+    try:
+        resp = httpx.get(f"{url}/health", timeout=_HEALTH_TIMEOUT)
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPError as e:
+        raise ComputeUnavailable(f"Compute-service unreachable at {url}: {e}")

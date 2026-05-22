@@ -13,7 +13,9 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`logging_setup.py`](../backend/logging_setup.py) | Logging config: ANSI colours, TRACE/DEBUG/INFO levels, custom formatter, uvicorn access filter. Configures the root logger on import |
 | [`api_helpers.py`](../backend/api_helpers.py) | Shared router helpers: `fmt_range()` (log date ranges), `row_to_dict()` (stats-row → dict) |
 | [`ai_pricing.py`](../backend/ai_pricing.py) | Per-million-token USD pricing tables for Gemini and Claude models |
-| [`yolo_detect.py`](../backend/yolo_detect.py) | Local YOLO/OpenVINO detection: lazy model loading, COCO→Russian names, OpenVINO thumbnail cache paths. `OV_THUMB_VERSION = "v2"` — bump to invalidate cache when draw params change |
+| [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `health`). Raises `ComputeDisabled` / `ComputeUnavailable` |
+| [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` |
+| [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
 | [`database.py`](../backend/database.py) | SQLite: table schema, all SQL queries (upsert, aggregations, pagination, AI analysis). The only file that touches the DB |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames (Foscam patterns + mtime fallback); writes to DB |
 | [`config.py`](../backend/config.py) | Parses `cameras.yaml` → `Camera` dataclass (id, name, path_snapshots, path_videos) |
@@ -22,7 +24,6 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`erosion_thumbnails.py`](../backend/erosion_thumbnails.py) | Erosion thumbnails: MOG2 + morphological erosion. Cache in `erosion_thumbnails_cache/` |
 | [`motion_thumbnails.py`](../backend/motion_thumbnails.py) | Thumbnails for 4 motion modes: neon_mask, mhi, bounding_boxes, motion_stacking. Cache in `motion_thumbnails_cache/` |
 | [`diff_zoom_thumbnails.py`](../backend/diff_zoom_thumbnails.py) | Diff Zoom thumbnails: crop to most active 1/9 tile. Cache in `diff_zoom_thumbnails_cache/` |
-| [`video_thumbnails.py`](../backend/video_thumbnails.py) | Video preview thumbnails (OpenCV): first/last frame, 2×2 grid, max-change animated GIF. Cache in `video_thumbnails_cache/` |
 | `cameras.yaml` | Camera config. Edit manually before running |
 | `snapshots.db` | SQLite database (auto-created on startup) |
 
@@ -38,6 +39,7 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 | [`delete.py`](../backend/routers/delete.py) | `/delete/preview`, `/delete/confirm`, `/delete/preview_range`, `/delete/by_range` |
 | [`maintenance.py`](../backend/routers/maintenance.py) | `/database`, per-type `/*_thumbnails`, `/all_thumbnails`, `/storage_info` |
 | [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze`, `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`. Thin layer — request models + delegation; provider logic lives in `ai_providers/` |
+| [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status` — routing config for the compute-service |
 
 ### AI providers (`backend/ai_providers/`)
 
@@ -48,7 +50,7 @@ Provider-specific image-analysis logic, called by `routers/ai.py`.
 | [`common.py`](../backend/ai_providers/common.py) | Shared helpers: load photos as PIL images, strip ``` fences + parse JSON, compute USD cost, save structured `{scene, images}` results to DB |
 | [`gemini.py`](../backend/ai_providers/gemini.py) | Google Gemini — `analyze()` (free-form) and `analyze_batch()` (structured + save) |
 | [`claude.py`](../backend/ai_providers/claude.py) | Anthropic Claude — `analyze_batch()` (base64 JPEG → messages API) |
-| [`openvino.py`](../backend/ai_providers/openvino.py) | Local YOLO — `analyze_batch()` and `analyze_range()` (by camera + date range) |
+| [`openvino.py`](../backend/ai_providers/openvino.py) | `analyze_batch()` / `analyze_range()` — delegates detection to the compute-service, owns the DB read/write |
 
 ### Backend dependency graph
 
@@ -63,7 +65,31 @@ diff_thumbnails.py ──────────────┤  (all called fr
 erosion_thumbnails.py ───────────┤
 motion_thumbnails.py ────────────┤
 diff_zoom_thumbnails.py ─────────┘
+
+routers/ ──► compute_client.py ──HTTP──► compute-service (:8001)
 ```
+
+---
+
+## Compute-service (`compute-service/`)
+
+Optional stateless service for heavy compute. Full architecture: [`compute-service.md`](compute-service.md).
+
+| File | Role |
+|---|---|
+| [`app.py`](../compute-service/app.py) | FastAPI app on :8001 — `/health`, `/detect`, `/video/thumbnail` |
+| [`detection.py`](../compute-service/detection.py) | YOLO model loading + object detection |
+| [`video.py`](../compute-service/video.py) | Video thumbnail generation (first/last frame, 2×2 grid, max-change GIF) |
+| [`config.py`](../compute-service/config.py) | Path-remap config (env vars `COMPUTE_PATH_REMAP_FROM` / `_TO`) |
+
+## Shared block (`shared/`)
+
+Imported by both the main backend and the compute-service.
+
+| File | Role |
+|---|---|
+| [`contract.py`](../shared/contract.py) | Pydantic API models: `DetectRequest`, `DetectResponse`, `VideoThumbnailRequest`; `VIDEO_THUMB_MODES` |
+| [`coco_names.py`](../shared/coco_names.py) | `COCO_TO_RUSSIAN` map + `excluded_to_en()` |
 
 ---
 
@@ -114,6 +140,7 @@ diff_zoom_thumbnails.py ─────────┘
 | [`DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx) | OpenVINO confidence, excluded objects, emoji overrides, default-emoji reference |
 | [`GoogleAiTab.jsx`](../frontend/src/components/tools/GoogleAiTab.jsx) | Gemini API key, model, structured prompt template |
 | [`ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx) | Claude API key, model |
+| [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
 | [`MaintenanceTab.jsx`](../frontend/src/components/tools/MaintenanceTab.jsx) | Clear database, clear all thumbnails, storage info |
 
 ### Hour viewer parts (`frontend/src/components/hour/`)
@@ -150,7 +177,7 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 | [`motionStackingMode.js`](../frontend/src/components/viewModes/motionStackingMode.js) | Motion Stacking (accumulated motion heatmap) |
 | [`geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) | Gemini AI (icon overlay from analysis results) |
 | [`claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) | Claude AI (icon overlay from analysis results) |
-| [`index.js`](../frontend/src/components/viewModes/index.js) | Mode registry — single import point for all modes |
+| [`index.js`](../frontend/src/components/viewModes/index.js) | Mode registry — `VIEW_MODES`; `getEnabledViewModes()` hides `needsCompute` modes (OpenVINO) when the compute-service is off |
 
 ### Styles
 

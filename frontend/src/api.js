@@ -135,9 +135,9 @@ export function getStorageInfo() {
   return get('/storage_info')
 }
 
-async function postJson(path, body) {
+async function sendJson(method, path, body) {
   const res = await fetch(BASE + path, {
-    method: 'POST',
+    method,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
@@ -151,6 +151,14 @@ async function postJson(path, body) {
     throw new Error(msg)
   }
   return res.json()
+}
+
+function postJson(path, body) {
+  return sendJson('POST', path, body)
+}
+
+function putJson(path, body) {
+  return sendJson('PUT', path, body)
 }
 
 export function previewDelete(fileIds) {
@@ -209,4 +217,16 @@ export function getAiObjectsSummary(cameraId, dateFrom, dateTo) {
 export function getAiAnalysis(fileIds) {
   if (!fileIds.length) return Promise.resolve([])
   return get('/ai_analysis?file_ids=' + fileIds.join(','))
+}
+
+export function getComputeConfig() {
+  return get('/compute/config')
+}
+
+export function getComputeStatus() {
+  return get('/compute/status')
+}
+
+export function saveComputeConfig(mode, remoteUrl) {
+  return putJson('/compute/config', { mode, remote_url: remoteUrl })
 }

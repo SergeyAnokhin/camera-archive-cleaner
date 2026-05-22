@@ -135,13 +135,12 @@ Same flow, but converts images to base64 JPEG and sends via `anthropic` SDK (`cl
 
 Request: `{ file_ids, model_name, confidence }`
 
-1. Loads YOLOv8 model lazily via `load_yolo()` — tries `backend/models/{model}_openvino_model/` first, falls back to `.pt` download
-2. Runs detection on each photo at the given confidence threshold
-3. Maps COCO English class names → Russian via `COCO_TO_RUSSIAN` dict
-4. Saves each result via `save_ai_analysis()` with `provider='openvino'`, empty `scene_description`/`image_description`
-5. Returns: `{ elapsed_ms, images_used, saved_count, results: { file_id: [ru_word, ...] } }`
+1. For each photo, calls the compute-service `POST /detect` (`draw=false`) — see [`compute-service.md`](compute-service.md)
+2. The compute-service runs YOLOv8 detection and maps COCO English → Russian via `COCO_TO_RUSSIAN`
+3. Saves each result via `save_ai_analysis()` with `provider='openvino'`, empty `scene_description`/`image_description`
+4. Returns: `{ elapsed_ms, images_used, saved_count, results: { file_id: [ru_word, ...] } }`
 
-Objects are stored as Russian words so they match the existing `AI_ICON_MAP` in `aiHelpers.js`.
+Returns `503` if the compute-service is off or unreachable. Objects are stored as Russian words so they match the existing `AI_ICON_MAP` in `aiHelpers.js`.
 
 ### `POST /openvino_analyze_range`
 
@@ -164,11 +163,11 @@ Returns a JPEG with bounding boxes drawn by YOLO's built-in `.plot()` renderer:
 - Label: `person 0.87`, `cat 0.62` etc. (COCO English name + confidence)
 - Output resized to max 640 × 640 px
 
-**`excluded` param** (comma-separated, Russian or English labels): boxes for those classes are NOT drawn. Objects are still detected and saved to the DB — only the visual overlay is suppressed. Uses `excluded_to_en()` in `yolo_detect.py` to convert Russian → COCO English before filtering.
+**`excluded` param** (comma-separated, Russian or English labels): boxes for those classes are NOT drawn. Objects are still detected and saved to the DB — only the visual overlay is suppressed. The compute-service uses `excluded_to_en()` in `shared/coco_names.py` to convert Russian → COCO English before filtering.
 
-**On cache miss:** runs YOLO, draws filtered boxes, saves JPEG, and **also calls `save_ai_analysis()`** to persist ALL detected objects (including excluded ones — frontend filters them for display).
+**On cache miss:** the main backend calls the compute-service `POST /detect` (`draw=true`), writes the returned JPEG to the cache, and **also calls `save_ai_analysis()`** to persist ALL detected objects (including excluded ones — frontend filters them for display). Returns `503` if the compute-service is off/unreachable.
 
-Cache key: `sha256("v1:{file_id}:{model}:{conf:.2f}:{sorted_excluded_en}")[:16].jpg`  
+Cache key: `sha256("v3:{file_id}:{model}:{conf:.2f}:{sorted_excluded}")[:16].jpg`  
 Directory: `backend/openvino_thumbnails_cache/` — included in `DELETE /all_thumbnails` cleanup.
 
 ### `GET /ai_analysis?file_ids=1,2,3`
@@ -227,7 +226,7 @@ Object words are short Russian (or English) keywords stored space-separated in `
 
 ### COCO classes detected by OpenVINO — Russian translation
 
-`yolo_detect.py` → `COCO_TO_RUSSIAN` dict (23 entries mapped; unmapped classes fall back to English):
+`shared/coco_names.py` → `COCO_TO_RUSSIAN` dict (23 entries mapped; unmapped classes fall back to English):
 
 | COCO English | Russian word stored in DB |
 |---|---|
@@ -256,26 +255,26 @@ Object words are short Russian (or English) keywords stored space-separated in `
 | suitcase | чемодан |
 
 All remaining COCO 80 classes (bench, chair, tv, laptop, cell phone, etc.) fall through as English — they have emoji in `OBJECT_EMOJI_DEFAULTS`.  
-`RUSSIAN_TO_COCO` (reverse map) and `excluded_to_en()` live in `yolo_detect.py` — used to convert user-supplied excluded labels (Russian or English) to COCO English class names for box filtering.
+`RUSSIAN_TO_COCO` (reverse map) and `excluded_to_en()` live in `shared/coco_names.py` — used by the compute-service to convert user-supplied excluded labels (Russian or English) to COCO English class names for box filtering.
 
 ---
 
 ## OpenVINO model runtime
 
-`load_yolo()` in [`yolo_detect.py`](../backend/yolo_detect.py) picks the runtime per model name:
+`load_yolo()` in [`compute-service/detection.py`](../compute-service/detection.py) picks the runtime per model name:
 
-- **`backend/models/{model}_openvino_model/` exists** → loads the OpenVINO IR build (compiled for Intel AVX-512 / VNNI / AMX, 2–5× faster on Intel CPUs). Log: `🔷 Loading OpenVINO model: …`
+- **`compute-service/models/{model}_openvino_model/` exists** → loads the OpenVINO IR build (compiled for Intel AVX-512 / VNNI / AMX, 2–5× faster on Intel CPUs). Log: `🔷 Loading OpenVINO model: …`
 - **otherwise** → downloads/loads the PyTorch `.pt` model. Log: `🔷 Loading PyTorch model: …`
 
-The repo ships pre-exported folders for `yolov8n`, `yolov8s`, `yolov8m` under `backend/models/`. To (re)export one:
+Pre-export folders for `yolov8n`, `yolov8s`, `yolov8m` under `compute-service/models/`. To (re)export one:
 
 ```powershell
-cd backend
+cd compute-service
 python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='openvino')"
-Move-Item yolov8n_openvino_model models\   # final: backend/models/yolov8n_openvino_model/
+Move-Item yolov8n_openvino_model models\   # final: compute-service/models/yolov8n_openvino_model/
 ```
 
-Restart the backend afterwards. The export folder must be named exactly `{model}_openvino_model` and sit directly under `backend/models/` — `load_yolo()` builds that path from the model name.
+Restart the compute-service afterwards. The export folder must be named exactly `{model}_openvino_model` and sit directly under `compute-service/models/` — `load_yolo()` builds that path from the model name.
 
 ---
 

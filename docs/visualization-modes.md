@@ -187,7 +187,7 @@ Runs local YOLOv8 object detection using the Intel OpenVINO runtime (falls back 
 
 **Model change:** Stored in `openvino_model` localStorage key. Changing the model triggers a forced URL re-render via `onParamChange('_refresh', timestamp)` so all photo cards request new bbox images.
 
-**Runtime:** if a `backend/models/{model}_openvino_model/` folder exists it is used (2–5× faster on Intel CPUs); otherwise the `.pt` PyTorch model is downloaded and used. See [`docs/ai-analysis.md`](ai-analysis.md#openvino-model-runtime) for how to export OpenVINO models.
+**Runtime:** detection runs in the [compute-service](compute-service.md). If a `compute-service/models/{model}_openvino_model/` folder exists it is used (2–5× faster on Intel CPUs); otherwise the `.pt` PyTorch model is downloaded and used. See [`docs/ai-analysis.md`](ai-analysis.md#openvino-model-runtime) for how to export OpenVINO models.
 
 ---
 
@@ -239,4 +239,5 @@ Cache keys include the sorted list of page photo IDs and the current threshold v
 | `backend/diff_zoom_thumbnails.py` | Diff Zoom — diff + crop to hottest 1/9 tile |
 | `backend/erosion_thumbnails.py` | MOG2 + erode/dilate + neon overlay + boxes |
 | `backend/motion_thumbnails.py` | Shared MOG2 pipeline + 4 visualization renderers |
-| `backend/yolo_detect.py` | YOLO/OpenVINO model loading, COCO→Russian names, bbox cache paths (OpenVINO modes) |
+| `backend/compute_cache.py` | Bbox cache paths (OpenVINO modes) — the JPEG itself is rendered by the compute-service |
+| `compute-service/detection.py` | YOLO/OpenVINO model loading + detection — runs in the [compute-service](compute-service.md) |

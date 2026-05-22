@@ -148,6 +148,9 @@ vite.config.ts.timestamp-*
 /backend/*_cache/*
 /backend/models/*
 /backend/yolo**.pt
+/backend/compute_config.json
+/compute-service/models/*
+/compute-service/yolo**.pt
 /backend/routers/__pycache__/*
 /.claude/settings.local.json
 **/__pycache__/*

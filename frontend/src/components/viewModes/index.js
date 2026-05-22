@@ -24,3 +24,15 @@ export const VIEW_MODES = [
   openvinoMode,
 ]
 export const DEFAULT_VIEW_MODE_KEY = normalMode.key
+
+// View modes available given the current compute-service mode.
+// Modes flagged `needsCompute` are hidden when the compute-service is off.
+export function getEnabledViewModes() {
+  let computeOff = false
+  try {
+    computeOff = localStorage.getItem('compute_mode') === 'off'
+  } catch {
+    computeOff = false
+  }
+  return computeOff ? VIEW_MODES.filter(m => !m.needsCompute) : VIEW_MODES
+}

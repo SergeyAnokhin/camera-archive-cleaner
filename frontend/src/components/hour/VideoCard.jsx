@@ -11,6 +11,7 @@ function readPreviewMode() {
 export default function VideoCard({ file, selectionMode, selected, onToggle, index, isFocused }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [previewMode, setPreviewMode] = useState(readPreviewMode)
+  const [thumbError, setThumbError] = useState(false)
   const cardRef = useRef(null)
 
   useEffect(() => {
@@ -18,7 +19,7 @@ export default function VideoCard({ file, selectionMode, selected, onToggle, ind
   }, [isFocused])
 
   useEffect(() => {
-    function onModeChange(e) { setPreviewMode(e.detail) }
+    function onModeChange(e) { setPreviewMode(e.detail); setThumbError(false) }
     document.addEventListener('video-preview-mode-change', onModeChange)
     return () => document.removeEventListener('video-preview-mode-change', onModeChange)
   }, [])
@@ -27,7 +28,7 @@ export default function VideoCard({ file, selectionMode, selected, onToggle, ind
     if (selectionMode) { onToggle(file, index, e.shiftKey) } else { setModalOpen(true) }
   }
 
-  const showThumb = previewMode !== 'none'
+  const showThumb = previewMode !== 'none' && !thumbError
   const thumbUrl = showThumb ? getVideoThumbnailUrl(file.id, previewMode) : null
 
   return (
@@ -49,6 +50,7 @@ export default function VideoCard({ file, selectionMode, selected, onToggle, ind
             className="hv-video-thumb"
             alt=""
             draggable={false}
+            onError={() => setThumbError(true)}
           />
         ) : (
           <i className="mdi mdi-video hv-video-icon" />

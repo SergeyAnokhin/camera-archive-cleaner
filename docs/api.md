@@ -45,7 +45,7 @@ All thumbnail endpoints generate and cache on first request.
 | `GET` | `/diff_zoom_thumbnail/{file_id}` | Diff Zoom: crop to the most active 1/9 tile. Same params |
 | `GET` | `/erosion_thumbnail/{file_id}` | Erosion/MOG2: morphological erosion. Same params |
 | `GET` | `/motion_thumbnail/{file_id}` | One of 4 motion modes: `neon_mask` / `mhi` / `bounding_boxes` / `motion_stacking`. Params: `page_ids`, `threshold`, `mode` |
-| `GET` | `/video_thumbnail/{file_id}` | Video preview image. `mode`: `first_frame` / `last_frame` / `four_frames` (2×2 JPEG grid) / `max_change_gif` (2-frame animated GIF). Cache in `video_thumbnails_cache/` |
+| `GET` | `/video_thumbnail/{file_id}` | Video preview image. `mode`: `first_frame` / `last_frame` / `four_frames` (2×2 JPEG grid) / `max_change_gif` (2-frame animated GIF). Computed by the [compute-service](compute-service.md); cache in `video_thumbnails_cache/`. Returns `503` when compute is off/unreachable |
 
 ---
 
@@ -72,9 +72,13 @@ All thumbnail endpoints generate and cache on first request.
 
 ### Local AI (OpenVINO / YOLOv8)
 
+YOLO inference runs in the optional [compute-service](compute-service.md). These
+endpoints keep the DB read/write and disk cache; they return `503` when the
+compute-service is disabled or unreachable.
+
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/openvino_thumbnail/{file_id}` | Returns a JPEG with YOLO bounding boxes drawn. Params: `model` (default `yolov8n`), `confidence` (default `0.25`). Generates and caches on first request; **also saves detected objects to `ai_analysis`** on cache miss. Cache: `backend/openvino_thumbnails_cache/` |
+| `GET` | `/openvino_thumbnail/{file_id}` | Returns a JPEG with YOLO bounding boxes drawn. Params: `model` (default `yolov8n`), `confidence` (default `0.25`), `excluded` (comma-separated labels). Caches on first request; **also saves detected objects to `ai_analysis`** on cache miss. Cache: `backend/openvino_thumbnails_cache/` |
 | `POST` | `/openvino_analyze_batch` | Run YOLO on a list of photos. Body: `file_ids`, `model_name`, `confidence`. Saves results to `ai_analysis`. Returns `{elapsed_ms, images_used, saved_count, results}` |
 | `POST` | `/openvino_analyze_range` | Same as `/openvino_analyze_batch` but fetches all photos in a date range. Body: `camera_id`, `date_from`, `date_to`, `model_name`, `confidence`. Used by heatmap batch analysis |
 
@@ -84,6 +88,19 @@ All thumbnail endpoints generate and cache on first request.
 |---|---|---|
 | `GET` | `/ai_analysis` | Fetch saved AI results. Param: `file_ids` comma-separated |
 | `GET` | `/ai_objects_summary` | Unique object keywords for a date range. Optional: `camera_id`, `date_from`, `date_to`. Used by heatmap cells for icon display |
+
+---
+
+## Compute service
+
+Routing config for the optional [compute-service](compute-service.md). The
+config is persisted server-side in `backend/compute_config.json`.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/compute/config` | Current routing config: `{mode, remote_url}`. `mode` is `off` / `local` / `remote` |
+| `PUT` | `/compute/config` | Update routing config. Body: `{mode, remote_url}`. Rejects an unknown `mode` with `400` |
+| `GET` | `/compute/status` | Reachability check: `{mode, url, reachable, capabilities}`. Pings the compute-service `/health` |
 
 ---
 

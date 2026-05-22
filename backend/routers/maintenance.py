@@ -10,8 +10,7 @@ from diff_thumbnails import DIFF_THUMB_DIR
 from erosion_thumbnails import EROSION_THUMB_DIR
 from motion_thumbnails import MOTION_THUMB_DIR
 from diff_zoom_thumbnails import DIFF_ZOOM_THUMB_DIR
-from yolo_detect import OV_THUMB_DIR
-from video_thumbnails import VID_THUMB_DIR
+from compute_cache import OV_THUMB_DIR, VID_THUMB_DIR
 
 router = APIRouter()
 logger = logging.getLogger("api")

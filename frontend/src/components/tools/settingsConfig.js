@@ -116,3 +116,9 @@ export const U_DEFAULTS = { af: [40, 65], se: [55, 80], bc: [40, 65], combined: 
 export const MOTION_MODE_KEYS = [
   'motion_diff', 'diff_zoom', 'erosion', 'neon_mask', 'mhi', 'bounding_boxes', 'motion_stacking'
 ]
+
+// Compute-service routing — local cache of the server-side config.
+// Source of truth is the backend (compute_config.json); these keys let the
+// frontend read the mode synchronously (e.g. to hide heavy view modes).
+export const COMPUTE_MODE_KEY = 'compute_mode'
+export const COMPUTE_URL_KEY  = 'compute_remote_url'

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { VIEW_MODES } from '../viewModes/index.js'
+import { getEnabledViewModes } from '../viewModes/index.js'
 import { VIEW_MODE_KEY } from './hourUtils.js'
 
 /**
@@ -94,16 +94,18 @@ export function useHourKeyboard(ctx) {
       } else if (e.key === 'Insert' || e.key === 'm' || e.key === 'M') {
         e.preventDefault()
         setViewMode(prev => {
-          const idx = VIEW_MODES.findIndex(m => m.key === prev)
-          const next = VIEW_MODES[(idx + 1) % VIEW_MODES.length].key
+          const modes = getEnabledViewModes()
+          const idx = modes.findIndex(m => m.key === prev)
+          const next = modes[(idx + 1) % modes.length].key
           localStorage.setItem(VIEW_MODE_KEY, next)
           return next
         })
       } else if (e.key === 'p' || e.key === 'P') {
         e.preventDefault()
         setViewMode(prev => {
-          const idx = VIEW_MODES.findIndex(m => m.key === prev)
-          const next = VIEW_MODES[(idx - 1 + VIEW_MODES.length) % VIEW_MODES.length].key
+          const modes = getEnabledViewModes()
+          const idx = modes.findIndex(m => m.key === prev)
+          const next = modes[(idx - 1 + modes.length) % modes.length].key
           localStorage.setItem(VIEW_MODE_KEY, next)
           return next
         })

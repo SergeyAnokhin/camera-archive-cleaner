@@ -1,19 +1,19 @@
-"""Local YOLO / OpenVINO object detection — no API key required."""
+"""Local object detection via the compute-service — saves Russian labels to DB.
+
+The YOLO/OpenVINO inference itself runs in the compute-service; this module
+owns the DB read (file paths) and DB write (detected objects).
+"""
 import logging
 import time
 
+import compute_client
 from database import get_connection, get_file_by_id, save_ai_analysis
-from yolo_detect import COCO_TO_RUSSIAN, load_yolo
 
 logger = logging.getLogger("api")
 
 
 def analyze_batch(file_ids, model_name="yolov8n", confidence=0.25):
     """Detect objects in the given photo files, save Russian object labels to DB."""
-    from PIL import Image as PILImage
-
-    yolo = load_yolo(model_name)
-
     with get_connection() as conn:
         file_rows = [get_file_by_id(conn, fid) for fid in file_ids]
 
@@ -28,27 +28,21 @@ def analyze_batch(file_ids, model_name="yolov8n", confidence=0.25):
                 continue
             fid = row["id"]
             try:
-                img = PILImage.open(row["file_path"]).convert("RGB")
+                result = compute_client.detect(
+                    row["file_path"], model_name, confidence, frozenset(), draw=False)
                 images_used += 1
-                detections = yolo(img, conf=confidence, verbose=False)
-                seen: set[str] = set()
-                objects_ru: list[str] = []
-                for det in detections:
-                    for cls_id in det.boxes.cls.tolist():
-                        en = yolo.names[int(cls_id)]
-                        ru = COCO_TO_RUSSIAN.get(en, en)
-                        if ru not in seen:
-                            seen.add(ru)
-                            objects_ru.append(ru)
-                objects_str = " ".join(objects_ru)
-                save_ai_analysis(conn, fid, "openvino", model_name, "", "", objects_str)
-                results_out[fid] = objects_ru
+                save_ai_analysis(conn, fid, "openvino", model_name, "", "",
+                                 " ".join(result.objects))
+                results_out[fid] = result.objects
                 saved_count += 1
+            except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable):
+                raise
             except Exception as e:
                 logger.warning("OpenVINO: ошибка файла %s: %s", row["file_path"], e)
 
     elapsed_ms = int((time.time() - t0) * 1000)
-    logger.info("🔷 OpenVINO %s: %d фото, %.0f мс, сохранено %d", model_name, images_used, elapsed_ms, saved_count)
+    logger.info("🔷 OpenVINO %s: %d фото, %.0f мс, сохранено %d",
+                model_name, images_used, elapsed_ms, saved_count)
 
     return {
         "elapsed_ms": elapsed_ms,
