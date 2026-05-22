@@ -45,13 +45,16 @@ Swagger UI at **`http://localhost:8000/docs`**
 cameras.yaml
     │
     ▼
-config.py ──► scanner.py ──► database.py (SQLite: snapshots.db)
+config.py ──► scanner.py ──► database.py  (SQLite: snapshots.db)
+                                  ▲
+   thumbnail pipeline ────────────┤   thumbnails / diff / diff_zoom /
+                                  │   erosion / motion / video
+   ai_providers/ ─────────────────┤   gemini · claude · openvino
+   yolo_detect.py ────────────────┘   (local YOLO/OpenVINO detection)
                                   │
-                    thumbnails.py / diff_thumbnails.py
-                    erosion_thumbnails.py / motion_thumbnails.py
-                    diff_zoom_thumbnails.py
+                          routers/  (FastAPI APIRouters, grouped by area)
                                   │
-                             main.py (FastAPI :8000)
+                             main.py  (FastAPI :8000)
                                   │
                              Vite proxy
                                   │
@@ -60,6 +63,8 @@ config.py ──► scanner.py ──► database.py (SQLite: snapshots.db)
                             └── ToolsModal (settings, AI)
 ```
 
+Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.md).
+
 ---
 
 ## Documentation
@@ -67,11 +72,12 @@ config.py ──► scanner.py ──► database.py (SQLite: snapshots.db)
 | File | Description |
 |------|-------------|
 | [`docs/code-map.md`](docs/code-map.md) | Code map — all backend and frontend files, what each file does |
+| [`docs/subsystems.md`](docs/subsystems.md) | Backend grouped into subsystems: dependencies, seams, extraction guide for the detection service |
 | [`docs/settings.md`](docs/settings.md) | All user settings: localStorage keys, defaults, ranges, where each is defined |
 | [`docs/api.md`](docs/api.md) | All API endpoints with parameters and descriptions |
 | [`docs/database.md`](docs/database.md) | SQLite schema: `files`, `thumbnails`, `ai_analysis` tables, cascades, data flow |
-| [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis: Gemini & Claude integration, DB schema, prompt format, icon display |
-| [`docs/visualization-modes.md`](docs/visualization-modes.md) | All 9 view modes: Normal, Motion Diff, Erosion, etc. |
+| [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis: Gemini, Claude & OpenVINO integration, DB schema, prompt format, icon display |
+| [`docs/visualization-modes.md`](docs/visualization-modes.md) | All 12 view modes: Normal, Motion Diff, Erosion, OpenVINO Detection, etc. |
 | [`docs/logging.md`](docs/logging.md) | Log levels, format, colours, how to configure |
 
 ---

@@ -44,17 +44,17 @@ Thumbnails older than 30 days are purged automatically via `pop_old_basic_thumbn
 
 ### `ai_analysis` — AI analysis results
 
-Cache of Gemini/Claude analysis results. One row per file. Re-running analysis overwrites the existing row (`ON CONFLICT DO UPDATE`).
+Results from all three AI providers (Gemini, Claude, OpenVINO). One row per file. Re-running any provider overwrites the existing row (`ON CONFLICT(file_id) DO UPDATE`).
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | INTEGER PK | Auto-increment |
 | `file_id` | INTEGER UNIQUE | FK → `files.id` (CASCADE DELETE) |
-| `provider` | TEXT | AI provider: `'gemini'` or `'claude'` |
-| `model` | TEXT | Model name (e.g. `gemini-2.0-flash`) |
+| `provider` | TEXT | AI provider: `'gemini'`, `'claude'`, or `'openvino'` |
+| `model` | TEXT | Model name (e.g. `gemini-2.5-flash`, `yolov8n`) |
 | `analyzed_at` | TEXT | Analysis timestamp |
-| `scene_description` | TEXT | Scene type (street, yard, parking, etc.) |
-| `image_description` | TEXT | Detailed description of what is visible in the frame |
+| `scene_description` | TEXT | Scene type (street, yard, parking, etc.). Empty for OpenVINO |
+| `image_description` | TEXT | Detailed description of what is visible in the frame. Empty for OpenVINO |
 | `objects` | TEXT | Space-separated list of detected object keywords |
 
 **Index:** `idx_ai_analysis_file` — `(file_id)`.
@@ -88,7 +88,11 @@ thumbnails.py ──► save_thumbnail_path() ──► thumbnails
                                     │
 /gemini_analyze_batch (POST)        │
 /claude_analyze_batch (POST)        │
+/openvino_analyze_batch (POST)      │
+/openvino_thumbnail/{id} (GET)      │
     │                               │
     ▼                               │
-AI API ──► save_ai_analysis() ──► ai_analysis
+AI provider ──► save_ai_analysis() ──► ai_analysis
 ```
+
+Cloud providers (Gemini/Claude) reach `ai_analysis` via the `ai_providers/` package; OpenVINO writes there both from `ai_providers/openvino.py` and as a side effect of the `/openvino_thumbnail` endpoint on cache miss.

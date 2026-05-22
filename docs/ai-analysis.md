@@ -260,137 +260,22 @@ All remaining COCO 80 classes (bench, chair, tv, laptop, cell phone, etc.) fall 
 
 ---
 
-## OpenVINO model export — step-by-step
+## OpenVINO model runtime
 
-The default flow downloads a PyTorch `.pt` model and runs inference through the Python runtime. Exporting to OpenVINO format compiles the network graph for a specific Intel CPU architecture, enabling 2–5× faster inference.
+`load_yolo()` in [`yolo_detect.py`](../backend/yolo_detect.py) picks the runtime per model name:
 
-### Why it's faster
+- **`backend/models/{model}_openvino_model/` exists** → loads the OpenVINO IR build (compiled for Intel AVX-512 / VNNI / AMX, 2–5× faster on Intel CPUs). Log: `🔷 Loading OpenVINO model: …`
+- **otherwise** → downloads/loads the PyTorch `.pt` model. Log: `🔷 Loading PyTorch model: …`
 
-| Runtime | How it works |
-|---------|-------------|
-| PyTorch `.pt` | Generic Python, uses standard x86 instructions |
-| OpenVINO `.xml` | Compiled C++ graph optimised for AVX-512 / VNNI / AMX — Intel-specific matrix math instructions that PyTorch doesn't always use |
-
-Expected speedup depends on CPU generation:
-
-| CPU | Speedup |
-|-----|---------|
-| Intel 12th gen+ (Alder Lake, Raptor Lake, Meteor Lake) | 3–5× |
-| Intel 10th–11th gen | 2–3× |
-| Intel 8th–9th gen | 1.5–2× |
-| AMD / very old Intel | minimal |
-
-### Export procedure
-
-All commands run in the `backend/` directory.
-
-**Step 1 — activate the same Python environment used by the backend:**
+The repo ships pre-exported folders for `yolov8n`, `yolov8s`, `yolov8m` under `backend/models/`. To (re)export one:
 
 ```powershell
-cd C:\REPOS\camera-snapshots-cleaner-claude\backend
-```
-
-**Step 2 — export the model (one-time, takes ~20 seconds):**
-
-```powershell
+cd backend
 python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='openvino')"
+Move-Item yolov8n_openvino_model models\   # final: backend/models/yolov8n_openvino_model/
 ```
 
-This downloads `yolov8n.pt` (~6 MB) if not already cached, then creates a folder `yolov8n_openvino_model/` in the current directory containing:
-
-```
-yolov8n_openvino_model/
-  yolov8n.xml        ← model graph (human-readable XML)
-  yolov8n.bin        ← model weights (binary, ~12 MB)
-  metadata.yaml
-```
-
-**Step 3 — move the folder into `backend/models/`:**
-
-```powershell
-mkdir models -ErrorAction SilentlyContinue
-Move-Item yolov8n_openvino_model models\
-```
-
-Final path must be exactly:
-```
-backend/
-  models/
-    yolov8n_openvino_model/
-      yolov8n.xml
-      yolov8n.bin
-      metadata.yaml
-```
-
-**Step 4 — restart the backend.**
-
-On the next request the log will show:
-
-```
-🔷 Loading OpenVINO model: ...\backend\models\yolov8n_openvino_model
-```
-
-instead of:
-
-```
-🔷 Loading PyTorch model: yolov8n.pt (tip: export with ...)
-```
-
-### Exporting yolov8s or yolov8m
-
-Same procedure, just change the model name:
-
-```powershell
-python -c "from ultralytics import YOLO; YOLO('yolov8s.pt').export(format='openvino')"
-Move-Item yolov8s_openvino_model models\
-
-python -c "from ultralytics import YOLO; YOLO('yolov8m.pt').export(format='openvino')"
-Move-Item yolov8m_openvino_model models\
-```
-
-The backend selects the right folder automatically based on the model chosen in the UI.
-
-### Verifying speedup
-
-Run this in the `backend/` directory — it compares 10 inference runs with both runtimes:
-
-```python
-# save as benchmark.py, run: python benchmark.py <path-to-any-photo.jpg>
-import sys, time
-from pathlib import Path
-from PIL import Image
-from ultralytics import YOLO
-
-img = Image.open(sys.argv[1]).convert("RGB")
-
-# PyTorch
-m1 = YOLO("yolov8n.pt")
-m1(img, verbose=False)          # warm-up
-t = time.time()
-for _ in range(10): m1(img, verbose=False)
-print(f"PyTorch:  {(time.time()-t)/10*1000:.0f} ms/photo")
-
-# OpenVINO
-ov = Path("models/yolov8n_openvino_model")
-if ov.exists():
-    m2 = YOLO(str(ov))
-    m2(img, verbose=False)      # warm-up
-    t = time.time()
-    for _ in range(10): m2(img, verbose=False)
-    print(f"OpenVINO: {(time.time()-t)/10*1000:.0f} ms/photo")
-else:
-    print("OpenVINO model not found — run export first")
-```
-
-```powershell
-python benchmark.py "C:\path\to\any\photo.jpg"
-```
-
-Typical output on Intel i7-12700:
-```
-PyTorch:  1840 ms/photo
-OpenVINO:  390 ms/photo
-```
+Restart the backend afterwards. The export folder must be named exactly `{model}_openvino_model` and sit directly under `backend/models/` — `load_yolo()` builds that path from the model name.
 
 ---
 

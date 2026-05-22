@@ -1,6 +1,7 @@
 # Code Map
 
 Map of all project files — what each file contains and what it is responsible for.
+For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsystems.md`](subsystems.md).
 
 ---
 

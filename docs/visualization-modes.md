@@ -1,6 +1,8 @@
 # Visualization Modes
 
-The HourViewer offers 11 visualization modes for browsing camera snapshots. Modes 2–7 are motion-analysis modes computed server-side and cached on disk. Modes 8–10 are AI analysis modes that send photos to an external API or run a local model.
+The HourViewer offers 12 visualization modes for browsing camera snapshots. Modes 2–8 are motion-analysis modes computed server-side and cached on disk. Modes 9–12 are AI / object-detection modes that send photos to an external API or run a local model.
+
+Mode registry: [`viewModes/index.js`](../frontend/src/components/viewModes/index.js) — one file per mode.
 
 ---
 
@@ -8,7 +10,7 @@ The HourViewer offers 11 visualization modes for browsing camera snapshots. Mode
 
 | Control | Where | Effect |
 |---------|-------|--------|
-| **Mode selector** | HourViewer header dropdown | Switch between the 11 modes |
+| **Mode selector** | HourViewer header dropdown | Switch between the 12 modes |
 | **Threshold slider** | Tools → Hour view | 0–100, default 20. Controls sensitivity of motion modes (see per-mode notes below) |
 | **AI mode panel** | Appears below mode selector when an AI mode is active | Model selector, confidence slider (OpenVINO), Analyze button, usage stats |
 
@@ -42,7 +44,19 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
-## 3. Erosion
+## 3. Diff Zoom
+
+**Key:** `diff_zoom` | **Cache:** `backend/diff_zoom_thumbnails_cache/`
+
+**Algorithm:** Same per-pixel delta as Motion diff, then the frame is split into a 3×3 grid and **cropped to the single tile with the most changed pixels** — the result is that tile scaled back up.
+
+**Threshold meaning:** Same as Motion diff (minimum channel delta).
+
+**Best for:** Inspecting small or distant motion that is hard to see in a full-frame thumbnail — the crop zooms straight onto the active region.
+
+---
+
+## 4. Erosion
 
 **Key:** `erosion` | **Cache:** `backend/erosion_thumbnails_cache/`
 
@@ -61,7 +75,7 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
-## 4. Neon mask
+## 5. Neon mask
 
 **Key:** `neon_mask` | **Cache:** `backend/motion_thumbnails_cache/`
 
@@ -75,7 +89,7 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
-## 5. MHI trail
+## 6. MHI trail
 
 **Key:** `mhi` | **Cache:** `backend/motion_thumbnails_cache/`
 
@@ -94,7 +108,7 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
-## 6. Bounding boxes
+## 7. Bounding boxes
 
 **Key:** `bounding_boxes` | **Cache:** `backend/motion_thumbnails_cache/`
 
@@ -113,7 +127,7 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
-## 7. Motion stacking
+## 8. Motion stacking
 
 **Key:** `motion_stacking` | **Cache:** `backend/motion_thumbnails_cache/`
 
@@ -132,7 +146,7 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
-## 8. Gemini Analysis
+## 9. Gemini Analysis
 
 **Key:** `gemini_analysis` | **Cache:** none (results stored in `ai_analysis` DB table) | **`isAiMode: true`**
 
@@ -146,7 +160,7 @@ Sends all photos on the current page to the Google Gemini API (or a selection if
 
 ---
 
-## 9. Claude Analysis
+## 10. Claude Analysis
 
 **Key:** `claude_analysis` | **Cache:** none (results in `ai_analysis` table) | **`isAiMode: true`**
 
@@ -158,7 +172,7 @@ Same flow as Gemini but uses the Anthropic Claude API. Sends photos as base64 JP
 
 ---
 
-## 10. OpenVINO Detection
+## 11. OpenVINO Detection
 
 **Key:** `openvino_detection` | **Cache:** `backend/openvino_thumbnails_cache/` (bbox JPEG per file+model+confidence) | **`isAiMode: true`**
 
@@ -173,16 +187,17 @@ Runs local YOLOv8 object detection using the Intel OpenVINO runtime (falls back 
 
 **Model change:** Stored in `openvino_model` localStorage key. Changing the model triggers a forced URL re-render via `onParamChange('_refresh', timestamp)` so all photo cards request new bbox images.
 
-**Optional: export to OpenVINO IR format (2–5× faster on Intel CPUs):**
-```powershell
-cd backend
-python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='openvino')"
-mkdir models -ErrorAction SilentlyContinue
-Move-Item yolov8n_openvino_model models\
-```
-Restart the backend; the log will confirm: `🔷 Loading OpenVINO model: …\models\yolov8n_openvino_model`.
+**Runtime:** if a `backend/models/{model}_openvino_model/` folder exists it is used (2–5× faster on Intel CPUs); otherwise the `.pt` PyTorch model is downloaded and used. See [`docs/ai-analysis.md`](ai-analysis.md#openvino-model-runtime) for how to export OpenVINO models.
 
-See full export guide in [`docs/ai-analysis.md`](ai-analysis.md#openvino-model-export--step-by-step).
+---
+
+## 12. OpenVINO Boxes
+
+**Key:** `openvino_bbox` | **Cache:** `backend/openvino_thumbnails_cache/` (shared with OpenVINO Detection)
+
+Same bounding-box image as OpenVINO Detection — same `/openvino_thumbnail` endpoint — but **not** an AI mode (`isAiMode` is unset): no model selector, no Run button, no hover description tooltip. Confidence is read from the `openvino_confidence` localStorage key instead of the mode-params slider.
+
+**Best for:** a plain box overlay when you only want the visual and not the analysis panel.
 
 ---
 
@@ -206,9 +221,10 @@ All computed thumbnails are cached on disk to avoid re-processing.
 |----------------|-------|-----------|
 | `backend/thumbnails_cache/` | Normal | Tools → Maintenance → Clear thumbnails |
 | `backend/diff_thumbnails_cache/` | Motion diff | Tools → Maintenance → Clear diff thumbnails |
+| `backend/diff_zoom_thumbnails_cache/` | Diff Zoom | Tools → Maintenance → Clear diff-zoom thumbnails |
 | `backend/erosion_thumbnails_cache/` | Erosion | Tools → Maintenance → Clear erosion thumbnails |
 | `backend/motion_thumbnails_cache/` | Neon mask, MHI trail, Bounding boxes, Motion stacking | Tools → Maintenance → Clear motion thumbnails |
-| `backend/openvino_thumbnails_cache/` | OpenVINO Detection | Tools → Maintenance → Clear all thumbnails |
+| `backend/openvino_thumbnails_cache/` | OpenVINO Detection, OpenVINO Boxes | Tools → Maintenance → Clear all thumbnails |
 
 Cache keys include the sorted list of page photo IDs and the current threshold value, so changing either will generate new cached images.
 
@@ -220,5 +236,7 @@ Cache keys include the sorted list of page photo IDs and the current threshold v
 |------|---------------|
 | `backend/thumbnails.py` | Resize + cache regular thumbnails (PIL) |
 | `backend/diff_thumbnails.py` | Motion diff — numpy mean/delta |
+| `backend/diff_zoom_thumbnails.py` | Diff Zoom — diff + crop to hottest 1/9 tile |
 | `backend/erosion_thumbnails.py` | MOG2 + erode/dilate + neon overlay + boxes |
 | `backend/motion_thumbnails.py` | Shared MOG2 pipeline + 4 visualization renderers |
+| `backend/yolo_detect.py` | YOLO/OpenVINO model loading, COCO→Russian names, bbox cache paths (OpenVINO modes) |
