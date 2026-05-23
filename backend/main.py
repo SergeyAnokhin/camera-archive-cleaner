@@ -4,7 +4,8 @@ Wires together the routers; the actual endpoints live in the `routers/` package.
 HTTP endpoints are split by responsibility:
   catalog        — /cameras, /scan
   stats          — /stats, /files, /distribution, /previews
-  thumbnails_api — /thumbnail, /diff_*, /erosion_*, /motion_*, /openvino_thumbnail, /media
+  thumbnails_api — /thumbnail, /diff_*, /erosion_*, /motion_*, /openvino_thumbnail, /video_thumbnail
+  media          — /media
   delete         — /delete/*
   maintenance    — /database, /*_thumbnails, /storage_info
   ai             — /gemini_*, /claude_*, /openvino_analyze_*, /ai_*
@@ -29,7 +30,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from database import init_db
-from routers import ai, catalog, compute, delete, maintenance, stats, thumbnails_api
+from routers import ai, catalog, compute, delete, maintenance, media, stats, thumbnails_api
 
 logger = logging.getLogger("api")
 
@@ -64,6 +65,7 @@ def startup():
 app.include_router(catalog.router)
 app.include_router(stats.router)
 app.include_router(thumbnails_api.router)
+app.include_router(media.router)
 app.include_router(delete.router)
 app.include_router(maintenance.router)
 app.include_router(ai.router)

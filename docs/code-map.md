@@ -35,8 +35,9 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 |---|---|
 | [`catalog.py`](../backend/routers/catalog.py) | `/cameras`, `/scan` |
 | [`stats.py`](../backend/routers/stats.py) | `/stats`, `/files`, `/distribution`, `/previews` |
-| [`thumbnails_api.py`](../backend/routers/thumbnails_api.py) | `/thumbnail`, `/diff_thumbnail`, `/diff_zoom_thumbnail`, `/erosion_thumbnail`, `/motion_thumbnail`, `/openvino_thumbnail`, `/video_thumbnail`, `/media` |
-| [`delete.py`](../backend/routers/delete.py) | `/delete/preview`, `/delete/confirm`, `/delete/preview_range`, `/delete/by_range` |
+| [`thumbnails_api.py`](../backend/routers/thumbnails_api.py) | `/thumbnail`, `/diff_thumbnail`, `/diff_zoom_thumbnail`, `/erosion_thumbnail`, `/motion_thumbnail`, `/openvino_thumbnail`, `/video_thumbnail`. The 4 page-context diff endpoints share `_parse_page_ids()` + `_page_thumbnail_response()` helpers |
+| [`media.py`](../backend/routers/media.py) | `/media/{file_id}` — serves the original photo/video file with the correct MIME type |
+| [`delete.py`](../backend/routers/delete.py) | `/delete/preview`, `/delete/confirm`, `/delete/preview_range`, `/delete/by_range`. Runs its own inline SQL (not via `database.py`) |
 | [`maintenance.py`](../backend/routers/maintenance.py) | `/database`, per-type `/*_thumbnails`, `/all_thumbnails`, `/storage_info` |
 | [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze`, `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`. Thin layer — request models + delegation; provider logic lives in `ai_providers/` |
 | [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status` — routing config for the compute-service |
@@ -158,6 +159,7 @@ Imported by both the main backend and the compute-service.
 | [`ModeSettingsPanel.jsx`](../frontend/src/components/hour/ModeSettingsPanel.jsx) | Slider panel for non-AI view modes with tunable params (e.g. motion threshold) |
 | [`AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx) | AI mode panel: compact 2-row layout — label+model+run on row 1, threshold (OpenVINO)/stats/emojis on row 2. Exports `AI_PROVIDER_CONFIG` |
 | [`useHourKeyboard.js`](../frontend/src/components/hour/useHourKeyboard.js) | Custom hook holding all keyboard handling: peek original, browse-mode keys, selection-mode keys |
+| [`useHourDelete.js`](../frontend/src/components/hour/useHourDelete.js) | Custom hook holding all delete logic: per-file/whole-page delete (preview → confirm) and whole-hour delete. Owns the delete-related state + the two `DeleteConfirmModal` data sources |
 
 ### View modes (`frontend/src/components/viewModes/`)
 

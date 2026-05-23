@@ -1,6 +1,6 @@
 import './HourViewer.css'
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { getFiles, getDistribution, getStatsTotal, previewDelete, confirmDelete, previewDeleteRange, getAiAnalysis } from '../api.js'
+import { getFiles, getDistribution, getStatsTotal, getAiAnalysis } from '../api.js'
 import DeleteConfirmModal from './DeleteConfirmModal.jsx'
 import GeminiAnalysisModal from './GeminiAnalysisModal.jsx'
 import ClaudeAnalysisModal from './ClaudeAnalysisModal.jsx'
@@ -13,9 +13,10 @@ import DistributionChart from './hour/DistributionChart.jsx'
 import ModeSettingsPanel from './hour/ModeSettingsPanel.jsx'
 import AiModePanel from './hour/AiModePanel.jsx'
 import { useHourKeyboard } from './hour/useHourKeyboard.js'
+import { useHourDelete } from './hour/useHourDelete.js'
 import {
   getPageSize, getHoverZoom, getThumbWidth, buildInitialModeParams,
-  saveModeParams, formatBytes, recordAiRequest, VIEW_MODE_KEY,
+  saveModeParams, recordAiRequest, VIEW_MODE_KEY,
 } from './hour/hourUtils.js'
 
 export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, onBack, onFilesDeleted }) {
@@ -34,16 +35,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
 
   const [selectionMode, setSelectionMode]     = useState(false)
   const [selectedMap, setSelectedMap]         = useState(new Map())
-  const [preview, setPreview]                 = useState(null)
-  const [previewLoading, setPreviewLoading]   = useState(false)
-  const [deleteLoading, setDeleteLoading]     = useState(false)
-  const [deleteError, setDeleteError]         = useState(null)
-  const [deleteSuccess, setDeleteSuccess]     = useState(null)
   const [internalRefreshKey, setInternalRefreshKey] = useState(0)
-  const [hourPreview, setHourPreview]         = useState(null)
-  const [hourPreviewLoading, setHourPreviewLoading] = useState(false)
-  const [hourDeleteLoading, setHourDeleteLoading] = useState(false)
-  const [hourDeleteError, setHourDeleteError] = useState(null)
 
   const [geminiOpen, setGeminiOpen]         = useState(false)
   const [geminiStructured, setGeminiStructured] = useState(false)
@@ -67,6 +59,18 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     }
     return { photos, videos, bytes }
   }, [selectedMap])
+
+  const del = useHourDelete({
+    cameraId, dateFrom, dateTo, files, selectedIds,
+    onBack, onFilesDeleted,
+    onClearSelection: () => {
+      setSelectionMode(false)
+      setSelectedMap(new Map())
+      anchorIdxRef.current = null
+      anchorActionRef.current = null
+    },
+    onRefresh: () => setInternalRefreshKey(k => k + 1),
+  })
 
   useEffect(() => {
     function onPageSize()   { setPageSize(getPageSize()); setPage(1) }
@@ -114,8 +118,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     setSelectedMap(new Map())
     anchorIdxRef.current = null
     anchorActionRef.current = null
-    setDeleteError(null)
-    setDeleteSuccess(null)
+    del.resetMessages()
   }
 
   function toggleSelect(file, idx, shiftKey) {
@@ -137,63 +140,6 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       }
       return next
     })
-  }
-
-  async function handleDeletePreview() {
-    if (selectedIds.size === 0) return
-    setPreviewLoading(true)
-    setDeleteError(null)
-    setDeleteSuccess(null)
-    try {
-      const data = await previewDelete([...selectedIds])
-      setPreview(data)
-    } catch (e) {
-      setDeleteError(e.message)
-    } finally {
-      setPreviewLoading(false)
-    }
-  }
-
-  async function handleDeleteConfirm() {
-    const allIds = [
-      ...preview.selected.map(f => f.id),
-      ...preview.related_videos.map(f => f.id),
-    ]
-    setDeleteLoading(true)
-    setDeleteError(null)
-    setDeleteSuccess(null)
-    try {
-      const allPreviewFiles = [...preview.selected, ...preview.related_videos]
-      const firstName = allPreviewFiles[0]?.file_path?.split(/[\\/]/).pop()
-      const extraCount = allPreviewFiles.length - 1
-
-      const res = await confirmDelete(allIds)
-      setPreview(null)
-      setSelectionMode(false)
-      setSelectedMap(new Map())
-      anchorIdxRef.current = null
-      anchorActionRef.current = null
-
-      const parts = []
-      if (res.photo_count) parts.push(`${res.photo_count} photo${res.photo_count !== 1 ? 's' : ''}`)
-      if (res.video_count) parts.push(`${res.video_count} video${res.video_count !== 1 ? 's' : ''}`)
-      const fileSummary = parts.length ? parts.join(' + ') : `${res.deleted.length} files`
-      const thumbPart = res.thumbnails_deleted ? ` · ${res.thumbnails_deleted} thumbnail${res.thumbnails_deleted !== 1 ? 's' : ''} removed` : ''
-      const freedPart = res.freed_bytes > 0 ? ` · freed ${formatBytes(res.freed_bytes)}` : ''
-      const fileHint = firstName ? ` — ${firstName}${extraCount > 0 ? ` +${extraCount}` : ''}` : ''
-
-      if (res.failed?.length > 0) {
-        setDeleteError(`Deleted ${fileSummary}${thumbPart}${freedPart}${fileHint}. ${res.failed.length} could not be removed from disk.`)
-      } else {
-        setDeleteSuccess(`Deleted ${fileSummary}${thumbPart}${freedPart}${fileHint}`)
-      }
-      setInternalRefreshKey(k => k + 1)
-      onFilesDeleted?.()
-    } catch (e) {
-      setDeleteError(e.message)
-    } finally {
-      setDeleteLoading(false)
-    }
   }
 
   // Reset focused file when page content changes
@@ -224,53 +170,6 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     _ovReloadTimer.current = setTimeout(() => reloadAiAnalysis(), 1500)
   }
 
-  async function handleDeleteAll() {
-    if (files.length === 0) return
-    setPreviewLoading(true)
-    setDeleteError(null)
-    setDeleteSuccess(null)
-    try {
-      const data = await previewDelete(files.map(f => f.id))
-      setPreview(data)
-    } catch (e) {
-      setDeleteError(e.message)
-    } finally {
-      setPreviewLoading(false)
-    }
-  }
-
-  async function handleDeleteHourPreview() {
-    setHourPreviewLoading(true)
-    setHourDeleteError(null)
-    try {
-      const data = await previewDeleteRange(cameraId, dateFrom, dateTo)
-      setHourPreview(data)
-    } catch (e) {
-      setHourDeleteError(e.message)
-    } finally {
-      setHourPreviewLoading(false)
-    }
-  }
-
-  async function handleDeleteHourConfirm() {
-    const allIds = [
-      ...hourPreview.selected.map(f => f.id),
-      ...hourPreview.related_videos.map(f => f.id),
-    ]
-    setHourDeleteLoading(true)
-    setHourDeleteError(null)
-    try {
-      await confirmDelete(allIds)
-      setHourPreview(null)
-      onFilesDeleted?.()
-      onBack()
-    } catch (e) {
-      setHourDeleteError(e.message)
-    } finally {
-      setHourDeleteLoading(false)
-    }
-  }
-
   function handleViewModeChange(e) {
     const v = e.target.value
     setViewMode(v)
@@ -290,7 +189,10 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     gridRef, anchorIdxRef, anchorActionRef,
     setPage, setFocusedFileIndex, setViewMode, setSelectionMode,
     setSelectedMap, setInternalRefreshKey, setPeekOriginal,
-    toggleSelectionMode, handleDeletePreview, handleDeleteAll, handleDeleteHourPreview,
+    toggleSelectionMode,
+    handleDeletePreview: del.handleDeletePreview,
+    handleDeleteAll: del.handleDeleteAll,
+    handleDeleteHourPreview: del.handleDeleteHourPreview,
   })
 
   const enabledModes = getEnabledViewModes()
@@ -334,11 +236,11 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           <button
             className="hv-select-btn"
             style={{ color: '#f87171' }}
-            onClick={handleDeleteHourPreview}
-            disabled={hourPreviewLoading}
+            onClick={del.handleDeleteHourPreview}
+            disabled={del.hourPreviewLoading}
             title="Delete all files in this hour (Backspace)"
           >
-            {hourPreviewLoading
+            {del.hourPreviewLoading
               ? <i className="mdi mdi-loading mdi-spin" />
               : <><i className="mdi mdi-delete-sweep-outline" /> Delete hour</>
             }
@@ -411,9 +313,9 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           selectionStats={selectionStats}
           onSelectAll={() => setSelectedMap(new Map(files.map(f => [f.id, f])))}
           onSelectNone={() => setSelectedMap(new Map())}
-          onDelete={handleDeletePreview}
+          onDelete={del.handleDeletePreview}
           onCancel={toggleSelectionMode}
-          loading={previewLoading}
+          loading={del.previewLoading}
         />
       )}
 
@@ -460,40 +362,40 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         </div>
       )}
 
-      {deleteError && !preview && !hourPreview && (
+      {del.deleteError && !del.preview && !del.hourPreview && (
         <div className="hv-delete-error">
-          <i className="mdi mdi-alert-circle-outline" /> {deleteError}
+          <i className="mdi mdi-alert-circle-outline" /> {del.deleteError}
         </div>
       )}
-      {deleteSuccess && !preview && !hourPreview && (
+      {del.deleteSuccess && !del.preview && !del.hourPreview && (
         <div className="hv-delete-success">
-          <i className="mdi mdi-check-circle-outline" /> {deleteSuccess}
+          <i className="mdi mdi-check-circle-outline" /> {del.deleteSuccess}
         </div>
       )}
-      {hourDeleteError && !hourPreview && (
+      {del.hourDeleteError && !del.hourPreview && (
         <div className="hv-delete-error">
-          <i className="mdi mdi-alert-circle-outline" /> {hourDeleteError}
+          <i className="mdi mdi-alert-circle-outline" /> {del.hourDeleteError}
         </div>
       )}
 
-      {preview && (
+      {del.preview && (
         <DeleteConfirmModal
-          preview={preview}
-          onConfirm={handleDeleteConfirm}
-          onCancel={() => { setPreview(null); setDeleteError(null); setDeleteSuccess(null) }}
-          busy={deleteLoading}
-          error={deleteError}
+          preview={del.preview}
+          onConfirm={del.handleDeleteConfirm}
+          onCancel={del.cancelPreview}
+          busy={del.deleteLoading}
+          error={del.deleteError}
           camera={camera}
         />
       )}
 
-      {hourPreview && (
+      {del.hourPreview && (
         <DeleteConfirmModal
-          preview={hourPreview}
-          onConfirm={handleDeleteHourConfirm}
-          onCancel={() => { setHourPreview(null); setHourDeleteError(null) }}
-          busy={hourDeleteLoading}
-          error={hourDeleteError}
+          preview={del.hourPreview}
+          onConfirm={del.handleDeleteHourConfirm}
+          onCancel={del.cancelHourPreview}
+          busy={del.hourDeleteLoading}
+          error={del.hourDeleteError}
           camera={camera}
         />
       )}

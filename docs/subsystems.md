@@ -20,7 +20,9 @@ For a flat per-file listing see [`code-map.md`](code-map.md). This doc is the *g
 | **Compute-service** (separate process) | `compute-service/*` | `shared/` | ultralytics, openvino, opencv, Pillow |
 | **Shared block** | `shared/*` | — | pydantic |
 
-Rule of thumb: **`database.py` is the only file that runs SQL.** Every other subsystem reaches the DB through its functions — that makes `database.py` the single seam to mock or replace.
+Rule of thumb: **`database.py` owns the table schema and the shared SQL helpers.** `config & scan`, `stats`, the thumbnail pipeline and `ai_providers` reach the DB only through its functions — that makes `database.py` the main seam to mock or replace.
+
+The exception is [`routers/delete.py`](../backend/routers/delete.py), which runs its own inline SQL: the file-deletion `SELECT`/`DELETE` and the ±5 s video-matching `JOIN`. [`routers/ai.py`](../backend/routers/ai.py) (`/ai_objects_summary`), [`routers/maintenance.py`](../backend/routers/maintenance.py) (`DELETE FROM files`) and [`ai_providers/openvino.py`](../backend/ai_providers/openvino.py) each run one inline query as well. So when changing the DB schema, grep for raw SQL beyond `database.py` too.
 
 ---
 

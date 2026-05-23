@@ -1,10 +1,10 @@
-"""On-demand thumbnail generation and original-file serving.
+"""On-demand thumbnail generation.
 
 Endpoints: /thumbnail, /diff_thumbnail, /diff_zoom_thumbnail, /erosion_thumbnail,
-/motion_thumbnail, /openvino_thumbnail, /video_thumbnail, /media.
+/motion_thumbnail, /openvino_thumbnail, /video_thumbnail.
+Serving original files lives in `routers/media.py`.
 """
 import base64
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -22,6 +22,37 @@ from diff_zoom_thumbnails import get_or_create_diff_zoom_thumbnail
 router = APIRouter()
 
 _THUMB_CACHE_HEADERS = {"Cache-Control": "public, max-age=604800"}
+
+
+def _parse_page_ids(page_ids: str) -> list[int]:
+    """Parse the comma-separated `page_ids` query param into a non-empty int list."""
+    try:
+        ids = [int(x) for x in page_ids.split(",") if x.strip()]
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid page_ids format")
+    if not ids:
+        raise HTTPException(status_code=400, detail="page_ids cannot be empty")
+    return ids
+
+
+def _page_thumbnail_response(file_id: int, kind: str, build) -> FileResponse:
+    """Shared flow for the page-context motion thumbnails (diff / diff_zoom / erosion / motion).
+
+    Validates the file is a photo, ensures the base thumbnail exists, then runs
+    `build(conn)` to get or create the mode-specific thumbnail.
+    """
+    with get_connection() as conn:
+        file_row = get_file_by_id(conn, file_id)
+        if file_row is None:
+            raise HTTPException(status_code=404, detail="File not found")
+        if file_row["file_type"] != "photo":
+            raise HTTPException(status_code=400, detail=f"{kind} thumbnails only available for photos")
+        try:
+            get_or_create_thumbnail(conn, file_id, file_row["file_path"])
+            path = build(conn)
+        except (FileNotFoundError, ValueError) as e:
+            raise HTTPException(status_code=404, detail=str(e))
+    return FileResponse(str(path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
 
 @router.get("/thumbnail/{file_id}", summary="Get or generate a thumbnail for a photo")
@@ -45,28 +76,11 @@ def get_diff_thumbnail(
     page_ids: str = Query(description="Comma-separated photo file IDs on the current page"),
     threshold: int = Query(default=20, ge=0, le=255),
 ):
-    try:
-        ids = [int(x) for x in page_ids.split(",") if x.strip()]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid page_ids format")
-    if not ids:
-        raise HTTPException(status_code=400, detail="page_ids cannot be empty")
-
-    with get_connection() as conn:
-        file_row = get_file_by_id(conn, file_id)
-        if file_row is None:
-            raise HTTPException(status_code=404, detail="File not found")
-        if file_row["file_type"] != "photo":
-            raise HTTPException(status_code=400, detail="Diff thumbnails only available for photos")
-        try:
-            get_or_create_thumbnail(conn, file_id, file_row["file_path"])
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-        try:
-            diff_path = get_or_create_diff_thumbnail(conn, file_id, ids, threshold)
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-    return FileResponse(str(diff_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
+    ids = _parse_page_ids(page_ids)
+    return _page_thumbnail_response(
+        file_id, "Diff",
+        lambda conn: get_or_create_diff_thumbnail(conn, file_id, ids, threshold),
+    )
 
 
 @router.get("/diff_zoom_thumbnail/{file_id}", summary="Motion-diff zoom thumbnail (crop to hottest 1/9 tile)")
@@ -75,28 +89,11 @@ def get_diff_zoom_thumbnail(
     page_ids: str = Query(description="Comma-separated photo file IDs on the current page"),
     threshold: int = Query(default=20, ge=0, le=255),
 ):
-    try:
-        ids = [int(x) for x in page_ids.split(",") if x.strip()]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid page_ids format")
-    if not ids:
-        raise HTTPException(status_code=400, detail="page_ids cannot be empty")
-
-    with get_connection() as conn:
-        file_row = get_file_by_id(conn, file_id)
-        if file_row is None:
-            raise HTTPException(status_code=404, detail="File not found")
-        if file_row["file_type"] != "photo":
-            raise HTTPException(status_code=400, detail="Diff zoom thumbnails only available for photos")
-        try:
-            get_or_create_thumbnail(conn, file_id, file_row["file_path"])
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-        try:
-            zoom_path = get_or_create_diff_zoom_thumbnail(conn, file_id, ids, threshold)
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-    return FileResponse(str(zoom_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
+    ids = _parse_page_ids(page_ids)
+    return _page_thumbnail_response(
+        file_id, "Diff zoom",
+        lambda conn: get_or_create_diff_zoom_thumbnail(conn, file_id, ids, threshold),
+    )
 
 
 @router.get("/erosion_thumbnail/{file_id}", summary="Erosion/MOG2 thumbnail for a photo")
@@ -105,28 +102,11 @@ def get_erosion_thumbnail(
     page_ids: str = Query(description="Comma-separated photo file IDs on the current page"),
     threshold: int = Query(default=20, ge=0, le=255),
 ):
-    try:
-        ids = [int(x) for x in page_ids.split(",") if x.strip()]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid page_ids format")
-    if not ids:
-        raise HTTPException(status_code=400, detail="page_ids cannot be empty")
-
-    with get_connection() as conn:
-        file_row = get_file_by_id(conn, file_id)
-        if file_row is None:
-            raise HTTPException(status_code=404, detail="File not found")
-        if file_row["file_type"] != "photo":
-            raise HTTPException(status_code=400, detail="Erosion thumbnails only available for photos")
-        try:
-            get_or_create_thumbnail(conn, file_id, file_row["file_path"])
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-        try:
-            erosion_path = get_or_create_erosion_thumbnail(conn, file_id, ids, threshold)
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-    return FileResponse(str(erosion_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
+    ids = _parse_page_ids(page_ids)
+    return _page_thumbnail_response(
+        file_id, "Erosion",
+        lambda conn: get_or_create_erosion_thumbnail(conn, file_id, ids, threshold),
+    )
 
 
 @router.get("/motion_thumbnail/{file_id}", summary="Motion visualization thumbnail (4 modes)")
@@ -138,28 +118,11 @@ def get_motion_thumbnail(
 ):
     if mode not in MOTION_VALID_MODES:
         raise HTTPException(status_code=400, detail=f"Invalid mode '{mode}'")
-    try:
-        ids = [int(x) for x in page_ids.split(",") if x.strip()]
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid page_ids format")
-    if not ids:
-        raise HTTPException(status_code=400, detail="page_ids cannot be empty")
-
-    with get_connection() as conn:
-        file_row = get_file_by_id(conn, file_id)
-        if file_row is None:
-            raise HTTPException(status_code=404, detail="File not found")
-        if file_row["file_type"] != "photo":
-            raise HTTPException(status_code=400, detail="Motion thumbnails only available for photos")
-        try:
-            get_or_create_thumbnail(conn, file_id, file_row["file_path"])
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-        try:
-            motion_path = get_or_create_motion_thumbnail(conn, file_id, ids, threshold, mode)
-        except (FileNotFoundError, ValueError) as e:
-            raise HTTPException(status_code=404, detail=str(e))
-    return FileResponse(str(motion_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
+    ids = _parse_page_ids(page_ids)
+    return _page_thumbnail_response(
+        file_id, "Motion",
+        lambda conn: get_or_create_motion_thumbnail(conn, file_id, ids, threshold, mode),
+    )
 
 
 @router.get("/openvino_thumbnail/{file_id}", summary="Photo with YOLO bounding boxes (OpenVINO detection)")
@@ -232,24 +195,3 @@ def get_video_thumbnail(
     VID_THUMB_DIR.mkdir(exist_ok=True)
     cache_path.write_bytes(data)
     return FileResponse(str(cache_path), media_type=media_type, headers=_THUMB_CACHE_HEADERS)
-
-
-@router.get("/media/{file_id}", summary="Serve the original file")
-def get_media(file_id: int):
-    with get_connection() as conn:
-        file_row = get_file_by_id(conn, file_id)
-        if file_row is None:
-            raise HTTPException(status_code=404, detail="File not found")
-        src = Path(file_row["file_path"])
-        if not src.exists():
-            raise HTTPException(status_code=404, detail="Source file not found on disk")
-    suffix = src.suffix.lower()
-    mime_map = {
-        ".mp4": "video/mp4",
-        ".webm": "video/webm",
-        ".mov": "video/quicktime",
-        ".avi": "video/x-msvideo",
-        ".mkv": "video/x-matroska",
-    }
-    media_type = mime_map.get(suffix, "application/octet-stream")
-    return FileResponse(str(src), media_type=media_type)

@@ -81,6 +81,7 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 | File | Description |
 |------|-------------|
 | [`docs/code-map.md`](docs/code-map.md) | Code map — all backend and frontend files, what each file does |
+| [`docs/recipes.md`](docs/recipes.md) | Change recipes — which files to touch for cross-cutting tasks (add a view mode, AI provider, endpoint) |
 | [`docs/subsystems.md`](docs/subsystems.md) | Backend grouped into subsystems: dependencies and seams |
 | [`docs/compute-service.md`](docs/compute-service.md) | Optional compute-service: stateless detection + video backend, routing (off/local/remote), path remapping |
 | [`docs/settings.md`](docs/settings.md) | All user settings: localStorage keys, defaults, ranges, where each is defined |
