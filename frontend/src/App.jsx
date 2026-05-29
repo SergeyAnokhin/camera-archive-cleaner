@@ -16,9 +16,7 @@ import {
   LEVELS, dateRangeForPeriod, computeIntensity, getPreviewsPerCell,
   loadNavState, saveNavState,
 } from './components/navUtils.js'
-
-const CELL_ANALYSIS_PROMPT = (n) =>
-  `You are analyzing ${n} photos from a security camera. Return ONLY valid JSON:\n{"scene":"one sentence","images":[{"description":"1-2 sentences","objects":["мужчина","кошка"]}]}\nUse Russian words for people and animals (человек, мужчина, женщина, ребёнок, кошка, собака, птица, машина, велосипед, etc.).`
+import { CELL_ANALYSIS_PROMPT } from './prompts.js'
 
 const _nav = loadNavState()
 

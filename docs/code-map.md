@@ -103,6 +103,7 @@ Imported by both the main backend and the compute-service.
 | [`App.jsx`](../frontend/src/App.jsx) | Root component. Owns all state: selected camera, drill-down level (year/month/day/hour), date range, delete mode. Orchestrates level transitions |
 | [`api.js`](../frontend/src/api.js) | All HTTP calls to the backend. The only file that knows API URLs |
 | [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI display utilities: `OBJECT_EMOJI_DEFAULTS` (100+ label→emoji), `resolveAiIcons(str)` → `[{emoji,label}]`, `getExcludedObjects()` — reads `detection_excluded_objects` from localStorage |
+| [`prompts.js`](../frontend/src/prompts.js) | Single source of truth for all AI prompt templates: `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude), `GEMINI_FREEFORM_PROMPT`, `CELL_ANALYSIS_PROMPT(n)` (heatmap batch). `{n}` = image count |
 | [`main.jsx`](../frontend/src/main.jsx) | React entry point. Mounts `<App />` |
 
 ### Components (`frontend/src/components/`)

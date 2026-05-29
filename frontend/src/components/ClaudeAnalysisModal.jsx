@@ -1,29 +1,14 @@
 import { useState, useEffect } from 'react'
 import { claudeAnalyzeBatch } from '../api.js'
+import { STRUCTURED_ANALYSIS_TEMPLATE } from '../prompts.js'
 import './GeminiAnalysisModal.css'
 
 const CLAUDE_API_KEY_KEY   = 'claude_api_key'
 const CLAUDE_MODEL_KEY     = 'claude_model'
 const CLAUDE_DEFAULT_MODEL = 'claude-haiku-4-5-20251001'
 
-const CLAUDE_STRUCTURED_TEMPLATE = `Ты анализируешь {n} снимков с камеры видеонаблюдения.
-
-Для каждого снимка:
-- description: 1-2 предложения. Опиши ДИНАМИЧЕСКИЕ объекты и их взаимодействие или положение. Если очевидно, что объект что-то делает — укажи, но только при высокой уверенности. Фон и декорации не описывай.
-- objects: массив коротких слов для динамических объектов. Используй максимально конкретные слова:
-  • Люди: "мужчина", "женщина", "ребёнок", "мальчик", "девочка" — или "человек" если пол/возраст не определить.
-  • Животные: "кошка", "собака", "птица", "курица", "кролик", "лиса", "белка", "конь", "корова", "ёж" и т.д. — НЕ пиши просто "животное".
-  • Транспорт: "машина", "грузовик", "велосипед", "мотоцикл", "автобус".
-  • Прочее: "дождь", "снег", "паук", "пакет".
-  Пустой массив [], если динамических объектов нет.
-
-scene: 1 предложение — что в целом происходит на этих {n} снимках (общая активность, не описание места).
-
-Ответь СТРОГО JSON (без markdown, без пояснений):
-{"scene": "...", "images": [{"description": "...", "objects": [...]}, ...]}`
-
 function buildStructuredPrompt(n) {
-  return CLAUDE_STRUCTURED_TEMPLATE.replace(/\{n\}/g, n)
+  return STRUCTURED_ANALYSIS_TEMPLATE.replace(/\{n\}/g, n)
 }
 
 export default function ClaudeAnalysisModal({ fileIds, onClose, onComplete }) {

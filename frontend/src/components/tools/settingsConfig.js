@@ -1,5 +1,7 @@
 // localStorage keys, defaults and option lists for the Tools modal.
 
+import { STRUCTURED_ANALYSIS_TEMPLATE } from '../../prompts.js'
+
 export const FONT_KEY = 'font-base'
 export const FONT_MIN = 12
 export const FONT_MAX = 22
@@ -45,21 +47,7 @@ export const GEMINI_API_KEY_KEY = 'gemini_api_key'
 export const GEMINI_MODEL_KEY   = 'gemini_model'
 export const GEMINI_PROMPT_KEY  = 'gemini_structured_prompt'
 export const GEMINI_DEFAULT_MODEL  = 'gemini-3.1-flash-lite'
-export const GEMINI_DEFAULT_PROMPT = `Ты анализируешь {n} снимков с камеры видеонаблюдения.
-
-Для каждого снимка:
-- description: 1-2 предложения. Опиши ДИНАМИЧЕСКИЕ объекты и их взаимодействие или положение. Если очевидно, что объект что-то делает — укажи, но только при высокой уверенности. Фон и декорации не описывай.
-- objects: массив коротких слов для динамических объектов. Используй максимально конкретные слова:
-  • Люди: "мужчина", "женщина", "ребёнок", "мальчик", "девочка" — или "человек" если пол/возраст не определить.
-  • Животные: "кошка", "собака", "птица", "курица", "кролик", "лиса", "белка", "конь", "корова", "ёж" и т.д. — НЕ пиши просто "животное".
-  • Транспорт: "машина", "грузовик", "велосипед", "мотоцикл", "автобус".
-  • Прочее: "дождь", "снег", "паук", "пакет".
-  Пустой массив [], если динамических объектов нет.
-
-scene: 1 предложение — что в целом происходит на этих {n} снимках (общая активность, не описание места).
-
-Ответь СТРОГО JSON (без markdown, без пояснений):
-{"scene": "...", "images": [{"description": "...", "objects": [...]}, ...]}`
+export const GEMINI_DEFAULT_PROMPT = STRUCTURED_ANALYSIS_TEMPLATE
 
 export const CLAUDE_API_KEY_KEY   = 'claude_api_key'
 export const CLAUDE_MODEL_KEY     = 'claude_model'

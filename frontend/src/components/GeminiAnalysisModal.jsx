@@ -1,31 +1,15 @@
 import { useState, useEffect } from 'react'
 import { geminiAnalyze, geminiAnalyzeBatch } from '../api.js'
+import { STRUCTURED_ANALYSIS_TEMPLATE, GEMINI_FREEFORM_PROMPT } from '../prompts.js'
 import './GeminiAnalysisModal.css'
 
 const GEMINI_API_KEY_KEY = 'gemini_api_key'
 const GEMINI_MODEL_KEY   = 'gemini_model'
 const GEMINI_PROMPT_KEY  = 'gemini_structured_prompt'
 const GEMINI_DEFAULT_MODEL  = 'gemini-3.1-flash-lite'
-const GEMINI_DEFAULT_PROMPT = 'Детально опиши, что происходит на этих снимках с камеры видеонаблюдения. Перечисли все заметные объекты, людей, транспортные средства и события.'
-
-const FALLBACK_STRUCTURED_TEMPLATE = `Ты анализируешь {n} снимков с камеры видеонаблюдения.
-
-Для каждого снимка:
-- description: 1-2 предложения. Опиши ДИНАМИЧЕСКИЕ объекты и их взаимодействие или положение. Если очевидно, что объект что-то делает — укажи, но только при высокой уверенности. Фон и декорации не описывай.
-- objects: массив коротких слов для динамических объектов. Используй максимально конкретные слова:
-  • Люди: "мужчина", "женщина", "ребёнок", "мальчик", "девочка" — или "человек" если пол/возраст не определить.
-  • Животные: "кошка", "собака", "птица", "курица", "кролик", "лиса", "белка", "конь", "корова", "ёж" и т.д. — НЕ пиши просто "животное".
-  • Транспорт: "машина", "грузовик", "велосипед", "мотоцикл", "автобус".
-  • Прочее: "дождь", "снег", "паук", "пакет".
-  Пустой массив [], если динамических объектов нет.
-
-scene: 1 предложение — что в целом происходит на этих {n} снимках (общая активность, не описание места).
-
-Ответь СТРОГО JSON (без markdown, без пояснений):
-{"scene": "...", "images": [{"description": "...", "objects": [...]}, ...]}`
 
 function buildStructuredPrompt(n) {
-  const template = localStorage.getItem(GEMINI_PROMPT_KEY) || FALLBACK_STRUCTURED_TEMPLATE
+  const template = localStorage.getItem(GEMINI_PROMPT_KEY) || STRUCTURED_ANALYSIS_TEMPLATE
   return template.replace(/\{n\}/g, n)
 }
 
@@ -38,7 +22,7 @@ export default function GeminiAnalysisModal({ fileIds, onClose, structured = fal
   const [prompt, setPrompt] = useState(() =>
     structured
       ? buildStructuredPrompt(fileIds.length)
-      : (localStorage.getItem('gemini_prompt') || GEMINI_DEFAULT_PROMPT)
+      : (localStorage.getItem('gemini_prompt') || GEMINI_FREEFORM_PROMPT)
   )
   const [running, setRunning]   = useState(false)
   const [result, setResult]     = useState(null)

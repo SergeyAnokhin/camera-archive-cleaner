@@ -107,10 +107,17 @@ After creating or updating a doc, add/update its entry in the `README.md` Docume
 
 ## 6. Project description
 
-Read for more details technical specifications:
+**Current architecture is in `docs/` — that is the source of truth.** Use the
+Documentation table in [`README.md`](README.md) as the index; before touching any
+feature area, find the relevant doc there and read it first.
+
+The requirements brief (ТЗ) below has been **rewritten to match the shipped
+system**: it is now an implementation-agnostic specification of current behaviour
+(API, data model, view modes, AI, compute-service, UI), written so the project
+could be rebuilt on a different stack. `docs/` remains the authoritative,
+code-level source of truth; the ТЗ is the higher-level functional spec. Where
+they ever disagree, trust `docs/` and the code:
 
 - [Часть 1 из 3](technical-specifications/part1.md)
 - [Часть 2 из 3](technical-specifications/part2.md)
 - [Часть 3 из 3](technical-specifications/part3.md)
-
-**Docs index** — see the Documentation table in [`README.md`](README.md). That table is the single source of truth for all architecture docs. Before touching any feature area, find the relevant doc there and read it first.
