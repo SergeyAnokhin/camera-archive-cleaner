@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "camera-cleaner.fullname" . }}-compute
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "compute") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.compute.service.port }}
+      targetPort: 8001

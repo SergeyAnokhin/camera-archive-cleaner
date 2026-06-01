@@ -1,0 +1,99 @@
+# Default values for camera-cleaner.
+# Image tags are rewritten by CI (.github/workflows/build.yml) on each push to main.
+
+nameOverride: ""
+fullnameOverride: "camera-cleaner"
+
+image:
+  # GHCR base for all three images: <registry>/<component>:<tag>
+  registry: ghcr.io/sergeyanokhin/camera-snapshots-cleaner-claude
+  pullPolicy: IfNotPresent
+  backend:
+    repository: backend
+    tag: "latest"   # CI overwrites with the git SHA
+  compute:
+    repository: compute
+    tag: "latest"   # CI overwrites with the git SHA
+  frontend:
+    repository: frontend
+    tag: "latest"   # CI overwrites with the git SHA
+
+# Pull secret name(s) for the GHCR images (only needed if the packages are private).
+imagePullSecrets: []
+# - name: ghcr-creds
+
+backend:
+  replicas: 1
+  service:
+    port: 8000
+  # State persisted on the SQLite + cache PVC (mounted into /app/backend via subPath).
+  state:
+    size: 5Gi
+    storageClass: ""        # "" = cluster default StorageClass
+  # Cache directories created under /app/backend by the app — mounted via subPath
+  # so they persist without shadowing the code copied into the image.
+  cacheDirs:
+    - thumbnails_cache
+    - openvino_thumbnails_cache
+    - video_thumbnails_cache
+    - diff_thumbnails_cache
+    - diff_zoom_thumbnails_cache
+    - motion_thumbnails_cache
+    - erosion_thumbnails_cache
+
+compute:
+  replicas: 1
+  service:
+    port: 8001
+  # Pin the heavy compute-service to the powerful node (labelled role=compute).
+  nodeSelector:
+    role: compute
+  # Path remap: empty because the SMB share is mounted at the SAME path in both
+  # backend and compute pods (identity — no remap needed). See docs/compute-service.md.
+  pathRemap:
+    from: ""
+    to: ""
+
+frontend:
+  replicas: 1
+  service:
+    port: 80
+
+# cameras.yaml served to the backend as a ConfigMap. Paths are LINUX paths under
+# the SMB mountPath below — NOT the Windows/UNC paths used in local dev.
+camerasConfig: |
+  cameras:
+    - id: "foscam_fi9805w"
+      name: "Foscam FI9805W"
+      path_snapshots: "/camera/Foscam/FI9805W_C4D6553DECE1/snap"
+      path_videos: "/camera/Foscam/FI9805W_C4D6553DECE1/record"
+    - id: "foscamHut"
+      name: "Foscam Hut"
+      path_snapshots: "/camera/FoscamHut/FI9800P_00626E870C7B/snap"
+      path_videos: "/camera/FoscamHut/FI9800P_00626E870C7B/record"
+
+# Camera NAS share, mounted (read-write — backend deletes files) into both pods
+# via the SMB CSI driver. Requires csi-driver-smb installed in the cluster.
+camera:
+  smb:
+    # SMB source in //server/share form.
+    source: "//192.168.1.91/Camera"
+    # Mount point inside both pods — MUST match the prefix used in camerasConfig.
+    mountPath: /camera
+    size: 100Gi
+    # Secret holding the SMB credentials (keys: username, password).
+    # Set createSecret=true to render it from username/password below, or create
+    # it yourself and set createSecret=false.
+    createSecret: false
+    secretName: smb-creds
+    username: ""
+    password: ""
+
+ingress:
+  enabled: true
+  className: traefik
+  host: camera.local
+  # Traefik middleware that strips the /api prefix before forwarding to backend.
+  # The frontend calls relative /api/... (see frontend/src/api.js); the backend
+  # serves routes at the root, so the prefix must be removed.
+  stripApiPrefix: true

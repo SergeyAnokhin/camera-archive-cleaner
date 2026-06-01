@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "camera-cleaner.fullname" . }}-state
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.backend.state.size }}
+  {{- with .Values.backend.state.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}

@@ -204,3 +204,20 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 | [`vite.config.js`](../frontend/vite.config.js) | Vite: proxies `/api/*` → `http://localhost:8000` |
 | [`package.json`](../frontend/package.json) | Dependencies: React, Recharts, Vite |
 | [`index.html`](../frontend/index.html) | HTML entry point; loads MDI icons from CDN |
+
+---
+
+## Deployment (k3s + ArgoCD + Helm)
+
+Containerisation + GitOps deploy. Full architecture and rationale: [`deployment.md`](deployment.md).
+
+| File | Role |
+|---|---|
+| [`backend/Dockerfile`](../backend/Dockerfile) | Backend image (:8000). Build context = repo root (needs `shared/`) |
+| [`compute-service/Dockerfile`](../compute-service/Dockerfile) | Compute image (:8001). CPU-only torch; pre-bakes `yolov8n.pt`. Context = repo root |
+| [`frontend/Dockerfile`](../frontend/Dockerfile) | Vite build → nginx static image |
+| [`frontend/nginx.conf`](../frontend/nginx.conf) | nginx: serves the SPA with `index.html` fallback (no `/api` proxy — the Ingress routes it) |
+| [`.dockerignore`](../.dockerignore) | Keeps `node_modules`, caches, DB, `*.pt` out of the build context |
+| [`deploy/helm/camera-cleaner/`](../deploy/helm/camera-cleaner/) | Helm chart: 3 Deployments+Services, state PVC (subPath mounts), SMB PV/PVC, cameras ConfigMap, Traefik Ingress + StripPrefix middleware. Tags in `values.yaml` are rewritten by CI |
+| [`deploy/argocd/application.yaml`](../deploy/argocd/application.yaml) | ArgoCD Application — auto-sync from `deploy/helm/camera-cleaner` |
+| [`.github/workflows/build.yml`](../.github/workflows/build.yml) | CI: build+push 3 images to GHCR by git SHA, `yq`-bump tags in `values.yaml`, commit back |

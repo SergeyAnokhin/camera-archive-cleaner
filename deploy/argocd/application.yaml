@@ -1,0 +1,25 @@
+# ArgoCD Application — deploy with:
+#   kubectl apply -f deploy/argocd/application.yaml
+# ArgoCD watches the repo; when CI rewrites image tags in values.yaml it syncs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: camera-cleaner
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/SergeyAnokhin/camera-snapshots-cleaner-claude.git
+    targetRevision: main
+    path: deploy/helm/camera-cleaner
+    helm:
+      releaseName: camera-cleaner
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: camera-cleaner
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

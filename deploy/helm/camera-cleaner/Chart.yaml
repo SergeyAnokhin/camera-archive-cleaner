@@ -1,0 +1,6 @@
+apiVersion: v2
+name: camera-cleaner
+description: Camera Snapshots Cleaner — backend + compute-service + frontend
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

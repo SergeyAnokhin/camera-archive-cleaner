@@ -1,0 +1,79 @@
+{{- $fullname := include "camera-cleaner.fullname" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-backend
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "backend") | nindent 6 }}
+  strategy:
+    type: Recreate          # state PVC is RWO — avoid two pods mounting it at once
+  template:
+    metadata:
+      labels:
+        {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "backend") | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Seed compute_config.json on the state PVC so the backend routes heavy
+        # work to the compute Service (mode=local would point at localhost:8001,
+        # which is a different pod here). Only written if absent — UI edits persist.
+        - name: seed-compute-config
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - >-
+              test -s /state/compute_config.json ||
+              printf '{"mode":"remote","remote_url":"http://%s-compute:%d"}'
+              "{{ $fullname }}" "{{ .Values.compute.service.port }}"
+              > /state/compute_config.json
+          volumeMounts:
+            - name: state
+              mountPath: /state
+      containers:
+        - name: backend
+          image: {{ include "camera-cleaner.image" (dict "ctx" . "img" .Values.image.backend) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /cameras
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: cameras
+              mountPath: /app/backend/cameras.yaml
+              subPath: cameras.yaml
+            - name: state
+              mountPath: /app/backend/snapshots.db
+              subPath: snapshots.db
+            - name: state
+              mountPath: /app/backend/compute_config.json
+              subPath: compute_config.json
+            {{- range $dir := .Values.backend.cacheDirs }}
+            - name: state
+              mountPath: /app/backend/{{ $dir }}
+              subPath: {{ $dir }}
+            {{- end }}
+            - name: camera-share
+              mountPath: {{ .Values.camera.smb.mountPath }}
+      volumes:
+        - name: cameras
+          configMap:
+            name: {{ $fullname }}-cameras
+        - name: state
+          persistentVolumeClaim:
+            claimName: {{ $fullname }}-state
+        - name: camera-share
+          persistentVolumeClaim:
+            claimName: {{ $fullname }}-camera

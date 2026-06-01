@@ -1,0 +1,30 @@
+# VCS / tooling
+.git
+.github
+.claude
+
+# Node
+node_modules
+**/node_modules
+frontend/dist
+
+# Python
+**/__pycache__
+*.pyc
+
+# Local state / caches (regenerated at runtime, never baked into images)
+backend/snapshots.db
+backend/snapshots.db*
+backend/*_cache
+backend/compute_config.json
+backend/models
+compute-service/models
+**/*.pt
+
+# Dev data
+CameraArchive
+
+# Docs & specs (not needed in runtime images)
+docs
+technical-specifications
+*.md

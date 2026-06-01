@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "camera-cleaner.fullname" . }}-compute
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.compute.replicas }}
+  selector:
+    matchLabels:
+      {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "compute") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "compute") | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.compute.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: compute
+          image: {{ include "camera-cleaner.image" (dict "ctx" . "img" .Values.image.compute) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8001
+          env:
+            - name: COMPUTE_PATH_REMAP_FROM
+              value: {{ .Values.compute.pathRemap.from | quote }}
+            - name: COMPUTE_PATH_REMAP_TO
+              value: {{ .Values.compute.pathRemap.to | quote }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: camera-share
+              mountPath: {{ .Values.camera.smb.mountPath }}
+              readOnly: true
+      volumes:
+        - name: camera-share
+          persistentVolumeClaim:
+            claimName: {{ include "camera-cleaner.fullname" . }}-camera

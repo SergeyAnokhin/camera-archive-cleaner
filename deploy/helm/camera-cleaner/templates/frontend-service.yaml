@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "camera-cleaner.fullname" . }}-frontend
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "frontend") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.service.port }}
+      targetPort: 80

@@ -1,0 +1,56 @@
+{{- $fullname := include "camera-cleaner.fullname" . -}}
+{{- if .Values.camera.smb.createSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.camera.smb.secretName }}
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  username: {{ .Values.camera.smb.username | quote }}
+  password: {{ .Values.camera.smb.password | quote }}
+---
+{{- end }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ $fullname }}-camera
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+spec:
+  capacity:
+    storage: {{ .Values.camera.smb.size }}
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+    - noperm
+  csi:
+    driver: smb.csi.k8s.io
+    readOnly: false
+    # Must be unique across the cluster.
+    volumeHandle: {{ $fullname }}-camera
+    volumeAttributes:
+      source: {{ .Values.camera.smb.source | quote }}
+    nodeStageSecretRef:
+      name: {{ .Values.camera.smb.secretName }}
+      namespace: {{ .Release.Namespace }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullname }}-camera
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: {{ $fullname }}-camera
+  resources:
+    requests:
+      storage: {{ .Values.camera.smb.size }}
