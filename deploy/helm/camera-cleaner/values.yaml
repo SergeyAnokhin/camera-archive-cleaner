@@ -3,21 +3,19 @@
 
 nameOverride: ""
 fullnameOverride: "camera-cleaner"
-
 image:
   # GHCR base for all three images: <registry>/<component>:<tag>
   registry: ghcr.io/sergeyanokhin/camera-snapshots-cleaner-claude
   pullPolicy: IfNotPresent
   backend:
     repository: backend
-    tag: "latest"   # CI overwrites with the git SHA
+    tag: "8291a03a5329" # CI overwrites with the git SHA
   compute:
     repository: compute
-    tag: "latest"   # CI overwrites with the git SHA
+    tag: "8291a03a5329" # CI overwrites with the git SHA
   frontend:
     repository: frontend
-    tag: "latest"   # CI overwrites with the git SHA
-
+    tag: "8291a03a5329" # CI overwrites with the git SHA
 # Pull secret name(s) for the GHCR images (only needed if the packages are private).
 imagePullSecrets: []
 # - name: ghcr-creds
@@ -29,7 +27,7 @@ backend:
   # State persisted on the SQLite + cache PVC (mounted into /app/backend via subPath).
   state:
     size: 5Gi
-    storageClass: ""        # "" = cluster default StorageClass
+    storageClass: "" # "" = cluster default StorageClass
   # Cache directories created under /app/backend by the app — mounted via subPath
   # so they persist without shadowing the code copied into the image.
   cacheDirs:
@@ -40,7 +38,6 @@ backend:
     - diff_zoom_thumbnails_cache
     - motion_thumbnails_cache
     - erosion_thumbnails_cache
-
 compute:
   replicas: 1
   service:
@@ -53,12 +50,10 @@ compute:
   pathRemap:
     from: ""
     to: ""
-
 frontend:
   replicas: 1
   service:
     port: 80
-
 # cameras.yaml served to the backend as a ConfigMap. Paths are LINUX paths under
 # the SMB mountPath below — NOT the Windows/UNC paths used in local dev.
 camerasConfig: |
@@ -71,7 +66,6 @@ camerasConfig: |
       name: "Foscam Hut"
       path_snapshots: "/camera/FoscamHut/FI9800P_00626E870C7B/snap"
       path_videos: "/camera/FoscamHut/FI9800P_00626E870C7B/record"
-
 # Camera NAS share, mounted (read-write — backend deletes files) into both pods
 # via the SMB CSI driver. Requires csi-driver-smb installed in the cluster.
 camera:
@@ -88,7 +82,6 @@ camera:
     secretName: smb-creds
     username: ""
     password: ""
-
 ingress:
   enabled: true
   className: traefik
