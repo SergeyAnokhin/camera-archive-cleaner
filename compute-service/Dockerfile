@@ -19,9 +19,11 @@ COPY shared/ shared/
 COPY compute-service/ compute-service/
 
 WORKDIR /app/compute-service
-# Pre-download the default model so the pod doesn't fetch it at runtime.
-# detection.py loads "{model}.pt" from the working dir when no OpenVINO export exists.
-RUN python -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
+# Export all three YOLO models to OpenVINO IR format once at build time.
+# Resulting models/ directory is baked into the image so the pod starts instantly
+# with fast Intel CPU inference. .pt weights are removed afterwards to keep the
+# image lean. detection.py picks up models/<name>_openvino_model/ automatically.
+RUN python export_models.py
 
 EXPOSE 8001
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8001"]
