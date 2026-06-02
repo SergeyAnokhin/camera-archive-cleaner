@@ -30,11 +30,13 @@ spec:
           command:
             - sh
             - -c
-            - >-
-              test -s /state/compute_config.json ||
-              printf '{"mode":"remote","remote_url":"http://%s-compute:%d"}'
-              "{{ $fullname }}" "{{ .Values.compute.service.port }}"
-              > /state/compute_config.json
+            - |
+              test -s /state/compute_config.json || \
+                printf '{"mode":"remote","remote_url":"http://%s-compute:%d"}' \
+                "{{ $fullname }}" "{{ .Values.compute.service.port }}" \
+                > /state/compute_config.json
+              [ -d /state/snapshots.db ] && rm -rf /state/snapshots.db
+              touch /state/snapshots.db
           volumeMounts:
             - name: state
               mountPath: /state
