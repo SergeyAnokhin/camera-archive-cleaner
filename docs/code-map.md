@@ -78,10 +78,11 @@ Optional stateless service for heavy compute. Full architecture: [`compute-servi
 
 | File | Role |
 |---|---|
-| [`app.py`](../compute-service/app.py) | FastAPI app on :8001 — `/health`, `/detect`, `/video/thumbnail` |
-| [`detection.py`](../compute-service/detection.py) | YOLO model loading + object detection |
+| [`app.py`](../compute-service/app.py) | FastAPI app on :8001 — `/health`, `/detect`, `/video/thumbnail`. Logs elapsed seconds per request |
+| [`detection.py`](../compute-service/detection.py) | YOLO model loading (lazy) + object detection. Prefers `models/<name>_openvino_model/` over `.pt` |
 | [`video.py`](../compute-service/video.py) | Video thumbnail generation (first/last frame, 2×2 grid, max-change GIF) |
 | [`config.py`](../compute-service/config.py) | Path-remap config (env vars `COMPUTE_PATH_REMAP_FROM` / `_TO`) |
+| [`export_models.py`](../compute-service/export_models.py) | **Build-time only** — exports yolov8n/s/m to OpenVINO IR; called by `Dockerfile RUN`, never at runtime |
 
 ## Shared block (`shared/`)
 
@@ -214,7 +215,7 @@ Containerisation + GitOps deploy. Full architecture and rationale: [`deployment.
 | File | Role |
 |---|---|
 | [`backend/Dockerfile`](../backend/Dockerfile) | Backend image (:8000). Build context = repo root (needs `shared/`) |
-| [`compute-service/Dockerfile`](../compute-service/Dockerfile) | Compute image (:8001). CPU-only torch; pre-bakes `yolov8n.pt`. Context = repo root |
+| [`compute-service/Dockerfile`](../compute-service/Dockerfile) | Compute image (:8001). CPU-only torch; runs `export_models.py` at build time to bake all 3 OpenVINO models in. Context = repo root |
 | [`frontend/Dockerfile`](../frontend/Dockerfile) | Vite build → nginx static image |
 | [`frontend/nginx.conf`](../frontend/nginx.conf) | nginx: serves the SPA with `index.html` fallback (no `/api` proxy — the Ingress routes it) |
 | [`.dockerignore`](../.dockerignore) | Keeps `node_modules`, caches, DB, `*.pt` out of the build context |

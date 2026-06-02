@@ -50,7 +50,7 @@ the same off/local/remote design.
 | Image | Dockerfile | Context | Notes |
 |---|---|---|---|
 | backend | [`backend/Dockerfile`](../backend/Dockerfile) | repo root (needs `shared/`) | light deps; serves :8000 |
-| compute | [`compute-service/Dockerfile`](../compute-service/Dockerfile) | repo root (needs `shared/`) | CPU-only torch + ultralytics; pre-bakes `yolov8n.pt`; serves :8001 |
+| compute | [`compute-service/Dockerfile`](../compute-service/Dockerfile) | repo root (needs `shared/`) | CPU-only torch + ultralytics; runs [`export_models.py`](../compute-service/export_models.py) at build time — downloads yolov8n/s/m, exports all three to OpenVINO IR, removes `.pt` files; serves :8001 |
 | frontend | [`frontend/Dockerfile`](../frontend/Dockerfile) | repo root | Vite build → nginx static ([`frontend/nginx.conf`](../frontend/nginx.conf)) |
 
 Both Python images import `shared/`, so they build from the **repo root** with
@@ -151,11 +151,15 @@ helm install csi-driver-smb csi-driver-smb/csi-driver-smb -n kube-system
 kubectl -n kube-system get pods | grep csi-smb   # csi-smb-node pods Running on every node
 ```
 
-### Step 3 — Label the powerful node
-Pins the compute-service (heavy YOLO/video work) to that machine.
+### Step 3 — Label and taint the compute node
+Label pins the compute-service to that machine. The taint prevents any other workload
+from accidentally landing there — only pods with an explicit toleration can run on it.
 ```bash
 kubectl label node <powerful-node> role=compute
+kubectl taint nodes <powerful-node> role=compute:NoSchedule
 ```
+The compute Deployment in the Helm chart already includes the matching toleration
+(`values.yaml` → `compute.tolerations`). No other pods in the chart tolerate this taint.
 
 ### Step 4 — Namespace + secrets
 ```bash
@@ -229,7 +233,7 @@ browser ──http──► Traefik Ingress (host: ingress.host)
 | frontend → backend | relative `/api` in [`api.js`](../frontend/src/api.js) → same origin via Ingress |
 | backend → compute | seeded `compute_config.json` = `remote http://camera-cleaner-compute:8001` |
 | backend/compute → camera files | one SMB PVC mounted at the same `mountPath` in both pods |
-| compute → powerful node | `nodeSelector: role=compute` |
+| compute → powerful node | `nodeSelector: role=compute` + taint `role=compute:NoSchedule` on that node |
 | git push → running pods | CI builds + bumps tags → ArgoCD auto-syncs |
 
 ---
@@ -247,12 +251,56 @@ kubectl -n camera-cleaner exec deploy/camera-cleaner-backend -- ls /camera
 |---|---|
 | Pod `ImagePullBackOff` | GHCR package private and no `imagePullSecrets`, or wrong `image.registry` |
 | Pod stuck `ContainerCreating`, PVC unbound | SMB CSI driver missing, bad `smb-creds`, or wrong `camera.smb.source` |
-| compute pod won't schedule (`Pending`) | no node labelled `role=compute` |
+| compute pod won't schedule (`Pending`) | no node labelled `role=compute`, or taint applied without toleration in chart |
+| Unexpected pod lands on compute node | taint not applied — run `kubectl taint nodes <node> role=compute:NoSchedule` |
 | Heatmap empty after scan | `camerasConfig` paths don't match the SMB mount contents |
 | Tools → Compute shows unavailable | compute pod not Ready, or seeded `remote_url` doesn't match the compute Service name |
 | `/api` calls 404 | StripPrefix middleware not applied (`ingress.stripApiPrefix: true`) |
+| Site down after compute node shutdown | a kube-system pod (e.g. `csi-smb-controller`, `traefik`) drifted onto the compute node — see "Node stability" below |
 
 Render the manifests locally without a cluster:
 ```bash
 helm template camera-cleaner deploy/helm/camera-cleaner -n camera-cleaner
 ```
+
+---
+
+## Node stability — powering down the compute node
+
+The design goal: the compute node (ubuntu-server) can be shut down and the main
+site (frontend + backend) keeps working. When it goes down, only the compute pod
+disappears; OpenVINO and video modes show as unavailable, everything else works.
+
+**What can go wrong:** k3s schedules `kube-system` workloads on any node by
+default. If `csi-smb-controller` (Deployment) or `traefik` (Deployment) land on
+the compute node, they die with it and break SMB mounts or ingress.
+
+**Permanent fix — taint (Step 3):** once the taint is applied, no new pod lands
+on the compute node unless it carries the matching toleration. Only our compute
+Deployment does.
+
+**If a kube-system deployment already drifted to the compute node:**
+
+```bash
+# Move csi-smb-controller to the k3s node immediately:
+kubectl patch deployment csi-smb-controller -n kube-system \
+  --patch '{"spec":{"template":{"spec":{"nodeSelector":{"kubernetes.io/hostname":"k3s"}}}}}'
+
+# If traefik landed on the compute node, pin it via K3s HelmChartConfig
+# (a kubectl patch would be overwritten by the k3s Helm controller):
+kubectl apply -f - <<'EOF'
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    nodeSelector:
+      kubernetes.io/hostname: k3s
+EOF
+```
+
+**Note on `svclb-traefik`:** this is a DaemonSet (klipper-lb), so it runs on
+every node by design. The instance on the compute node dying is harmless — the
+instance on k3s keeps routing traffic.

@@ -103,16 +103,47 @@ machine.
 
 | File | Role |
 |---|---|
-| [`compute-service/app.py`](../compute-service/app.py) | FastAPI app — `/health`, `/detect`, `/video/thumbnail` |
-| [`compute-service/detection.py`](../compute-service/detection.py) | YOLO model loading + detection (was `backend/yolo_detect.py`) |
+| [`compute-service/app.py`](../compute-service/app.py) | FastAPI app — `/health`, `/detect`, `/video/thumbnail`. Logs elapsed time for every request |
+| [`compute-service/detection.py`](../compute-service/detection.py) | YOLO model loading (lazy, cached) + detection. Logs model load time and per-image inference time |
 | [`compute-service/video.py`](../compute-service/video.py) | Video thumbnail generation (was `backend/video_thumbnails.py`) |
 | [`compute-service/config.py`](../compute-service/config.py) | Path-remap config (env driven) |
+| [`compute-service/export_models.py`](../compute-service/export_models.py) | **Build-time only** — downloads yolov8n/s/m `.pt` weights, exports each to OpenVINO IR (`models/<name>_openvino_model/`), removes the `.pt` files. Run by the Dockerfile `RUN` step; never executed at runtime |
 | [`shared/contract.py`](../shared/contract.py) | Pydantic API models — shared by both backends |
 | [`shared/coco_names.py`](../shared/coco_names.py) | COCO→Russian map + `excluded_to_en` |
 | [`backend/compute_client.py`](../backend/compute_client.py) | HTTP client used by the main backend |
 | [`backend/compute_config.py`](../backend/compute_config.py) | Routing config (`compute_config.json`) |
 | [`backend/compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO + video thumbnails |
 | [`backend/routers/compute.py`](../backend/routers/compute.py) | `/compute/config`, `/compute/status` endpoints |
+
+---
+
+## OpenVINO model export
+
+`detection.py` checks for `models/<name>_openvino_model/` at startup and, when
+found, loads the OpenVINO IR model instead of raw PyTorch — typically 2–5×
+faster on Intel CPUs. The OpenVINO IR format is portable; CPU-specific
+optimisation happens automatically in the OpenVINO Runtime at load time.
+
+**In Docker (k3s):** [`export_models.py`](../compute-service/export_models.py) runs
+inside the Dockerfile `RUN` step — all three models are exported and baked into
+the image. Build time increases ~4–5 min (one-time per image build). The `.pt`
+files are deleted afterwards to keep the image lean.
+
+**Locally:** export once manually then the files persist in `compute-service/models/`
+(git-ignored):
+```powershell
+cd compute-service
+python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='openvino')"
+mkdir models -ErrorAction SilentlyContinue
+Move-Item yolov8n_openvino_model models\
+```
+
+**Log lines to confirm which path is taken:**
+```
+🔷 Loading OpenVINO model: .../models/yolov8n_openvino_model   ← fast path
+🔷 Loading PyTorch model: yolov8n.pt (tip: export ...)         ← slow path
+🔷 Model yolov8n ready in 3.4 s                                ← either path
+```
 
 ---
 
