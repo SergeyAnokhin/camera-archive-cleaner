@@ -17,6 +17,7 @@ def load_yolo(model_name: str):
     if model_name not in _yolo_models:
         from ultralytics import YOLO
         ov_path = Path(__file__).parent / "models" / f"{model_name}_openvino_model"
+        t0 = time.time()
         if ov_path.exists():
             logger.info("🔷 Loading OpenVINO model: %s", ov_path)
             _yolo_models[model_name] = YOLO(str(ov_path), task="detect")
@@ -25,6 +26,7 @@ def load_yolo(model_name: str):
                         "`yolo export model=%s.pt format=openvino` for faster Intel CPU inference)",
                         model_name, model_name)
             _yolo_models[model_name] = YOLO(f"{model_name}.pt", task="detect")
+        logger.info("🔷 Model %s ready in %.1f s", model_name, time.time() - t0)
     return _yolo_models[model_name]
 
 

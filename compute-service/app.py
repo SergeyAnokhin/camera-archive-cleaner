@@ -13,6 +13,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import logging
+import time
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,12 +54,15 @@ def detect_endpoint(req: DetectRequest):
     except Exception as e:
         logger.error("Detection failed for %s: %s", path, e)
         raise HTTPException(status_code=500, detail=f"Detection error: {e}")
+    logger.info("detect  %-30s  model=%-10s  conf=%.2f  objects=%d  %.2f s",
+                Path(path).name, req.model, req.confidence, len(objects), elapsed / 1000)
     return DetectResponse(objects=objects, annotated_jpeg_b64=jpeg_b64, elapsed_ms=elapsed)
 
 
 @app.post("/video/thumbnail", summary="Video preview thumbnail (image/jpeg or image/gif)")
 def video_endpoint(req: VideoThumbnailRequest):
     path = config.remap_path(req.path)
+    t0 = time.time()
     try:
         data, content_type = video.make_video_thumbnail(path, req.mode)
     except FileNotFoundError as e:
@@ -68,4 +72,6 @@ def video_endpoint(req: VideoThumbnailRequest):
     except Exception as e:
         logger.error("Video thumbnail failed for %s: %s", path, e)
         raise HTTPException(status_code=500, detail=f"Video thumbnail error: {e}")
+    logger.info("video   %-30s  mode=%-15s  %.2f s",
+                Path(path).name, req.mode, time.time() - t0)
     return Response(content=data, media_type=content_type)
