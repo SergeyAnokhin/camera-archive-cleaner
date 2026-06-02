@@ -22,6 +22,8 @@ imagePullSecrets: []
 
 backend:
   replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: k3s
   service:
     port: 8000
   # State persisted on the SQLite + cache PVC (mounted into /app/backend via subPath).
@@ -52,6 +54,8 @@ compute:
     to: ""
 frontend:
   replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: k3s
   service:
     port: 80
 # cameras.yaml served to the backend as a ConfigMap. Paths are LINUX paths under
