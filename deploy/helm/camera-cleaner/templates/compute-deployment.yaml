@@ -22,6 +22,10 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.compute.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: compute
           image: {{ include "camera-cleaner.image" (dict "ctx" . "img" .Values.image.compute) }}

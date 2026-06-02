@@ -47,6 +47,14 @@ compute:
   # Pin the heavy compute-service to the powerful node (labelled role=compute).
   nodeSelector:
     role: compute
+  # Tolerate the taint placed on the compute node so that only explicitly
+  # tolerated workloads (i.e. this pod) land there. Apply the taint once with:
+  #   kubectl taint nodes ubuntu-server role=compute:NoSchedule
+  tolerations:
+    - key: role
+      operator: Equal
+      value: compute
+      effect: NoSchedule
   # Path remap: empty because the SMB share is mounted at the SAME path in both
   # backend and compute pods (identity — no remap needed). See docs/compute-service.md.
   pathRemap:
