@@ -1,0 +1,17 @@
+{{- if .Values.ollama.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "camera-cleaner.fullname" . }}-ollama
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.ollama.storage.size }}
+  {{- with .Values.ollama.storage.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}

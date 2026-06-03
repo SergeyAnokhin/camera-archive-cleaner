@@ -87,7 +87,8 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 | [`docs/settings.md`](docs/settings.md) | All user settings: localStorage keys, defaults, ranges, where each is defined |
 | [`docs/api.md`](docs/api.md) | All API endpoints with parameters and descriptions |
 | [`docs/database.md`](docs/database.md) | SQLite schema: `files`, `thumbnails`, `ai_analysis` tables, cascades, data flow |
-| [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis: Gemini, Claude & OpenVINO integration, DB schema, prompt format, icon display |
+| [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis: Gemini, Claude, Ollama & OpenVINO integration, DB schema, prompt format, icon display |
+| [`docs/ollama.md`](docs/ollama.md) | Local vision-LLM analysis via self-hosted Ollama (gemma3:4b): backend→Ollama flow, model install/select, k3s deploy, memory budget |
 | [`docs/visualization-modes.md`](docs/visualization-modes.md) | All 12 view modes: Normal, Motion Diff, Erosion, OpenVINO Detection, etc. |
 | [`docs/logging.md`](docs/logging.md) | Log levels, format, colours, how to configure |
 | [`docs/deployment.md`](docs/deployment.md) | k3s deployment: Docker images, Helm chart, ArgoCD GitOps, SMB camera share, node pinning |

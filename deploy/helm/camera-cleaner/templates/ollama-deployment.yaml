@@ -1,0 +1,56 @@
+{{- if .Values.ollama.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "camera-cleaner.fullname" . }}-ollama
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "ollama") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "ollama") | nindent 8 }}
+    spec:
+      {{- with .Values.ollama.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.ollama.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: ollama
+          image: {{ .Values.ollama.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 11434
+          env:
+            # Keep only one model resident and unload it when idle — the compute
+            # node shares ~5 GB with the compute-service (torch/YOLO). See docs/ollama.md.
+            - name: OLLAMA_KEEP_ALIVE
+              value: {{ .Values.ollama.keepAlive | quote }}
+            - name: OLLAMA_MAX_LOADED_MODELS
+              value: {{ .Values.ollama.maxLoadedModels | quote }}
+          {{- with .Values.ollama.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 11434
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: ollama-models
+              mountPath: /root/.ollama
+      volumes:
+        - name: ollama-models
+          persistentVolumeClaim:
+            claimName: {{ include "camera-cleaner.fullname" . }}-ollama
+{{- end }}

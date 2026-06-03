@@ -4,6 +4,7 @@ import { getFiles, getDistribution, getStatsTotal, getAiAnalysis } from '../api.
 import DeleteConfirmModal from './DeleteConfirmModal.jsx'
 import GeminiAnalysisModal from './GeminiAnalysisModal.jsx'
 import ClaudeAnalysisModal from './ClaudeAnalysisModal.jsx'
+import OllamaAnalysisModal from './OllamaAnalysisModal.jsx'
 import OpenVinoAnalysisModal from './OpenVinoAnalysisModal.jsx'
 import { VIEW_MODES, DEFAULT_VIEW_MODE_KEY, getEnabledViewModes } from './viewModes/index.js'
 import PhotoCard from './hour/PhotoCard.jsx'
@@ -40,6 +41,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [geminiOpen, setGeminiOpen]         = useState(false)
   const [geminiStructured, setGeminiStructured] = useState(false)
   const [claudeOpen, setClaudeOpen]         = useState(false)
+  const [ollamaOpen, setOllamaOpen]         = useState(false)
   const [openVinoOpen, setOpenVinoOpen]     = useState(false)
   const [aiAnalysisMap, setAiAnalysisMap]   = useState(new Map())
   const [aiStatsKey, setAiStatsKey]         = useState(0)
@@ -271,6 +273,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           onRun={() => {
             if (activeMode.aiProvider === 'claude') {
               setClaudeOpen(true)
+            } else if (activeMode.aiProvider === 'ollama') {
+              setOllamaOpen(true)
             } else if (activeMode.aiProvider === 'openvino') {
               setOpenVinoOpen(true)
             } else {
@@ -425,6 +429,20 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             fileIds={ids}
             onClose={() => setClaudeOpen(false)}
             onComplete={() => { recordAiRequest('claude'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}
+          />
+        )
+      })()}
+
+      {ollamaOpen && (() => {
+        const photoFiles = files.filter(f => f.file_type === 'photo')
+        const ids = selectedIds.size > 0
+          ? photoFiles.filter(f => selectedIds.has(f.id)).map(f => f.id)
+          : photoFiles.map(f => f.id)
+        return (
+          <OllamaAnalysisModal
+            fileIds={ids}
+            onClose={() => setOllamaOpen(false)}
+            onComplete={() => { recordAiRequest('ollama'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}
           />
         )
       })()}

@@ -189,6 +189,18 @@ export function claudeAnalyzeBatch({ fileIds, prompt, model, apiKey }) {
   return postJson('/claude_analyze_batch', { file_ids: fileIds, prompt, model, api_key: apiKey })
 }
 
+export function ollamaAnalyzeBatch({ fileIds, prompt, model, baseUrl }) {
+  return postJson('/ollama_analyze_batch', { file_ids: fileIds, prompt, model, base_url: baseUrl })
+}
+
+export function getOllamaModels(baseUrl) {
+  return get('/ollama_models' + buildQuery({ base_url: baseUrl }))
+}
+
+export function pullOllamaModel(baseUrl, name) {
+  return postJson('/ollama_pull', { base_url: baseUrl, name })
+}
+
 export function openvinoAnalyzeBatch({ fileIds, modelName, confidence }) {
   return postJson('/openvino_analyze_batch', { file_ids: fileIds, model_name: modelName, confidence })
 }

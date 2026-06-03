@@ -30,6 +30,17 @@ export const AI_PROVIDER_CONFIG = {
     icon: 'mdi-robot',
     label: 'Claude Analysis',
   },
+  ollama: {
+    modelKey: 'ollama_model',
+    defaultModel: 'gemma3:4b',
+    models: [
+      { value: 'gemma3:4b', label: '🟢 gemma3:4b (локально, бесплатно)' },
+      { value: 'gemma3:1b', label: '🟢 gemma3:1b (легче, бесплатно)' },
+      { value: 'llava:7b',  label: '🟡 llava:7b (локально, бесплатно)' },
+    ],
+    icon: 'mdi-server-network',
+    label: 'Ollama (локально)',
+  },
   openvino: {
     modelKey: 'openvino_model',
     defaultModel: 'yolov8n',

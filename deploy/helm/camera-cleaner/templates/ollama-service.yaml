@@ -1,0 +1,15 @@
+{{- if .Values.ollama.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "camera-cleaner.fullname" . }}-ollama
+  labels:
+    {{- include "camera-cleaner.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "ollama") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.ollama.service.port }}
+      targetPort: 11434
+{{- end }}

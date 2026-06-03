@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 import compute_client
-from ai_providers import claude, gemini, openvino
+from ai_providers import claude, gemini, ollama, openvino
 from database import get_ai_analysis_by_file_ids, get_connection
 
 router = APIRouter()
@@ -45,6 +45,33 @@ class ClaudeAnalyzeRequest(BaseModel):
 @router.post("/claude_analyze_batch", summary="Structured analysis via Anthropic Claude + save to DB")
 def claude_analyze_batch(req: ClaudeAnalyzeRequest):
     return claude.analyze_batch(req.file_ids, req.prompt, req.model, req.api_key)
+
+
+class OllamaAnalyzeRequest(BaseModel):
+    file_ids: list[int]
+    prompt: str
+    model: str
+    base_url: str
+
+
+@router.post("/ollama_analyze_batch", summary="Structured analysis via a local Ollama model (no API key)")
+def ollama_analyze_batch(req: OllamaAnalyzeRequest):
+    return ollama.analyze_batch(req.file_ids, req.prompt, req.model, req.base_url)
+
+
+@router.get("/ollama_models", summary="List models installed on an Ollama server")
+def ollama_models(base_url: str = Query(..., description="Ollama base URL")):
+    return {"models": ollama.list_models(base_url)}
+
+
+class OllamaPullRequest(BaseModel):
+    base_url: str
+    name: str
+
+
+@router.post("/ollama_pull", summary="Pull (install) a model onto an Ollama server")
+def ollama_pull(req: OllamaPullRequest):
+    return ollama.pull_model(req.base_url, req.name)
 
 
 class OpenVinoAnalyzeRequest(BaseModel):

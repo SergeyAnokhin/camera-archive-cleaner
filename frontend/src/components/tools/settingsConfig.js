@@ -1,6 +1,6 @@
 // localStorage keys, defaults and option lists for the Tools modal.
 
-import { STRUCTURED_ANALYSIS_TEMPLATE } from '../../prompts.js'
+import { STRUCTURED_ANALYSIS_TEMPLATE, OLLAMA_SINGLE_IMAGE_TEMPLATE } from '../../prompts.js'
 
 export const FONT_KEY = 'font-base'
 export const FONT_MIN = 12
@@ -64,6 +64,13 @@ export const CLAUDE_PRICING = {
   'claude-sonnet-4-6':         { input: 3.00,  output: 15.00 },
   'claude-opus-4-7':           { input: 15.00, output: 75.00 },
 }
+
+export const OLLAMA_BASE_URL_KEY   = 'ollama_base_url'
+export const OLLAMA_MODEL_KEY      = 'ollama_model'
+export const OLLAMA_PROMPT_KEY     = 'ollama_single_image_prompt'
+export const OLLAMA_DEFAULT_URL    = 'http://localhost:11434'
+export const OLLAMA_DEFAULT_MODEL  = 'gemma3:4b'
+export const OLLAMA_DEFAULT_PROMPT = OLLAMA_SINGLE_IMAGE_TEMPLATE
 
 export const GEMINI_MODELS = [
   { value: 'gemini-3.1-flash-lite',    label: 'gemini-3.1-flash-lite',    tier: '🟢 lite' },

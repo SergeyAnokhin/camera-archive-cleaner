@@ -8,6 +8,7 @@ import boundingBoxesMode from './boundingBoxesMode.js'
 import motionStackingMode from './motionStackingMode.js'
 import geminiMode from './geminiMode.js'
 import claudeMode from './claudeMode.js'
+import ollamaMode from './ollamaMode.js'
 import openvinoMode from './openvinoMode.js'
 
 export const VIEW_MODES = [
@@ -21,6 +22,7 @@ export const VIEW_MODES = [
   motionStackingMode,
   geminiMode,
   claudeMode,
+  ollamaMode,
   openvinoMode,
 ]
 export const DEFAULT_VIEW_MODE_KEY = normalMode.key

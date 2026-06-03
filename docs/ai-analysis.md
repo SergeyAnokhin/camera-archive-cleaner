@@ -6,10 +6,11 @@ How the AI image analysis feature works: from API request to stored results to o
 
 ## Overview
 
-The app supports two types of AI analysis:
+The app supports three types of AI analysis:
 
 - **Cloud AI** (Gemini, Claude) — sends photos to an external API, receives a natural-language description + object list per photo. Requires an API key and internet access.
-- **Local AI** (OpenVINO) — runs YOLOv8 object detection on the local machine, no API key or internet required. Detects objects from the COCO 80-class vocabulary (people, animals, vehicles, etc.) and draws bounding boxes.
+- **Local AI — detection** (OpenVINO) — runs YOLOv8 object detection on the local machine, no API key or internet required. Detects objects from the COCO 80-class vocabulary (people, animals, vehicles, etc.) and draws bounding boxes.
+- **Local AI — vision LLM** (Ollama) — sends photos to a self-hosted [Ollama](https://ollama.com) server running a multimodal model (e.g. `gemma3:4b`). Same description + object output as the cloud providers, but local and free. The backend calls Ollama **directly** (not via the compute-service); see [`ollama.md`](ollama.md).
 
 Results from all providers are stored in the same `ai_analysis` table and displayed as icons on photo cards and heatmap cells.
 
@@ -22,6 +23,9 @@ Results from all providers are stored in the same `ai_analysis` table and displa
 | Google Gemini | `gemini` | `gemini_api_key` | `gemini_model` |
 | Anthropic Claude | `claude` | `claude_api_key` | `claude_model` |
 | OpenVINO (local) | `openvino` | — | `openvino_model` |
+| Ollama (local LLM) | `ollama` | — (`ollama_base_url` instead) | `ollama_model` |
+
+Ollama sends no API key; it uses `ollama_base_url` (default `http://localhost:11434`) — the address of the self-hosted server, reachable **from the backend**. The single-image prompt is stored in `ollama_single_image_prompt`. Cost is always `0`.
 
 OpenVINO stores two separate confidence values:
 - `openvino_confidence` (float, default `0.25`) in localStorage — used by `OpenVinoAnalysisModal` (the "Run" button)
@@ -35,6 +39,7 @@ OpenVINO stores two separate confidence values:
 |----------|-------|-----------|------|
 | `gemini_analysis` | Gemini Analysis | ✓ | [`viewModes/geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) |
 | `claude_analysis` | Claude Analysis | ✓ | [`viewModes/claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) |
+| `ollama_analysis` | Ollama (локально) | ✓ | [`viewModes/ollamaMode.js`](../frontend/src/components/viewModes/ollamaMode.js) |
 | `openvino_detection` | OpenVINO Detection | ✓ | [`viewModes/openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) — reads `excluded` from localStorage via `getExcludedParam()` and passes it as a URL param |
 | `openvino_bbox` | OpenVINO Boxes | — | [`viewModes/openvinoBboxMode.js`](../frontend/src/components/viewModes/openvinoBboxMode.js) — same as above but without `isAiMode`; reads confidence from `openvino_confidence` localStorage key |
 
@@ -62,8 +67,12 @@ User clicks Run in AiModePanel
     │                              POST /gemini_analyze_batch
     │                              saves to ai_analysis
     │
-    └─ provider === 'claude' ──► ClaudeAnalysisModal.jsx
-                                   POST /claude_analyze_batch
+    ├─ provider === 'claude' ──► ClaudeAnalysisModal.jsx
+    │                              POST /claude_analyze_batch
+    │                              saves to ai_analysis
+    │
+    └─ provider === 'ollama' ──► OllamaAnalysisModal.jsx
+                                   POST /ollama_analyze_batch
                                    saves to ai_analysis
     │
     └─ onComplete() ──► recordAiRequest(provider)
@@ -103,6 +112,7 @@ Opens `OpenVinoAnalysisModal` → `POST /openvino_analyze_batch` → saves to DB
 **Modal files:**
 - [`frontend/src/components/GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) — editable prompt, token stats, cost estimate
 - [`frontend/src/components/ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) — same format
+- [`frontend/src/components/OllamaAnalysisModal.jsx`](../frontend/src/components/OllamaAnalysisModal.jsx) — editable per-image prompt, no token/cost stats (local & free)
 - [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider (reads `openvino_confidence` from localStorage), per-photo object list, ms/photo timing. Each object tag has an **×** button: click → confirm dialog → adds that label to `detection_excluded_objects` in localStorage (tag dims to show it was added)
 - Shared CSS: [`frontend/src/components/GeminiAnalysisModal.css`](../frontend/src/components/GeminiAnalysisModal.css)
 
@@ -128,6 +138,19 @@ Opens `OpenVinoAnalysisModal` → `POST /openvino_analyze_batch` → saves to DB
 [`ai_providers/claude.py`](../backend/ai_providers/claude.py) — `analyze_batch()`
 
 Same flow, but converts images to base64 JPEG and sends via `anthropic` SDK (`client.messages.create()`).
+
+### `POST /ollama_analyze_batch`
+
+[`ai_providers/ollama.py`](../backend/ai_providers/ollama.py) — `analyze_batch()`
+
+Request: `{ file_ids, prompt, model, base_url }`
+
+1. Loads photos from DB and disk (reuses `open_thumbnails` + `encode_jpeg` from `common.py`)
+2. **Loops one image per request** — small models are unreliable at "N images → array of N". Each call is `POST {base_url}/api/chat` with `format: "json"`, the image as base64, and the single-image prompt
+3. Parses each `{ description, objects }`, assembles them into `{ scene: "", images: [...] }`, saves via `save_structured()` with `provider='ollama'`
+4. Returns the same shape as the cloud providers, but `input_tokens`/`output_tokens`/`total_tokens` are `0` and `cost_usd` is `0.0`
+
+Returns `503` if the Ollama server is unreachable. Two helper endpoints manage models on the server: `GET /ollama_models?base_url=…` (proxies `/api/tags`) and `POST /ollama_pull` `{base_url, name}` (proxies `/api/pull`).
 
 ### `POST /openvino_analyze_batch`
 
@@ -178,7 +201,7 @@ Returns saved analysis rows for the given file IDs. Called by `HourViewer` on ev
 
 Returns unique object words across all `ai_analysis` rows for files in the given date range. Called by each `HeatmapCell` to show aggregate icons.
 
-**API client functions:** [`frontend/src/api.js`](../frontend/src/api.js) — `geminiAnalyzeBatch`, `claudeAnalyzeBatch`, `openvinoAnalyzeBatch`, `getOpenVinoBboxThumbnailUrl`, `getAiAnalysis`, `getAiObjectsSummary`
+**API client functions:** [`frontend/src/api.js`](../frontend/src/api.js) — `geminiAnalyzeBatch`, `claudeAnalyzeBatch`, `ollamaAnalyzeBatch`, `getOllamaModels`, `pullOllamaModel`, `openvinoAnalyzeBatch`, `getOpenVinoBboxThumbnailUrl`, `getAiAnalysis`, `getAiObjectsSummary`
 
 ---
 
@@ -386,7 +409,7 @@ Displayed in `AiModePanel` after each completed analysis.
 
 ## Settings (Tools modal)
 
-**Files:** [`tools/DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx), [`tools/GoogleAiTab.jsx`](../frontend/src/components/tools/GoogleAiTab.jsx), [`tools/ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx) — keys/defaults in [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js)
+**Files:** [`tools/DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx), [`tools/GoogleAiTab.jsx`](../frontend/src/components/tools/GoogleAiTab.jsx), [`tools/ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx), [`tools/OllamaAiTab.jsx`](../frontend/src/components/tools/OllamaAiTab.jsx) — keys/defaults in [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js)
 
 | Tab | Setting | localStorage key |
 |-----|---------|-----------------|
@@ -398,6 +421,9 @@ Displayed in `AiModePanel` after each completed analysis.
 | Google AI | Prompt template | `gemini_structured_prompt` |
 | Claude AI | API key | `claude_api_key` |
 | Claude AI | Model | `claude_model` |
+| Ollama | Base URL | `ollama_base_url` |
+| Ollama | Model (free text + installed list) | `ollama_model` |
+| Ollama | Single-image prompt | `ollama_single_image_prompt` |
 
 OpenVINO model is set inline via the AiModePanel model dropdown (writes `openvino_model`).  
 `openvino_confidence` (float) is written only by `OpenVinoAnalysisModal` (the "Run" modal) — the AiModePanel slider uses `modeParams.confidence` (integer %) from `mode_params_openvino` instead.

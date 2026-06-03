@@ -1,4 +1,6 @@
 """Shared helpers for AI provider modules: file loading, JSON parsing, cost, persistence."""
+import base64
+import io
 import json
 import logging
 
@@ -33,6 +35,16 @@ def open_thumbnails(file_rows, max_size=(1024, 1024)):
         except Exception as e:
             logger.warning("AI: не удалось открыть %s: %s", row["file_path"], e)
     return images, rows_used
+
+
+def encode_jpeg(images, quality=85):
+    """Encode PIL images as base64 JPEG strings (shared by Claude + Ollama)."""
+    encoded = []
+    for img in images:
+        buf = io.BytesIO()
+        img.convert("RGB").save(buf, format="JPEG", quality=quality)
+        encoded.append(base64.b64encode(buf.getvalue()).decode())
+    return encoded
 
 
 def parse_json_response(raw_text):

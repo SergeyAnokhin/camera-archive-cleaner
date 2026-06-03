@@ -60,6 +60,37 @@ compute:
   pathRemap:
     from: ""
     to: ""
+# Self-hosted Ollama server for local AI image analysis (e.g. gemma3:4b). The
+# main backend calls it DIRECTLY (not via the compute-service) at the in-cluster
+# URL http://camera-cleaner-ollama:11434 — set that as the Base URL in
+# Tools → Ollama. Models are pulled once via the UI and persisted on the PVC.
+# See docs/ollama.md.
+ollama:
+  enabled: true
+  # Public Docker Hub image (not GHCR). Pin a tag in production.
+  image: "ollama/ollama:latest"
+  service:
+    port: 11434
+  # Pin to the same powerful node as the compute-service (labelled role=compute).
+  nodeSelector:
+    role: compute
+  tolerations:
+    - key: role
+      operator: Equal
+      value: compute
+      effect: NoSchedule
+  # gemma3:4b (Q4) peaks ~3.5-4.5 GB. The node shares ~5 GB with the
+  # compute-service, so cap memory and keep only one model loaded.
+  resources:
+    requests:
+      memory: "1Gi"
+    limits:
+      memory: "5Gi"
+  keepAlive: "5m"
+  maxLoadedModels: "1"
+  storage:
+    size: 10Gi
+    storageClass: "" # "" = cluster default StorageClass
 frontend:
   replicas: 1
   nodeSelector:

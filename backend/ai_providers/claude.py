@@ -1,6 +1,4 @@
 """Anthropic Claude image analysis — structured batch (/claude_analyze_batch)."""
-import base64
-import io
 import logging
 import time
 
@@ -10,6 +8,7 @@ from ai_pricing import CLAUDE_PRICING
 
 from .common import (
     compute_cost,
+    encode_jpeg,
     fetch_file_rows,
     open_thumbnails,
     parse_json_response,
@@ -17,16 +16,6 @@ from .common import (
 )
 
 logger = logging.getLogger("api")
-
-
-def _encode_jpeg(images):
-    """Encode PIL images as base64 JPEG strings for the Claude messages API."""
-    encoded = []
-    for img in images:
-        buf = io.BytesIO()
-        img.convert("RGB").save(buf, format="JPEG", quality=85)
-        encoded.append(base64.b64encode(buf.getvalue()).decode())
-    return encoded
 
 
 def analyze_batch(file_ids, prompt, model, api_key):
@@ -41,7 +30,7 @@ def analyze_batch(file_ids, prompt, model, api_key):
     if not images:
         raise HTTPException(status_code=400, detail="No valid photo files found")
 
-    images_b64 = _encode_jpeg(images)
+    images_b64 = encode_jpeg(images)
     logger.info("🤖 Claude batch %s: %d изображений", model, len(images_b64))
 
     content = [

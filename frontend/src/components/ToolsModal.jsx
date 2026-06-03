@@ -5,6 +5,7 @@ import HourViewTab from './tools/HourViewTab.jsx'
 import DetectionTab from './tools/DetectionTab.jsx'
 import GoogleAiTab from './tools/GoogleAiTab.jsx'
 import ClaudeAiTab from './tools/ClaudeAiTab.jsx'
+import OllamaAiTab from './tools/OllamaAiTab.jsx'
 import ComputeTab from './tools/ComputeTab.jsx'
 import MaintenanceTab from './tools/MaintenanceTab.jsx'
 
@@ -14,6 +15,7 @@ const TABS = [
   { id: 'detection',   label: 'Detection' },
   { id: 'google_ai',   label: 'Google AI' },
   { id: 'claude_ai',   label: 'Claude AI' },
+  { id: 'ollama_ai',   label: 'Ollama' },
   { id: 'compute',     label: 'Compute' },
   { id: 'maintenance', label: 'Maintenance' },
 ]
@@ -57,6 +59,7 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
           {activeTab === 'detection'   && <DetectionTab />}
           {activeTab === 'google_ai'   && <GoogleAiTab />}
           {activeTab === 'claude_ai'   && <ClaudeAiTab />}
+          {activeTab === 'ollama_ai'   && <OllamaAiTab />}
           {activeTab === 'compute'     && <ComputeTab />}
           {activeTab === 'maintenance' && <MaintenanceTab onDatabaseCleared={onDatabaseCleared} />}
         </div>
