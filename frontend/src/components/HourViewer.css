@@ -162,6 +162,28 @@
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.7);
 }
 
+.hv-lightbox-download {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(31, 41, 55, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius);
+  color: #f1f5f9;
+  font-size: calc(var(--font-base) * 0.88);
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.hv-lightbox-download:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ── Misc ── */
 .hv-empty {
   text-align: center;

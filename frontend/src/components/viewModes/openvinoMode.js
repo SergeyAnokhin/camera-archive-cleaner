@@ -1,4 +1,4 @@
-import { getOpenVinoBboxThumbnailUrl, getExcludedParam } from '../../api.js'
+import { getOpenVinoBboxThumbnailUrl, getExcludedParam, getClassesParam } from '../../api.js'
 
 export default {
   key: 'openvino_detection',
@@ -12,6 +12,6 @@ export default {
   getImageUrl(file, { params } = {}) {
     const model = localStorage.getItem('openvino_model') || 'yolov8n'
     const confidence = (params?.confidence ?? 25) / 100
-    return getOpenVinoBboxThumbnailUrl(file.id, model, confidence, getExcludedParam())
+    return getOpenVinoBboxThumbnailUrl(file.id, model, confidence, getExcludedParam(), getClassesParam())
   },
 }

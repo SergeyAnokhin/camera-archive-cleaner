@@ -89,6 +89,7 @@ export const OV_CONFIDENCE_KEY = 'mode_params_openvino_detection'
 export const OV_CONFIDENCE_DEFAULT = 25
 export const EXCLUDED_OBJECTS_KEY = 'detection_excluded_objects'
 export const EMOJI_OVERRIDES_KEY  = 'detection_emoji_overrides'
+export const DETECTION_CLASSES_KEY = 'detection_classes'
 
 export const UNIFORMITY_METHOD_KEY     = 'uniformity_method'
 export const UNIFORMITY_METHOD_DEFAULT = 'combined'

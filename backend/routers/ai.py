@@ -51,12 +51,13 @@ class OpenVinoAnalyzeRequest(BaseModel):
     file_ids: list[int]
     model_name: str = "yolov8n"
     confidence: float = 0.25
+    classes: Optional[list[int]] = None
 
 
 @router.post("/openvino_analyze_batch", summary="Local object detection via YOLO / OpenVINO (no API key)")
 def openvino_analyze_batch(req: OpenVinoAnalyzeRequest):
     try:
-        return openvino.analyze_batch(req.file_ids, req.model_name, req.confidence)
+        return openvino.analyze_batch(req.file_ids, req.model_name, req.confidence, req.classes)
     except compute_client.ComputeDisabled:
         raise HTTPException(status_code=503, detail="Compute-service is disabled")
     except compute_client.ComputeUnavailable as e:
@@ -69,12 +70,13 @@ class OpenVinoRangeRequest(BaseModel):
     date_to: str
     model_name: str = "yolov8n"
     confidence: float = 0.25
+    classes: Optional[list[int]] = None
 
 
 @router.post("/openvino_analyze_range", summary="Local object detection for all photos in a date range")
 def openvino_analyze_range(req: OpenVinoRangeRequest):
     try:
-        return openvino.analyze_range(req.camera_id, req.date_from, req.date_to, req.model_name, req.confidence)
+        return openvino.analyze_range(req.camera_id, req.date_from, req.date_to, req.model_name, req.confidence, req.classes)
     except compute_client.ComputeDisabled:
         raise HTTPException(status_code=503, detail="Compute-service is disabled")
     except compute_client.ComputeUnavailable as e:

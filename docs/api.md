@@ -78,9 +78,9 @@ compute-service is disabled or unreachable.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/openvino_thumbnail/{file_id}` | Returns a JPEG with YOLO bounding boxes drawn. Params: `model` (default `yolov8n`), `confidence` (default `0.25`), `excluded` (comma-separated labels). Caches on first request; **also saves detected objects to `ai_analysis`** on cache miss. Cache: `backend/openvino_thumbnails_cache/` |
-| `POST` | `/openvino_analyze_batch` | Run YOLO on a list of photos. Body: `file_ids`, `model_name`, `confidence`. Saves results to `ai_analysis`. Returns `{elapsed_ms, images_used, saved_count, results}` |
-| `POST` | `/openvino_analyze_range` | Same as `/openvino_analyze_batch` but fetches all photos in a date range. Body: `camera_id`, `date_from`, `date_to`, `model_name`, `confidence`. Used by heatmap batch analysis |
+| `GET` | `/openvino_thumbnail/{file_id}` | Returns a JPEG with YOLO bounding boxes drawn. Params: `model` (default `yolov8n`), `confidence` (default `0.25`), `excluded` (comma-separated labels), `classes` (comma-separated COCO class IDs; empty = all 80). `classes` restricts YOLO inference (passed as `classes=`) and is part of the cache key. Caches on first request; **also saves detected objects to `ai_analysis`** on cache miss. Cache: `backend/openvino_thumbnails_cache/` |
+| `POST` | `/openvino_analyze_batch` | Run YOLO on a list of photos. Body: `file_ids`, `model_name`, `confidence`, `classes` (optional list of COCO class IDs, `null` = all). Saves results to `ai_analysis`. Returns `{elapsed_ms, images_used, saved_count, results}` |
+| `POST` | `/openvino_analyze_range` | Same as `/openvino_analyze_batch` but fetches all photos in a date range. Body: `camera_id`, `date_from`, `date_to`, `model_name`, `confidence`, `classes` (optional). Used by heatmap batch analysis |
 
 ### Shared
 
@@ -126,6 +126,28 @@ Persistent task queue for long-running compute jobs. Tasks survive server restar
 - `openvino`: `{camera_id, date_from, date_to, model_name, confidence}`
 
 **Compute-service `/metrics`** (new endpoint): returns `{cpu_percent, memory_total, memory_used, memory_percent}`. Requires `psutil` in the compute-service.
+
+---
+
+## Tuning
+
+Model tuning sessions — upload reference images and find the best model +
+per-model confidence via a golden-section search. See [`docs/tuning.md`](tuning.md).
+Standalone; depends on the compute-service for detection.
+
+| Method | Path | Body / Params | Description |
+|---|---|---|---|
+| `GET` | `/tuning/sessions` | — | List sessions (with `image_count`, status, progress) |
+| `POST` | `/tuning/sessions` | **multipart** `name` + `files[]` | Create session, upload images. Returns the new session row |
+| `GET` | `/tuning/sessions/{id}` | — | Full session (images, ground_truth, config, results) |
+| `DELETE` | `/tuning/sessions/{id}` | — | Delete session + uploaded files |
+| `GET` | `/tuning/sessions/{id}/image/{image_id}` | — | Serve an uploaded image |
+| `POST` | `/tuning/sessions/{id}/autolabel` | `{model, confidence}` | Run a model to seed ground truth labels |
+| `PUT` | `/tuning/sessions/{id}/ground_truth` | `{ground_truth}` | Save corrected labels (`{image_id: [objects]}`) |
+| `POST` | `/tuning/sessions/{id}/benchmark` | `{conf_from, conf_to, iterations}` | Start per-model golden-section search (background) |
+
+**Statuses:** `setup` → `ready` → `running` → `done` / `failed`. Poll
+`GET /tuning/sessions/{id}` while `running`. Result shape: `{per_model: {model: {probes, best, evals, final_range}}, recommended}`.
 
 ---
 

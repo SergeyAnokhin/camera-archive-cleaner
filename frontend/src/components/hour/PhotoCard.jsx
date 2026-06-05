@@ -4,6 +4,12 @@ import { resolveAiIcons } from '../../aiHelpers.js'
 import { formatTime } from './hourUtils.js'
 import './PhotoCard.css'
 
+function downloadName(file) {
+  const ext = file.file_path?.slice(file.file_path.lastIndexOf('.')) || '.jpg'
+  const stamp = (file.timestamp || '').replace(/[:T]/g, '-')
+  return `snapshot_${stamp}${ext}`
+}
+
 export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused, aiData, onImageLoad }) {
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
@@ -111,6 +117,15 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
       {!selectionMode && fullscreen && (
         <div className="hv-lightbox" onClick={() => setFullscreen(false)}>
           <img src={getMediaUrl(file.id)} alt={formatTime(file.timestamp)} className="hv-lightbox-img" />
+          <a
+            href={getMediaUrl(file.id)}
+            download={downloadName(file)}
+            className="hv-lightbox-download"
+            onClick={e => e.stopPropagation()}
+            title="Скачать оригинал"
+          >
+            <i className="mdi mdi-download" /> Скачать
+          </a>
         </div>
       )}
     </>

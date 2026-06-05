@@ -15,6 +15,7 @@ def init_db() -> None:
     with get_connection() as conn:
         init_ai_analysis_table(conn)
         init_tasks_table(conn)
+        init_tuning_table(conn)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS files (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -310,6 +311,30 @@ def save_ai_analysis(conn: sqlite3.Connection, file_id: int, provider: str, mode
 # ---------------------------------------------------------------------------
 # tasks — persistent task queue
 # ---------------------------------------------------------------------------
+
+def init_tuning_table(conn: sqlite3.Connection) -> None:
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS tuning_sessions (
+            id                TEXT    PRIMARY KEY,
+            name              TEXT    NOT NULL,
+            status            TEXT    NOT NULL DEFAULT 'setup',
+            images            TEXT    NOT NULL DEFAULT '[]',
+            ground_truth      TEXT    NOT NULL DEFAULT '{}',
+            benchmark_config  TEXT    NOT NULL DEFAULT '{}',
+            benchmark_results TEXT,
+            progress_current  INTEGER NOT NULL DEFAULT 0,
+            progress_total    INTEGER NOT NULL DEFAULT 0,
+            error_message     TEXT,
+            created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+            completed_at      TEXT
+        );
+    """)
+    # Migration: rename earlier file_ids-based column to images
+    try:
+        conn.execute("ALTER TABLE tuning_sessions ADD COLUMN images TEXT NOT NULL DEFAULT '[]'")
+    except Exception:
+        pass
+
 
 def init_tasks_table(conn: sqlite3.Connection) -> None:
     conn.executescript("""

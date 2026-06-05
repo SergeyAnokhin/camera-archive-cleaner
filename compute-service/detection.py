@@ -31,12 +31,13 @@ def load_yolo(model_name: str):
 
 
 def detect(image_path: str, model: str, confidence: float,
-           excluded: list[str], draw: bool):
+           excluded: list[str], draw: bool, classes: list[int] | None = None):
     """Run detection on one image.
 
     Returns (objects_ru, annotated_jpeg_b64_or_None, elapsed_ms).
     `objects_ru` lists every detected class. The annotated image (if draw=True)
     has excluded classes removed before the boxes are rendered.
+    `classes` restricts YOLO inference to the given COCO class IDs (None = all).
     """
     from PIL import Image as PILImage
 
@@ -52,7 +53,7 @@ def detect(image_path: str, model: str, confidence: float,
 
     # --- stage 2: YOLO inference ---
     t_infer = time.time()
-    results = yolo(img, conf=confidence, verbose=False)
+    results = yolo(img, conf=confidence, classes=classes, verbose=False)
     n_boxes = len(results[0].boxes)
     logger.debug("  [2] YOLO inference     %.1f ms  boxes=%d", (time.time() - t_infer) * 1000, n_boxes)
 

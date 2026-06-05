@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getCameras, getStatsTotal, getStatsGrouped, previewDeleteRange, confirmDelete, deleteByRange, getPreviews, openvinoAnalyzeRange, geminiAnalyzeBatch, claudeAnalyzeBatch } from './api.js'
+import { getCameras, getStatsTotal, getStatsGrouped, previewDeleteRange, confirmDelete, deleteByRange, getPreviews, openvinoAnalyzeRange, geminiAnalyzeBatch, claudeAnalyzeBatch, getClassesList } from './api.js'
 import DeleteConfirmModal from './components/DeleteConfirmModal.jsx'
 import Header from './components/Header.jsx'
 import CameraSelector from './components/CameraSelector.jsx'
@@ -10,6 +10,7 @@ import StatsBar from './components/StatsBar.jsx'
 import ScanButton from './components/ScanButton.jsx'
 import ToolsButton from './components/ToolsButton.jsx'
 import TasksScreen from './components/TasksScreen.jsx'
+import TuningScreen from './components/TuningScreen.jsx'
 import { initFontSize } from './components/tools/settingsIO.js'
 import CellSelBar from './components/CellSelBar.jsx'
 import { useHeatmapKeyboard } from './components/useHeatmapKeyboard.js'
@@ -91,6 +92,7 @@ export default function App() {
   const [focusedPeriod, setFocusedPeriod] = useState(null)
   const restorePeriodRef = useRef(null)
   const [showTasks, setShowTasks] = useState(false)
+  const [showTuning, setShowTuning] = useState(false)
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
 
@@ -246,7 +248,7 @@ export default function App() {
         for (let i = 0; i < cells.length; i++) {
           setSelAnalyzeProgress(`${i + 1}/${cells.length}`)
           const { dateFrom, dateTo } = getCellDateRange(cells[i].period)
-          await openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName: model, confidence })
+          await openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName: model, confidence, classes: getClassesList() })
         }
       } else {
         const apiKey = localStorage.getItem(provider === 'gemini' ? 'gemini_api_key' : 'claude_api_key')
@@ -323,8 +325,16 @@ export default function App() {
           <div style={{ display: 'flex', gap: 'var(--gap-sm)' }}>
             <button
               className="modal-btn neutral"
+              style={{ fontSize: 'calc(var(--font-base) * 0.88)', borderColor: showTuning ? 'var(--accent)' : undefined, color: showTuning ? 'var(--accent)' : undefined }}
+              onClick={() => { setShowTuning(v => !v); setShowTasks(false) }}
+            >
+              <i className="mdi mdi-tune-variant" />
+              Tuning
+            </button>
+            <button
+              className="modal-btn neutral"
               style={{ fontSize: 'calc(var(--font-base) * 0.88)', borderColor: showTasks ? 'var(--accent)' : undefined, color: showTasks ? 'var(--accent)' : undefined }}
-              onClick={() => setShowTasks(v => !v)}
+              onClick={() => { setShowTasks(v => !v); setShowTuning(false) }}
             >
               <i className="mdi mdi-playlist-play" />
               Tasks
@@ -334,8 +344,10 @@ export default function App() {
           </div>
         </div>
 
-        {/* Breadcrumb */}
-        <DrilldownBreadcrumb drillStack={drillStack} currentLevel={currentLevel} onNavigate={drillUpTo} extraLabel={selectedHour?.label} />
+        {/* Breadcrumb — only in camera view, not in Tuning/Tasks */}
+        {!showTasks && !showTuning && (
+          <DrilldownBreadcrumb drillStack={drillStack} currentLevel={currentLevel} onNavigate={drillUpTo} extraLabel={selectedHour?.label} />
+        )}
 
         {/* Error banner */}
         {error && (
@@ -345,7 +357,7 @@ export default function App() {
           </div>
         )}
 
-        {(currentLevel === 'hour' || currentLevel === 'day') && !selectedHour && !showTasks && (
+        {(currentLevel === 'hour' || currentLevel === 'day') && !selectedHour && !showTasks && !showTuning && (
           <>
             {selMode ? (
               <CellSelBar
@@ -391,7 +403,9 @@ export default function App() {
           </>
         )}
 
-        {showTasks ? (
+        {showTuning ? (
+          <TuningScreen />
+        ) : showTasks ? (
           <TasksScreen cameras={cameras} />
         ) : selectedHour ? (
           <HourViewer

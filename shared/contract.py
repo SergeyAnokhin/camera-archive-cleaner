@@ -15,6 +15,7 @@ class DetectRequest(BaseModel):
     model: str = "yolov8n"
     confidence: float = 0.25
     excluded: list[str] = []
+    classes: list[int] | None = None  # COCO class IDs to detect; None = all 80
     draw: bool = True
 
 

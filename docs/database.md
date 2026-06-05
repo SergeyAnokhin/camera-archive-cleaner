@@ -85,6 +85,30 @@ On server startup, any task left in `running`/`pausing` state is reset to `pause
 
 ---
 
+### `tuning_sessions` — model tuning
+
+Standalone table for the [model tuning screen](tuning.md). One row per tuning
+session. **No foreign keys to `files`** — tuning works on user-uploaded images
+stored under `backend/tuning_uploads/<session_id>/`, not the camera archive.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | TEXT PK | UUID |
+| `name` | TEXT | User-given session name |
+| `status` | TEXT | `setup` → `ready` → `running` → `done` / `failed` |
+| `images` | TEXT | JSON array `[{id, name, file}]` of uploaded images |
+| `ground_truth` | TEXT | JSON `{image_id: [objects]}` — the corrected reference labels |
+| `benchmark_config` | TEXT | JSON `{conf_from, conf_to, iterations}` |
+| `benchmark_results` | TEXT | JSON `{per_model, recommended}` (null until done) |
+| `progress_current` / `progress_total` | INTEGER | Benchmark progress (detections done / total) |
+| `error_message` | TEXT | Set on failure |
+| `created_at` / `completed_at` | TEXT | Timestamps |
+
+Deleting a session row also removes its `tuning_uploads/<id>/` directory (handled
+in the router, not by SQLite).
+
+---
+
 ## Cascade deletes
 
 Deleting a row from `files` automatically removes related rows in `thumbnails` and `ai_analysis` (`ON DELETE CASCADE`).

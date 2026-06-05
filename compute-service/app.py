@@ -81,7 +81,7 @@ def detect_endpoint(req: DetectRequest):
 
     try:
         objects, jpeg_b64, elapsed = detection.detect(
-            path, req.model, req.confidence, req.excluded, req.draw)
+            path, req.model, req.confidence, req.excluded, req.draw, req.classes)
     except Exception as e:
         logger.error("Detection failed for %s: %s", path, e)
         raise HTTPException(status_code=500, detail=f"Detection error: {e}")

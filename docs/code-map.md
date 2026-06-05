@@ -43,6 +43,7 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 | [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze`, `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`. Thin layer — request models + delegation; provider logic lives in `ai_providers/` |
 | [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status` — routing config for the compute-service |
 | [`tasks.py`](../backend/routers/tasks.py) | `/tasks` CRUD + `/tasks/metrics` — task queue REST endpoints |
+| [`tuning.py`](../backend/routers/tuning.py) | `/tuning/sessions/*` — model tuning: image upload, autolabel, ground truth, background golden-section confidence search. See [`docs/tuning.md`](tuning.md) |
 
 ### AI providers (`backend/ai_providers/`)
 
@@ -106,6 +107,7 @@ Imported by both the main backend and the compute-service.
 | [`App.jsx`](../frontend/src/App.jsx) | Root component. Owns all state: selected camera, drill-down level (year/month/day/hour), date range, delete mode. Orchestrates level transitions |
 | [`api.js`](../frontend/src/api.js) | All HTTP calls to the backend. The only file that knows API URLs |
 | [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI display utilities: `OBJECT_EMOJI_DEFAULTS` (100+ label→emoji), `resolveAiIcons(str)` → `[{emoji,label}]`, `getExcludedObjects()` — reads `detection_excluded_objects` from localStorage |
+| [`cocoClasses.js`](../frontend/src/cocoClasses.js) | The 80 COCO classes (`{id, en, ru, emoji}`) in class-ID order + `DETECTION_CLASSES_DEFAULT`. Source for the Detection-tab class checklist; IDs flow to YOLO's `classes=` param |
 | [`prompts.js`](../frontend/src/prompts.js) | Single source of truth for all AI prompt templates: `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude), `GEMINI_FREEFORM_PROMPT`, `CELL_ANALYSIS_PROMPT(n)` (heatmap batch). `{n}` = image count |
 | [`main.jsx`](../frontend/src/main.jsx) | React entry point. Mounts `<App />` |
 
@@ -131,6 +133,7 @@ Imported by both the main backend and the compute-service.
 | [`ScanButton.jsx`](../frontend/src/components/ScanButton.jsx) | Scan button, spinner, data refresh on completion |
 | [`ToolsButton.jsx`](../frontend/src/components/ToolsButton.jsx) | Button that opens ToolsModal |
 | [`TasksScreen.jsx`](../frontend/src/components/TasksScreen.jsx) | Tasks screen — polls `/tasks` every 3 s, shows system metrics bar + task card list, hosts NewTaskModal |
+| [`TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx) | Model tuning screen (whole feature in one file): session sidebar + 3-step panel (upload, ground truth, golden-section benchmark, results charts). See [`docs/tuning.md`](tuning.md) |
 | [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card component: type icon, status badge, animated progress bar, speed/ETA, current-file thumbnail preview, pause/resume/cancel/delete/reorder buttons |
 | [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a new task: type selector cards (video\_thumbnails/openvino), camera+date-range picker, type-specific params, file-count estimate |
 
@@ -145,7 +148,7 @@ Imported by both the main backend and the compute-service.
 | [`SliderSetting.jsx`](../frontend/src/components/tools/SliderSetting.jsx) | Reusable labelled range-slider row used across tabs |
 | [`GeneralTab.jsx`](../frontend/src/components/tools/GeneralTab.jsx) | Font size, previews per cell, YAML export/import |
 | [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | Page size, thumb width, hover zoom, diff threshold, video preview, uniformity thresholds |
-| [`DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx) | OpenVINO confidence, excluded objects, emoji overrides, default-emoji reference |
+| [`DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx) | OpenVINO confidence, detected-classes checklist (80 COCO objects → `detection_classes`), excluded objects, emoji overrides, default-emoji reference |
 | [`GoogleAiTab.jsx`](../frontend/src/components/tools/GoogleAiTab.jsx) | Gemini API key, model, structured prompt template |
 | [`ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx) | Claude API key, model |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
@@ -158,7 +161,7 @@ Imported by both the main backend and the compute-service.
 | File | Role |
 |---|---|
 | [`hourUtils.js`](../frontend/src/components/hour/hourUtils.js) | localStorage keys/defaults, formatters (`formatTime`, `formatBytes`), mode-param load/save, AI request rate tracking, `computeUniformity(buckets)` → AF/SE/BC metrics + per-metric levels |
-| [`PhotoCard.jsx`](../frontend/src/components/hour/PhotoCard.jsx) | Single photo card: thumbnail, fullscreen lightbox, AI icons + description overlay |
+| [`PhotoCard.jsx`](../frontend/src/components/hour/PhotoCard.jsx) | Single photo card: thumbnail, fullscreen lightbox (with a **Скачать**/download button → `/media/{id}`), AI icons + description overlay |
 | [`VideoCard.jsx`](../frontend/src/components/hour/VideoCard.jsx) | Single video card. Default (`video_preview_mode = none`): camera icon + timestamp, no image. With a preview mode set: fetches `/video_thumbnail` and shows a JPEG or animated GIF. Opens VideoModal on click |
 | [`VideoModal.jsx`](../frontend/src/components/hour/VideoModal.jsx) | Fullscreen video player: Space = play/pause, ←/→ = skip ±1/5 duration, Escape = close, download, open externally, VLC fallback |
 | [`DistributionChart.jsx`](../frontend/src/components/hour/DistributionChart.jsx) | 60-bar per-minute distribution chart; click a bar to jump to its page. Shows AF/SE/BC uniformity badges (green/yellow/red) in the header |

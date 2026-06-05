@@ -70,10 +70,13 @@ FastAPI app on port `8001` — [`compute-service/app.py`](../compute-service/app
 | Method | Path | In | Out |
 |---|---|---|---|
 | `GET` | `/health` | — | `{status, capabilities}` |
-| `POST` | `/detect` | `{path, model, confidence, excluded, draw}` | `{objects, annotated_jpeg_b64, elapsed_ms}` |
+| `POST` | `/detect` | `{path, model, confidence, excluded, classes, draw}` | `{objects, annotated_jpeg_b64, elapsed_ms}` |
 | `POST` | `/video/thumbnail` | `{path, mode}` | binary `image/jpeg` or `image/gif` |
 
-`/detect` returns **all** detected objects (Russian) plus, when `draw=true`, the
+`classes` (optional list of COCO class IDs) restricts the YOLO inference itself —
+the model only looks for those classes, so others never appear in `objects`. This
+is distinct from `excluded`, which only hides classes from the drawn boxes/display.
+`/detect` returns **all** detected (non-restricted) objects (Russian) plus, when `draw=true`, the
 bounding-box JPEG (base64) with excluded classes removed — both in one call so a
 single inference serves both the `/openvino_thumbnail` image and the
 `ai_analysis` DB write. `/video/thumbnail` has no objects to return, so it
