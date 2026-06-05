@@ -67,3 +67,14 @@ def health() -> dict:
         return resp.json()
     except httpx.HTTPError as e:
         raise ComputeUnavailable(f"Compute-service unreachable at {url}: {e}")
+
+
+def metrics() -> dict:
+    """Fetch CPU/RAM usage from the compute-service. Raises ComputeDisabled / ComputeUnavailable."""
+    url = _base_url()
+    try:
+        resp = httpx.get(f"{url}/metrics", timeout=_HEALTH_TIMEOUT)
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPError as e:
+        raise ComputeUnavailable(f"Compute-service unreachable at {url}: {e}")

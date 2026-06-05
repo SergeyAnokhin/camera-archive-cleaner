@@ -25,6 +25,11 @@ import config
 import detection
 import video
 
+try:
+    import psutil as _psutil
+except ImportError:
+    _psutil = None
+
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("compute")
 
@@ -41,6 +46,20 @@ app.add_middleware(
 @app.get("/health", summary="Liveness + capabilities")
 def health():
     return {"status": "ok", "capabilities": ["detect", "video"]}
+
+
+@app.get("/metrics", summary="CPU and memory usage")
+def metrics_endpoint():
+    if _psutil is None:
+        return {"cpu_percent": None, "memory_total": None, "memory_used": None, "memory_percent": None}
+    cpu = _psutil.cpu_percent(interval=0.1)
+    mem = _psutil.virtual_memory()
+    return {
+        "cpu_percent": round(cpu, 1),
+        "memory_total": mem.total,
+        "memory_used": mem.used,
+        "memory_percent": round(mem.percent, 1),
+    }
 
 
 @app.post("/detect", response_model=DetectResponse, summary="Object detection (YOLO/OpenVINO)")

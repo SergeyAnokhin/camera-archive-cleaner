@@ -20,6 +20,18 @@ def list_cameras():
     return result
 
 
+@router.get("/cameras/{camera_id}/date_range", summary="Min and max timestamps for a camera")
+def camera_date_range(camera_id: str):
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT MIN(timestamp) AS min_ts, MAX(timestamp) AS max_ts FROM files WHERE camera_id = ?",
+            (camera_id,),
+        ).fetchone()
+    if not row or not row["min_ts"]:
+        return {"date_from": None, "date_to": None}
+    return {"date_from": row["min_ts"], "date_to": row["max_ts"]}
+
+
 @router.post("/scan", summary="Scan camera directories and update the database")
 def scan(
     camera_id: str | None = Query(

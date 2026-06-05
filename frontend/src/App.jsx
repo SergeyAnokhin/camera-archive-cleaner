@@ -9,6 +9,7 @@ import HourViewer from './components/HourViewer.jsx'
 import StatsBar from './components/StatsBar.jsx'
 import ScanButton from './components/ScanButton.jsx'
 import ToolsButton from './components/ToolsButton.jsx'
+import TasksScreen from './components/TasksScreen.jsx'
 import { initFontSize } from './components/tools/settingsIO.js'
 import CellSelBar from './components/CellSelBar.jsx'
 import { useHeatmapKeyboard } from './components/useHeatmapKeyboard.js'
@@ -89,6 +90,7 @@ export default function App() {
   const rangeDeleteDrillBack = useRef(null)
   const [focusedPeriod, setFocusedPeriod] = useState(null)
   const restorePeriodRef = useRef(null)
+  const [showTasks, setShowTasks] = useState(false)
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
 
@@ -319,6 +321,14 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--gap-sm)' }}>
           <CameraSelector cameras={cameras} selectedId={cameraId} onSelect={id => { setCameraId(id); setDrillStack([]); setSelectedHour(null) }} />
           <div style={{ display: 'flex', gap: 'var(--gap-sm)' }}>
+            <button
+              className="modal-btn neutral"
+              style={{ fontSize: 'calc(var(--font-base) * 0.88)', borderColor: showTasks ? 'var(--accent)' : undefined, color: showTasks ? 'var(--accent)' : undefined }}
+              onClick={() => setShowTasks(v => !v)}
+            >
+              <i className="mdi mdi-playlist-play" />
+              Tasks
+            </button>
             <ToolsButton onDatabaseCleared={handleScanComplete} />
             <ScanButton cameraId={cameraId} onScanComplete={handleScanComplete} />
           </div>
@@ -335,7 +345,7 @@ export default function App() {
           </div>
         )}
 
-        {(currentLevel === 'hour' || currentLevel === 'day') && !selectedHour && (
+        {(currentLevel === 'hour' || currentLevel === 'day') && !selectedHour && !showTasks && (
           <>
             {selMode ? (
               <CellSelBar
@@ -381,7 +391,9 @@ export default function App() {
           </>
         )}
 
-        {selectedHour ? (
+        {showTasks ? (
+          <TasksScreen cameras={cameras} />
+        ) : selectedHour ? (
           <HourViewer
             cameraId={cameraId}
             camera={cameras.find(c => c.id === cameraId)}

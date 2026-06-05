@@ -10,7 +10,9 @@ HTTP endpoints are split by responsibility:
   maintenance    — /database, /*_thumbnails, /storage_info
   ai             — /gemini_*, /claude_*, /openvino_analyze_*, /ai_*
   compute        — /compute/config, /compute/status
+  tasks          — /tasks (task queue)
 """
+import asyncio
 import sys
 from pathlib import Path
 
@@ -30,7 +32,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from database import init_db
-from routers import ai, catalog, compute, delete, maintenance, media, stats, thumbnails_api
+import task_runner
+from routers import ai, catalog, compute, delete, maintenance, media, stats, tasks, thumbnails_api
 
 logger = logging.getLogger("api")
 
@@ -52,8 +55,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 @app.on_event("startup")
-def startup():
+async def startup():
     init_db()
+    task_runner.init_runner_state()
+    asyncio.create_task(task_runner.task_loop())
     # Убираем uvicorn-хендлеры (у них свой формат) — пускаем через наш root
     for _n in ("uvicorn", "uvicorn.access", "uvicorn.error"):
         _lg = logging.getLogger(_n)
@@ -70,3 +75,4 @@ app.include_router(delete.router)
 app.include_router(maintenance.router)
 app.include_router(ai.router)
 app.include_router(compute.router)
+app.include_router(tasks.router)

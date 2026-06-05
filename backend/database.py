@@ -14,6 +14,7 @@ def get_connection() -> sqlite3.Connection:
 def init_db() -> None:
     with get_connection() as conn:
         init_ai_analysis_table(conn)
+        init_tasks_table(conn)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS files (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -304,6 +305,76 @@ def save_ai_analysis(conn: sqlite3.Connection, file_id: int, provider: str, mode
         """,
         (file_id, provider, model, scene_description, image_description, objects),
     )
+
+
+# ---------------------------------------------------------------------------
+# tasks — persistent task queue
+# ---------------------------------------------------------------------------
+
+def init_tasks_table(conn: sqlite3.Connection) -> None:
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id                TEXT    PRIMARY KEY,
+            type              TEXT    NOT NULL,
+            status            TEXT    NOT NULL DEFAULT 'queued',
+            params            TEXT    NOT NULL DEFAULT '{}',
+            order_index       INTEGER NOT NULL DEFAULT 0,
+            progress_current  INTEGER NOT NULL DEFAULT 0,
+            progress_total    INTEGER NOT NULL DEFAULT 0,
+            current_file_id   INTEGER,
+            current_file_path TEXT,
+            speed_per_sec     REAL,
+            eta_seconds       INTEGER,
+            created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+            started_at        TEXT,
+            completed_at      TEXT,
+            error_message     TEXT
+        );
+    """)
+
+
+def get_all_tasks(conn: sqlite3.Connection) -> list:
+    return conn.execute(
+        "SELECT * FROM tasks ORDER BY order_index ASC, created_at ASC"
+    ).fetchall()
+
+
+def get_task(conn: sqlite3.Connection, task_id: str):
+    return conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+
+
+def create_task(conn: sqlite3.Connection, task_id: str, task_type: str,
+                params_json: str, order_index: int) -> None:
+    conn.execute(
+        "INSERT INTO tasks (id, type, params, order_index) VALUES (?, ?, ?, ?)",
+        (task_id, task_type, params_json, order_index),
+    )
+
+
+def update_task_status(conn: sqlite3.Connection, task_id: str, status: str) -> None:
+    conn.execute("UPDATE tasks SET status = ? WHERE id = ?", (status, task_id))
+
+
+def update_task_progress(conn: sqlite3.Connection, task_id: str, current: int, total: int,
+                         file_id, file_path: str | None,
+                         speed: float | None, eta: int | None) -> None:
+    conn.execute(
+        """UPDATE tasks SET progress_current=?, progress_total=?, current_file_id=?,
+           current_file_path=?, speed_per_sec=?, eta_seconds=? WHERE id=?""",
+        (current, total, file_id, file_path, speed, eta, task_id),
+    )
+
+
+def delete_task(conn: sqlite3.Connection, task_id: str) -> None:
+    conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+
+
+def reorder_tasks(conn: sqlite3.Connection, order_list: list[dict]) -> None:
+    for item in order_list:
+        conn.execute(
+            "UPDATE tasks SET order_index = ? WHERE id = ?",
+            (item["order_index"], item["id"]),
+        )
 
 
 def get_ai_analysis_by_file_ids(conn: sqlite3.Connection, file_ids: list[int]) -> list:

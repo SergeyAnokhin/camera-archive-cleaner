@@ -104,6 +104,31 @@ config is persisted server-side in `backend/compute_config.json`.
 
 ---
 
+## Tasks
+
+Persistent task queue for long-running compute jobs. Tasks survive server restarts (stored in SQLite). The background runner processes one task at a time in the order defined by `order_index`.
+
+| Method | Path | Body / Params | Description |
+|---|---|---|---|
+| `GET` | `/tasks` | — | List all tasks ordered by `order_index` |
+| `POST` | `/tasks` | `{type, params, label?}` | Create a task. `type`: `video_thumbnails` \| `openvino`. Returns the new task row |
+| `GET` | `/tasks/metrics` | — | CPU/RAM from compute-service + `compute_mode`. Returns `null` fields when compute is off |
+| `PUT` | `/tasks/reorder` | `{order: [{id, order_index}]}` | Reorder tasks |
+| `DELETE` | `/tasks/{id}` | — | Delete a task (must not be `running`) |
+| `PUT` | `/tasks/{id}/pause` | — | Signal running task to pause after current file (`running` → `pausing`) |
+| `PUT` | `/tasks/{id}/resume` | — | Resume a paused/failed task (`paused`\|`failed` → `queued`) |
+| `PUT` | `/tasks/{id}/cancel` | — | Cancel any non-finished task |
+
+**Task statuses:** `queued` → `running` → `completed` / (`pausing` → `paused`) / `failed` / `cancelled`
+
+**`params` shape by type:**
+- `video_thumbnails`: `{camera_id, date_from, date_to, thumb_mode}` — `thumb_mode` matches `/video_thumbnail` modes
+- `openvino`: `{camera_id, date_from, date_to, model_name, confidence}`
+
+**Compute-service `/metrics`** (new endpoint): returns `{cpu_percent, memory_total, memory_used, memory_percent}`. Requires `psutil` in the compute-service.
+
+---
+
 ## Maintenance
 
 | Method | Path | Description |

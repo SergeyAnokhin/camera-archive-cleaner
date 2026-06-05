@@ -1,0 +1,173 @@
+.ntm {
+  width: 600px;
+}
+
+.ntm__body {
+  overflow-y: auto;
+  flex: 1;
+  padding: 4px 0;
+}
+
+/* ── Sections ──────────────────────────────────────────────── */
+.ntm__section {
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ntm__section:last-child { border-bottom: none; }
+
+.ntm__label {
+  font-size: calc(var(--font-base) * 0.8);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.ntm__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ntm__select {
+  max-width: 340px;
+}
+
+/* ── Type cards ───────────────────────────────────────────── */
+.ntm__type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.ntm__type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 14px 16px;
+  background: var(--bg-input);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+}
+
+.ntm__type-card:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.ntm__type-card--active {
+  border-color: var(--accent);
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.ntm__type-icon {
+  font-size: 26px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.ntm__type-card--active .ntm__type-icon {
+  color: var(--accent);
+}
+
+.ntm__type-name {
+  font-weight: 700;
+  font-size: calc(var(--font-base) * 0.93);
+  color: var(--text-primary);
+}
+
+.ntm__type-desc {
+  font-size: calc(var(--font-base) * 0.78);
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ── Date range ───────────────────────────────────────────── */
+.ntm__date-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ntm__date-hint {
+  font-size: calc(var(--font-base) * 0.76);
+  color: #86efac;
+  display: flex;
+  align-items: center;
+}
+
+.ntm__dates {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ntm__date-input {
+  flex: 1;
+  min-width: 180px;
+  color-scheme: dark;
+}
+
+.ntm__date-sep {
+  color: var(--text-dim);
+  font-size: calc(var(--font-base) * 0.85);
+  flex-shrink: 0;
+}
+
+/* ── Slider row ───────────────────────────────────────────── */
+.ntm__slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ntm__slider {
+  flex: 1;
+  accent-color: var(--accent);
+  height: 4px;
+  cursor: pointer;
+  max-width: 280px;
+}
+
+.ntm__slider-val {
+  font-size: calc(var(--font-base) * 0.87);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  width: 36px;
+  text-align: right;
+}
+
+/* ── Estimate ─────────────────────────────────────────────── */
+.ntm__estimate {
+  padding: 8px 20px;
+  font-size: calc(var(--font-base) * 0.85);
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+}
+
+.ntm__warn {
+  padding: 8px 20px;
+  font-size: calc(var(--font-base) * 0.85);
+  color: #fbbf24;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Footer ───────────────────────────────────────────────── */
+.ntm__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}

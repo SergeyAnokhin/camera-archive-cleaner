@@ -31,6 +31,10 @@ export function getCameras() {
   return get('/cameras')
 }
 
+export function getCameraDateRange(cameraId) {
+  return get(`/cameras/${encodeURIComponent(cameraId)}/date_range`)
+}
+
 export function triggerScan(cameraId = null) {
   return post('/scan' + buildQuery({ camera_id: cameraId }))
 }
@@ -229,4 +233,37 @@ export function getComputeStatus() {
 
 export function saveComputeConfig(mode, remoteUrl) {
   return putJson('/compute/config', { mode, remote_url: remoteUrl })
+}
+
+// Tasks
+export function getTasks() {
+  return get('/tasks')
+}
+
+export function createTask({ type, params, label }) {
+  return postJson('/tasks', { type, params, label })
+}
+
+export function deleteTask(taskId) {
+  return sendJson('DELETE', `/tasks/${taskId}`, {})
+}
+
+export function pauseTask(taskId) {
+  return putJson(`/tasks/${taskId}/pause`, {})
+}
+
+export function resumeTask(taskId) {
+  return putJson(`/tasks/${taskId}/resume`, {})
+}
+
+export function cancelTask(taskId) {
+  return putJson(`/tasks/${taskId}/cancel`, {})
+}
+
+export function reorderTasks(order) {
+  return putJson('/tasks/reorder', { order })
+}
+
+export function getTaskMetrics() {
+  return get('/tasks/metrics')
 }

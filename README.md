@@ -60,7 +60,7 @@ config.py ──► scanner.py ──► database.py  (SQLite: snapshots.db)
                                   │   erosion / motion
    ai_providers/ ─────────────────┤   gemini · claude
    compute_client.py ─────────────┘   ──HTTP──► compute-service (:8001)
-                                  │              YOLO detection · video
+   task_runner.py (asyncio bg loop)  │              YOLO detection · video
                           routers/  (FastAPI APIRouters, grouped by area)
                                   │
                              main.py  (FastAPI :8000)
@@ -70,6 +70,7 @@ config.py ──► scanner.py ──► database.py  (SQLite: snapshots.db)
                     App.jsx ── HeatmapGrid / HeatmapCell
                             └── HourViewer ── viewModes/
                             └── ToolsModal (settings, AI)
+                            └── TasksScreen ── TaskCard / NewTaskModal
 ```
 
 Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.md).
@@ -86,7 +87,7 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 | [`docs/compute-service.md`](docs/compute-service.md) | Optional compute-service: stateless detection + video backend, routing (off/local/remote), path remapping |
 | [`docs/settings.md`](docs/settings.md) | All user settings: localStorage keys, defaults, ranges, where each is defined |
 | [`docs/api.md`](docs/api.md) | All API endpoints with parameters and descriptions |
-| [`docs/database.md`](docs/database.md) | SQLite schema: `files`, `thumbnails`, `ai_analysis` tables, cascades, data flow |
+| [`docs/database.md`](docs/database.md) | SQLite schema: `files`, `thumbnails`, `ai_analysis`, `tasks` tables, cascades, data flow |
 | [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis: Gemini, Claude & OpenVINO integration, DB schema, prompt format, icon display |
 | [`docs/visualization-modes.md`](docs/visualization-modes.md) | All 12 view modes: Normal, Motion Diff, Erosion, OpenVINO Detection, etc. |
 | [`docs/logging.md`](docs/logging.md) | Log levels, format, colours, how to configure |

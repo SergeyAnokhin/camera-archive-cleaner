@@ -1,0 +1,256 @@
+"""Background task runner — processes the task queue one task at a time.
+
+Tasks persist in SQLite. The runner picks the lowest-order queued task,
+processes files one by one, and writes progress every ~5 seconds. Between
+items it re-reads the task status to support pause and cancel.
+
+On startup, tasks stuck in 'running'/'pausing' are reset to 'paused'.
+"""
+import asyncio
+import json
+import logging
+import time
+
+import compute_client
+from compute_cache import video_cache_path
+from database import (
+    get_connection, save_ai_analysis,
+    update_task_progress, update_task_status,
+)
+
+logger = logging.getLogger("api")
+
+_PROGRESS_INTERVAL = 5.0  # seconds between DB progress writes
+
+
+def init_runner_state() -> None:
+    """Reset tasks stuck mid-run to 'paused' after a server restart."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE tasks SET status='paused' WHERE status IN ('running', 'pausing')"
+        )
+
+
+async def task_loop() -> None:
+    """Infinite async loop — picks queued tasks and executes them sequentially."""
+    while True:
+        try:
+            with get_connection() as conn:
+                row = conn.execute(
+                    "SELECT * FROM tasks WHERE status='queued' "
+                    "ORDER BY order_index ASC, created_at ASC LIMIT 1"
+                ).fetchone()
+            if row:
+                await _execute_task(dict(row))
+            else:
+                await asyncio.sleep(2)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error("Task runner error: %s", e, exc_info=True)
+            await asyncio.sleep(5)
+
+
+async def _execute_task(task: dict) -> None:
+    task_id = task["id"]
+    task_type = task["type"]
+    params = json.loads(task["params"])
+    resume_from = task["progress_current"]
+
+    logger.info("▶ Task %s (%s) starting from %d", task_id[:8], task_type, resume_from)
+
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE tasks SET status='running', "
+            "started_at=COALESCE(started_at, datetime('now')) WHERE id=?",
+            (task_id,),
+        )
+
+    try:
+        if task_type == "video_thumbnails":
+            await _run_video_thumbnails(task_id, params, resume_from)
+        elif task_type == "openvino":
+            await _run_openvino(task_id, params, resume_from)
+        else:
+            raise ValueError(f"Unknown task type: {task_type}")
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        logger.error("Task %s failed: %s", task_id[:8], e, exc_info=True)
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE tasks SET status='failed', completed_at=datetime('now'), "
+                "error_message=? WHERE id=?",
+                (str(e)[:500], task_id),
+            )
+
+
+# ---------------------------------------------------------------------------
+# Blocking helpers (run in asyncio.to_thread)
+# ---------------------------------------------------------------------------
+
+def _read_status(task_id: str) -> str:
+    with get_connection() as conn:
+        row = conn.execute("SELECT status FROM tasks WHERE id=?", (task_id,)).fetchone()
+    return row["status"] if row else "cancelled"
+
+
+def _write_progress(task_id: str, current: int, total: int,
+                    file_id, file_path, speed, eta) -> None:
+    with get_connection() as conn:
+        update_task_progress(conn, task_id, current, total, file_id, file_path, speed, eta)
+
+
+def _make_video_thumb(file_path: str, mode: str, cache_path) -> None:
+    data, _ = compute_client.video_thumbnail(file_path, mode)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_bytes(data)
+
+
+def _detect_and_save(file_id: int, file_path: str, model_name: str, confidence: float) -> None:
+    result = compute_client.detect(file_path, model_name, confidence, frozenset(), draw=False)
+    with get_connection() as conn:
+        save_ai_analysis(conn, file_id, "openvino", model_name, "", "", " ".join(result.objects))
+
+
+# ---------------------------------------------------------------------------
+# Task executors
+# ---------------------------------------------------------------------------
+
+async def _run_video_thumbnails(task_id: str, params: dict, resume_from: int) -> None:
+    camera_id = params["camera_id"]
+    date_from = params["date_from"]
+    date_to = params["date_to"]
+    mode = params.get("thumb_mode", "four_frames")
+
+    with get_connection() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) AS n FROM files "
+            "WHERE camera_id=? AND timestamp>=? AND timestamp<=? AND file_type='video'",
+            (camera_id, date_from, date_to),
+        ).fetchone()["n"]
+        rows = conn.execute(
+            "SELECT id, file_path FROM files "
+            "WHERE camera_id=? AND timestamp>=? AND timestamp<=? AND file_type='video' "
+            "ORDER BY timestamp LIMIT -1 OFFSET ?",
+            (camera_id, date_from, date_to, resume_from),
+        ).fetchall()
+
+    await asyncio.to_thread(_write_progress, task_id, resume_from, total, None, None, None, None)
+
+    t_start = time.time()
+    processed = 0
+    last_save = time.time()
+
+    for row in rows:
+        status = await asyncio.to_thread(_read_status, task_id)
+        if status in ("pausing", "cancelled"):
+            current = resume_from + processed
+            await asyncio.to_thread(_write_progress, task_id, current, total, None, None, None, None)
+            with get_connection() as conn:
+                conn.execute("UPDATE tasks SET status='paused' WHERE id=?", (task_id,))
+            logger.info("⏸ Task %s paused at %d/%d", task_id[:8], current, total)
+            return
+
+        file_id = row["id"]
+        file_path = row["file_path"]
+        cache_path = video_cache_path(file_id, mode)
+
+        if not cache_path.exists():
+            try:
+                await asyncio.to_thread(_make_video_thumb, file_path, mode, cache_path)
+            except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable) as e:
+                raise Exception(f"Compute service unavailable: {e}")
+            except Exception as e:
+                logger.warning("Video thumb error %s: %s", file_path, e)
+
+        processed += 1
+        current = resume_from + processed
+        elapsed = time.time() - t_start
+        speed = processed / elapsed if elapsed > 0.1 else None
+        remaining = total - current
+        eta = int(remaining / speed) if speed and speed > 0 else None
+
+        if time.time() - last_save >= _PROGRESS_INTERVAL:
+            await asyncio.to_thread(_write_progress, task_id, current, total,
+                                    file_id, file_path, speed, eta)
+            last_save = time.time()
+
+    final = resume_from + processed
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE tasks SET status='completed', completed_at=datetime('now'), "
+            "progress_current=?, progress_total=?, speed_per_sec=NULL, eta_seconds=NULL, "
+            "current_file_id=NULL, current_file_path=NULL WHERE id=?",
+            (final, total, task_id),
+        )
+    logger.info("✅ Task %s done (%d videos)", task_id[:8], final)
+
+
+async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
+    camera_id = params["camera_id"]
+    date_from = params["date_from"]
+    date_to = params["date_to"]
+    model_name = params.get("model_name", "yolov8n")
+    confidence = params.get("confidence", 0.25)
+
+    with get_connection() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) AS n FROM files "
+            "WHERE camera_id=? AND timestamp>=? AND timestamp<=? AND file_type='photo'",
+            (camera_id, date_from, date_to),
+        ).fetchone()["n"]
+        rows = conn.execute(
+            "SELECT id, file_path FROM files "
+            "WHERE camera_id=? AND timestamp>=? AND timestamp<=? AND file_type='photo' "
+            "ORDER BY timestamp LIMIT -1 OFFSET ?",
+            (camera_id, date_from, date_to, resume_from),
+        ).fetchall()
+
+    await asyncio.to_thread(_write_progress, task_id, resume_from, total, None, None, None, None)
+
+    t_start = time.time()
+    processed = 0
+    last_save = time.time()
+
+    for row in rows:
+        status = await asyncio.to_thread(_read_status, task_id)
+        if status in ("pausing", "cancelled"):
+            current = resume_from + processed
+            await asyncio.to_thread(_write_progress, task_id, current, total, None, None, None, None)
+            with get_connection() as conn:
+                conn.execute("UPDATE tasks SET status='paused' WHERE id=?", (task_id,))
+            logger.info("⏸ Task %s paused at %d/%d", task_id[:8], current, total)
+            return
+
+        file_id = row["id"]
+        file_path = row["file_path"]
+
+        try:
+            await asyncio.to_thread(_detect_and_save, file_id, file_path, model_name, confidence)
+        except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable) as e:
+            raise Exception(f"Compute service unavailable: {e}")
+        except Exception as e:
+            logger.warning("OpenVINO error %s: %s", file_path, e)
+
+        processed += 1
+        current = resume_from + processed
+        elapsed = time.time() - t_start
+        speed = processed / elapsed if elapsed > 0.1 else None
+        remaining = total - current
+        eta = int(remaining / speed) if speed and speed > 0 else None
+
+        if time.time() - last_save >= _PROGRESS_INTERVAL:
+            await asyncio.to_thread(_write_progress, task_id, current, total,
+                                    file_id, file_path, speed, eta)
+            last_save = time.time()
+
+    final = resume_from + processed
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE tasks SET status='completed', completed_at=datetime('now'), "
+            "progress_current=?, progress_total=?, speed_per_sec=NULL, eta_seconds=NULL, "
+            "current_file_id=NULL, current_file_path=NULL WHERE id=?",
+            (final, total, task_id),
+        )
+    logger.info("✅ Task %s done (%d photos)", task_id[:8], final)

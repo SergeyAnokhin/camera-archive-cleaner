@@ -61,6 +61,30 @@ Results from all three AI providers (Gemini, Claude, OpenVINO). One row per file
 
 ---
 
+### `tasks` — task queue
+
+Persistent queue for long-running compute jobs (video thumbnails, OpenVINO batch detection). One row per task; status survives server restarts.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | TEXT PK | UUID |
+| `type` | TEXT | `'video_thumbnails'` or `'openvino'` |
+| `status` | TEXT | `queued` → `running` → `completed` / (`pausing` → `paused`) / `failed` / `cancelled` |
+| `params` | TEXT | JSON blob — `{camera_id, date_from, date_to, thumb_mode\|model_name, confidence, label}` |
+| `order_index` | INTEGER | Sort order for the queue |
+| `progress_current` | INTEGER | Files processed so far (saved periodically; used as resume offset) |
+| `progress_total` | INTEGER | Total files in range |
+| `current_file_id` | INTEGER | FK → `files(id)` — last processed file (for thumbnail preview, nullable) |
+| `current_file_path` | TEXT | Path of the current file being processed |
+| `speed_per_sec` | REAL | Processing rate (files/s) |
+| `eta_seconds` | INTEGER | Estimated seconds remaining |
+| `created_at` / `started_at` / `completed_at` | TEXT | Timestamps |
+| `error_message` | TEXT | Set on failure |
+
+On server startup, any task left in `running`/`pausing` state is reset to `paused` so the user can resume manually.
+
+---
+
 ## Cascade deletes
 
 Deleting a row from `files` automatically removes related rows in `thumbnails` and `ai_analysis` (`ON DELETE CASCADE`).

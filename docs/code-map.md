@@ -16,6 +16,7 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `health`). Raises `ComputeDisabled` / `ComputeUnavailable` |
 | [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` |
 | [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
+| [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks, processes files one by one, writes progress to DB every 5 s. Supports pause/resume by checking task status between files |
 | [`database.py`](../backend/database.py) | SQLite: table schema, all SQL queries (upsert, aggregations, pagination, AI analysis). The only file that touches the DB |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames (Foscam patterns + mtime fallback); writes to DB |
 | [`config.py`](../backend/config.py) | Parses `cameras.yaml` → `Camera` dataclass (id, name, path_snapshots, path_videos) |
@@ -41,6 +42,7 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 | [`maintenance.py`](../backend/routers/maintenance.py) | `/database`, per-type `/*_thumbnails`, `/all_thumbnails`, `/storage_info` |
 | [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze`, `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`. Thin layer — request models + delegation; provider logic lives in `ai_providers/` |
 | [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status` — routing config for the compute-service |
+| [`tasks.py`](../backend/routers/tasks.py) | `/tasks` CRUD + `/tasks/metrics` — task queue REST endpoints |
 
 ### AI providers (`backend/ai_providers/`)
 
@@ -128,6 +130,9 @@ Imported by both the main backend and the compute-service.
 | [`StatsBar.jsx`](../frontend/src/components/StatsBar.jsx) | Recharts bar chart below the heatmap (size per period) |
 | [`ScanButton.jsx`](../frontend/src/components/ScanButton.jsx) | Scan button, spinner, data refresh on completion |
 | [`ToolsButton.jsx`](../frontend/src/components/ToolsButton.jsx) | Button that opens ToolsModal |
+| [`TasksScreen.jsx`](../frontend/src/components/TasksScreen.jsx) | Tasks screen — polls `/tasks` every 3 s, shows system metrics bar + task card list, hosts NewTaskModal |
+| [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card component: type icon, status badge, animated progress bar, speed/ETA, current-file thumbnail preview, pause/resume/cancel/delete/reorder buttons |
+| [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a new task: type selector cards (video\_thumbnails/openvino), camera+date-range picker, type-specific params, file-count estimate |
 
 ### Tools modal tabs (`frontend/src/components/tools/`)
 
