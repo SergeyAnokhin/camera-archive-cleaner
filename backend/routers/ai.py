@@ -114,18 +114,27 @@ def get_ai_analysis_in_range(
 ):
     with get_connection() as conn:
         rows = conn.execute("""
-            SELECT aa.file_id, f.timestamp, aa.objects, aa.model
+            SELECT aa.file_id, f.timestamp, aa.objects, aa.model,
+                   aa.input_tokens, aa.output_tokens, aa.cost_usd, aa.elapsed_ms
             FROM ai_analysis aa
             JOIN files f ON aa.file_id = f.id
             WHERE f.camera_id = ? AND f.timestamp >= ? AND f.timestamp <= ?
               AND aa.provider = ? AND f.file_type = 'photo'
             ORDER BY f.timestamp
         """, (camera_id, date_from, date_to, provider)).fetchall()
-    return [
+    results = [
         {"file_id": r["file_id"], "timestamp": r["timestamp"],
          "objects": r["objects"], "model": r["model"]}
         for r in rows
     ]
+    stats = {
+        "input_tokens":  sum(r["input_tokens"]  or 0 for r in rows),
+        "output_tokens": sum(r["output_tokens"] or 0 for r in rows),
+        "cost_usd":      sum(r["cost_usd"]      or 0.0 for r in rows),
+        "elapsed_ms":    sum(r["elapsed_ms"]    or 0 for r in rows),
+        "analyzed_count": len(rows),
+    }
+    return {"results": results, "stats": stats}
 
 
 @router.get("/ai_objects_summary", summary="Unique AI-detected objects for a date range")

@@ -2,7 +2,7 @@
 import logging
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 import compute_client
@@ -36,7 +36,7 @@ def update_compute_config(req: ComputeConfigUpdate):
 
 
 @router.get("/services/status", summary="Backend + compute-service status and metrics")
-def services_status():
+def services_status(request: Request):
     # Backend metrics (local process)
     backend_data: dict = {"cpu_percent": None, "memory_percent": None, "memory_used": None, "memory_total": None}
     if _psutil is not None:
@@ -76,7 +76,8 @@ def services_status():
         except Exception:
             pass
 
-    return {"backend": backend_data, "compute": compute_data}
+    backend_url = str(request.base_url).rstrip('/')
+    return {"backend_url": backend_url, "backend": backend_data, "compute": compute_data}
 
 
 @router.get("/compute/status", summary="Compute-service reachability + capabilities")

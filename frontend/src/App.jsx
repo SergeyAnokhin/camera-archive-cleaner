@@ -288,8 +288,8 @@ export default function App() {
     const camId = params.camera_id
     if (!camId || !params.date_from || !params.date_to) return
     try {
-      const results = await getAiAnalysisInRange(camId, params.date_from, params.date_to, task.type)
-      setTaskResultsModal({ task, results })
+      const data = await getAiAnalysisInRange(camId, params.date_from, params.date_to, task.type)
+      setTaskResultsModal({ task, results: data.results ?? [], stats: data.stats ?? null })
     } catch {
       // fallback: navigate to heatmap
       _navigateToTaskPeriod(task)
@@ -553,6 +553,7 @@ export default function App() {
         <TaskResultsModal
           task={taskResultsModal.task}
           results={taskResultsModal.results}
+          stats={taskResultsModal.stats}
           onClose={() => setTaskResultsModal(null)}
           onNavigateToHour={handleNavigateToHour}
         />

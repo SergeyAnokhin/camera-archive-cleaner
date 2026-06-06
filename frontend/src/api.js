@@ -213,12 +213,13 @@ export function getExcludedParam() {
   } catch { return '' }
 }
 
-// Selected COCO class IDs as a comma-separated string (empty = detect all 80).
+// Selected COCO class IDs as a comma-separated string. Falls back to defaults if never saved.
 export function getClassesParam() {
   try {
     const raw = localStorage.getItem('detection_classes')
-    return raw ? JSON.parse(raw).join(',') : ''
-  } catch { return '' }
+    const ids = raw ? JSON.parse(raw) : DETECTION_CLASSES_DEFAULT
+    return ids.join(',')
+  } catch { return DETECTION_CLASSES_DEFAULT.join(',') }
 }
 
 export function getClassesList() {

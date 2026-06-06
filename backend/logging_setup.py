@@ -84,7 +84,31 @@ _handler.setFormatter(_ColorFmt())
 _handler.setLevel(TRACE)  # хендлер принимает всё; уровень фильтрует root
 
 logging.root.handlers = [_handler]
-# ↓ главный рычаг: DEBUG — видны http-запросы; INFO — только наши логи
-logging.root.setLevel(logging.DEBUG)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# УРОВЕНЬ ЛОГА — меняй здесь и только здесь.
+#
+# Доступные уровни (от самого тихого к самому подробному):
+#
+#   logging.CRITICAL  — только критические ошибки (приложение падает)
+#   logging.ERROR     — ошибки, из-за которых запрос не выполнился
+#   logging.WARNING   — предупреждения (что-то подозрительное, но работает)
+#   logging.INFO      — наши рабочие логи (старт задач, AI-анализ, сканирование)
+#   logging.DEBUG     — всё выше + каждый HTTP-запрос от uvicorn (шумно)
+#   TRACE (= 5)       — всё выше + запросы thumbnail (очень шумно)
+#
+# Рекомендуемые режимы:
+#   logging.INFO   → продакшн / нормальная работа (чисто, только важное)
+#   logging.DEBUG  → отладка API (видны все HTTP-запросы, кроме thumbnail)
+#   TRACE          → отладка thumbnail-пайплайна (максимальный шум)
+#
+# Пример: чтобы видеть только WARNING и выше:
+#   logging.root.setLevel(logging.WARNING)
+# ══════════════════════════════════════════════════════════════════════════════
+logging.root.setLevel(logging.INFO)
+
+# httpx/httpcore генерируют очень много DEBUG-мусора при каждом запросе к compute
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 logger = logging.getLogger("api")

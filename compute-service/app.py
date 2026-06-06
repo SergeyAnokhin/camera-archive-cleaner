@@ -13,11 +13,13 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 import logging
+import re
 import time
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from shared.contract import DetectRequest, DetectResponse, VideoThumbnailRequest
 
@@ -33,6 +35,15 @@ except ImportError:
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("compute")
 
+_SILENT_RE = re.compile(r'"(?:GET|HEAD) /(?:api/health|health|metrics)\b')
+
+
+class _SilentFilter(logging.Filter):
+    """Drop access-log lines for /health and /metrics polls."""
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not _SILENT_RE.search(record.getMessage())
+
+
 app = FastAPI(title="Camera Snapshots Compute Service", version="1.0.0")
 
 app.add_middleware(
@@ -43,7 +54,26 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+async def startup():
+    logging.getLogger("uvicorn.access").addFilter(_SilentFilter())
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        logger.warning(
+            "404 %s %s  client=%s  user-agent=%s  referer=%s",
+            request.method, request.url.path,
+            request.client.host if request.client else "?",
+            request.headers.get("user-agent", "—"),
+            request.headers.get("referer", "—"),
+        )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
 @app.get("/health", summary="Liveness + capabilities")
+@app.get("/api/health", include_in_schema=False)
 def health():
     return {"status": "ok", "capabilities": ["detect", "video"]}
 

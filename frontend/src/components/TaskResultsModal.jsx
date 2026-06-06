@@ -8,11 +8,32 @@ const TYPE_LABEL = {
   claude:   'Claude AI Analysis',
 }
 
-export default function TaskResultsModal({ task, results, onClose, onNavigateToHour }) {
-  const params = task.params || {}
-  const model  = params.model_name || params.model || ''
-  const label  = TYPE_LABEL[task.type] || task.type
+function pad2(n) { return String(n).padStart(2, '0') }
+
+function fmtDuration(ms) {
+  if (!ms) return null
+  const s = Math.round(ms / 1000)
+  if (s < 60) return `${s} с`
+  const m = Math.floor(s / 60), r = s % 60
+  return r > 0 ? `${m} мин ${r} с` : `${m} мин`
+}
+
+export default function TaskResultsModal({ task, results, stats, onClose, onNavigateToHour }) {
+  const params  = task.params || {}
+  const model   = params.model_name || params.model || ''
+  const label   = TYPE_LABEL[task.type] || task.type
+  const isRunning = ['running', 'pausing', 'paused', 'queued'].includes(task.status)
   const withObjects = results.filter(r => r.objects && r.objects.trim())
+
+  const hasTokenStats = stats && (stats.input_tokens > 0 || stats.output_tokens > 0)
+
+  // LM params to show
+  const delayMin  = params.delay_min_sec
+  const delayMax  = params.delay_max_sec
+  const fromH     = params.active_from_hour
+  const toH       = params.active_to_hour
+  const hasDelay  = delayMax > 0
+  const hasWindow = fromH != null && toH != null
 
   useEffect(() => {
     function onKey(e) {
@@ -23,7 +44,6 @@ export default function TaskResultsModal({ task, results, onClose, onNavigateToH
   }, [onClose])
 
   function hourLabel(ts) {
-    // "2024-07-30T17:29:54" → "2024-07-30 17:00"
     return ts ? `${ts.slice(0, 10)} ${ts.slice(11, 13)}:00` : ''
   }
 
@@ -33,7 +53,11 @@ export default function TaskResultsModal({ task, results, onClose, onNavigateToH
 
         <div className="gai-header">
           <span><i className="mdi mdi-magnify-scan" style={{ color: '#60a5fa' }} /> {label} · Результаты</span>
-          <button className="gai-close" onClick={onClose}><i className="mdi mdi-close" /></button>
+          <button className="gai-close" onClick={onClose} title={isRunning ? 'Вернуться к задаче' : 'Закрыть'}>
+            {isRunning
+              ? <><i className="mdi mdi-arrow-left" /> Live view</>
+              : <i className="mdi mdi-close" />}
+          </button>
         </div>
 
         <div className="gai-body">
@@ -43,12 +67,44 @@ export default function TaskResultsModal({ task, results, onClose, onNavigateToH
               <i className="mdi mdi-image-multiple-outline" />
               <span>{results.length} фото</span>
               {model && <span className="gai-run-model">{model}</span>}
+              {isRunning && (
+                <span style={{ fontSize: 'calc(var(--font-base) * 0.8)', color: '#60a5fa' }}>
+                  <i className="mdi mdi-loading mdi-spin" /> в процессе
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="gai-stats">
-            <span><i className="mdi mdi-eye-outline" /> объекты найдены в {withObjects.length}/{results.length} фото</span>
-          </div>
+          {/* LM parameters row */}
+          {(hasDelay || hasWindow) && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '4px 0 2px' }}>
+              {hasDelay && (
+                <span className="tc__tag" style={{ fontSize: 'calc(var(--font-base) * 0.8)' }}>
+                  <i className="mdi mdi-timer-pause-outline" /> {delayMin}–{delayMax}s пауза
+                </span>
+              )}
+              {hasWindow && (
+                <span className="tc__tag" style={{ fontSize: 'calc(var(--font-base) * 0.8)' }}>
+                  <i className="mdi mdi-clock-time-four-outline" /> {pad2(fromH)}:00–{pad2(toH)}:00
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Stats */}
+          {hasTokenStats ? (
+            <div className="gai-stats">
+              <span><i className="mdi mdi-eye-outline" /> объекты в {withObjects.length}/{results.length}</span>
+              <span><i className="mdi mdi-counter" /> {(stats.input_tokens + stats.output_tokens).toLocaleString()} tok</span>
+              <span className="gai-stats-detail">in {stats.input_tokens.toLocaleString()} · out {stats.output_tokens.toLocaleString()}</span>
+              {stats.cost_usd > 0 && <span><i className="mdi mdi-currency-usd" /> ${stats.cost_usd.toFixed(6)}</span>}
+              {stats.elapsed_ms > 0 && <span><i className="mdi mdi-timer-outline" /> {fmtDuration(stats.elapsed_ms)}</span>}
+            </div>
+          ) : (
+            <div className="gai-stats">
+              <span><i className="mdi mdi-eye-outline" /> объекты найдены в {withObjects.length}/{results.length} фото</span>
+            </div>
+          )}
 
           {results.length > 0 && (
             <div className="gai-section">
@@ -92,7 +148,8 @@ export default function TaskResultsModal({ task, results, onClose, onNavigateToH
 
           {results.length === 0 && (
             <div className="gai-error" style={{ color: 'var(--text-dim)', background: 'transparent' }}>
-              <i className="mdi mdi-information-outline" /> Нет сохранённых результатов для этой задачи
+              <i className="mdi mdi-information-outline" />
+              {isRunning ? ' Анализ ещё не завершил ни одного фото' : ' Нет сохранённых результатов для этой задачи'}
             </div>
           )}
 

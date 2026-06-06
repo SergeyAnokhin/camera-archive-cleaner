@@ -83,13 +83,17 @@ def analyze_single(file_id, model, api_key):
     images, rows_used = open_thumbnails(rows)
     if not images:
         return False
-    response, _ = _generate(_SINGLE_PROMPT, images, model, api_key)
+    response, elapsed_ms = _generate(_SINGLE_PROMPT, images, model, api_key)
     raw = response.text or ""
     parsed = parse_json_response(raw)
     description = parsed.get("description", "") if parsed else ""
     objects_str = " ".join(str(o) for o in parsed.get("objects", [])) if parsed else ""
+    in_tok, out_tok, _ = _usage(response)
+    cost = compute_cost(model, in_tok, out_tok, GEMINI_PRICING)
     with get_connection() as conn:
-        save_ai_analysis(conn, rows_used[0]["id"], "gemini", model, "", description, objects_str)
+        save_ai_analysis(conn, rows_used[0]["id"], "gemini", model, "", description, objects_str,
+                         input_tokens=in_tok, output_tokens=out_tok,
+                         cost_usd=cost, elapsed_ms=elapsed_ms)
     return True
 
 

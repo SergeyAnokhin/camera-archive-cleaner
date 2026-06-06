@@ -284,27 +284,51 @@ def init_ai_analysis_table(conn: sqlite3.Connection) -> None:
             scene_description TEXT,
             image_description TEXT,
             objects           TEXT,
+            input_tokens      INTEGER NOT NULL DEFAULT 0,
+            output_tokens     INTEGER NOT NULL DEFAULT 0,
+            cost_usd          REAL    NOT NULL DEFAULT 0.0,
+            elapsed_ms        INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
         );
         CREATE INDEX IF NOT EXISTS idx_ai_analysis_file ON ai_analysis(file_id);
     """)
+    # Migrations for existing databases
+    for col, defn in [
+        ("input_tokens",  "INTEGER NOT NULL DEFAULT 0"),
+        ("output_tokens", "INTEGER NOT NULL DEFAULT 0"),
+        ("cost_usd",      "REAL    NOT NULL DEFAULT 0.0"),
+        ("elapsed_ms",    "INTEGER NOT NULL DEFAULT 0"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE ai_analysis ADD COLUMN {col} {defn}")
+        except Exception:
+            pass
 
 
 def save_ai_analysis(conn: sqlite3.Connection, file_id: int, provider: str, model: str,
-                     scene_description: str, image_description: str, objects: str) -> None:
+                     scene_description: str, image_description: str, objects: str,
+                     input_tokens: int = 0, output_tokens: int = 0,
+                     cost_usd: float = 0.0, elapsed_ms: int = 0) -> None:
     conn.execute(
         """
-        INSERT INTO ai_analysis (file_id, provider, model, analyzed_at, scene_description, image_description, objects)
-        VALUES (?, ?, ?, datetime('now'), ?, ?, ?)
+        INSERT INTO ai_analysis (file_id, provider, model, analyzed_at,
+                                 scene_description, image_description, objects,
+                                 input_tokens, output_tokens, cost_usd, elapsed_ms)
+        VALUES (?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(file_id) DO UPDATE SET
             provider          = excluded.provider,
             model             = excluded.model,
             analyzed_at       = excluded.analyzed_at,
             scene_description = excluded.scene_description,
             image_description = excluded.image_description,
-            objects           = excluded.objects
+            objects           = excluded.objects,
+            input_tokens      = excluded.input_tokens,
+            output_tokens     = excluded.output_tokens,
+            cost_usd          = excluded.cost_usd,
+            elapsed_ms        = excluded.elapsed_ms
         """,
-        (file_id, provider, model, scene_description, image_description, objects),
+        (file_id, provider, model, scene_description, image_description, objects,
+         input_tokens, output_tokens, cost_usd, elapsed_ms),
     )
 
 

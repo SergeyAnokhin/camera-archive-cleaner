@@ -60,28 +60,60 @@ function ServiceChip({ name, url, docsUrl, up, cpuPct, memPct, memUsed }) {
 
 export default function ServiceStatus() {
   const [status, setStatus] = useState(null)
+  const [backendUp, setBackendUp] = useState(false)
+  const [computeUrl, setComputeUrl] = useState(null)
+  const [computeUp, setComputeUp] = useState(false)
 
+  // Poll backend for status + compute URL
   useEffect(() => {
     let cancelled = false
     async function poll() {
       try {
         const res = await fetch('/api/services/status')
-        if (!cancelled && res.ok) setStatus(await res.json())
-      } catch {}
+        if (!cancelled) {
+          if (res.ok) {
+            const data = await res.json()
+            setStatus(data)
+            setBackendUp(true)
+            setComputeUrl(data.compute?.url || null)
+          } else {
+            setBackendUp(false)
+          }
+        }
+      } catch {
+        if (!cancelled) setBackendUp(false)
+      }
       if (!cancelled) setTimeout(poll, 1000)
     }
     poll()
     return () => { cancelled = true }
   }, [])
 
+  // Poll compute /health directly from browser (independent of backend)
+  useEffect(() => {
+    if (!computeUrl) return
+    let cancelled = false
+    async function poll() {
+      try {
+        const res = await fetch(`${computeUrl}/health`)
+        if (!cancelled) setComputeUp(res.ok)
+      } catch {
+        if (!cancelled) setComputeUp(false)
+      }
+      if (!cancelled) setTimeout(poll, 1000)
+    }
+    poll()
+    return () => { cancelled = true }
+  }, [computeUrl])
+
   if (!status) return null
 
-  const backendUrl = window.location.origin + '/api'
-  const backendDocsUrl = window.location.origin + '/api/docs'
+  const backendUrl = status.backend_url || (window.location.origin + '/api')
+  const backendDocsUrl = status.backend_url ? `${status.backend_url}/docs` : null
 
   const compute = status.compute
   const showCompute = compute?.mode !== 'off'
-  const computeDocsUrl = compute?.url ? `${compute.url}/docs` : null
+  const computeDocsUrl = computeUrl ? `${computeUrl}/docs` : null
 
   return (
     <div className="svc-status">
@@ -89,7 +121,7 @@ export default function ServiceStatus() {
         name="Backend"
         url={backendUrl}
         docsUrl={backendDocsUrl}
-        up={true}
+        up={backendUp}
         cpuPct={status.backend?.cpu_percent}
         memPct={status.backend?.memory_percent}
         memUsed={status.backend?.memory_used}
@@ -97,9 +129,9 @@ export default function ServiceStatus() {
       {showCompute && (
         <ServiceChip
           name="Compute"
-          url={compute.url}
+          url={computeUrl}
           docsUrl={computeDocsUrl}
-          up={compute.reachable}
+          up={computeUp}
           cpuPct={compute.cpu_percent}
           memPct={compute.memory_percent}
           memUsed={compute.memory_used}

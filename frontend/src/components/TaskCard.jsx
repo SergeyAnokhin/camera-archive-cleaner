@@ -109,7 +109,7 @@ export default function TaskCard({
   const showThumb = thumbUrl && (isActive || task.status === 'paused')
 
   const isAiTask = task.type === 'gemini' || task.type === 'claude' || task.type === 'openvino'
-  const canViewResults = task.status === 'completed' && isAiTask && onViewResults
+  const canViewResults = isAiTask && onViewResults
 
   const isFinished = ['completed', 'failed', 'cancelled'].includes(task.status)
   const durationSec = task.started_at && task.completed_at
@@ -191,7 +191,10 @@ export default function TaskCard({
           {params.thumb_mode  && <span className="tc__tag">{params.thumb_mode}</span>}
           {params.confidence != null && <span className="tc__tag">{params.confidence}</span>}
           {params.delay_max_sec > 0 && (
-            <span className="tc__tag">{params.delay_min_sec}–{params.delay_max_sec}s delay</span>
+            <span className="tc__tag"><i className="mdi mdi-timer-pause-outline" /> {params.delay_min_sec}–{params.delay_max_sec}s</span>
+          )}
+          {fromH != null && toH != null && (
+            <span className="tc__tag"><i className="mdi mdi-clock-time-four-outline" /> {pad2(Number(fromH))}:00–{pad2(Number(toH))}:00</span>
           )}
         </div>
       </div>

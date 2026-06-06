@@ -23,8 +23,6 @@ _SINGLE_PROMPT = (
     "Use Russian names: человек, мужчина, женщина, ребёнок, кошка, собака, машина, велосипед, etc."
 )
 
-logger = logging.getLogger("api")
-
 
 def _encode_jpeg(images):
     """Encode PIL images as base64 JPEG strings for the Claude messages API."""
@@ -54,17 +52,24 @@ def analyze_single(file_id, model, api_key):
     ]
     content.append({"type": "text", "text": _SINGLE_PROMPT})
     client = Anthropic(api_key=api_key)
+    t0 = time.time()
     response = client.messages.create(
         model=model,
         max_tokens=1024,
         messages=[{"role": "user", "content": content}],
     )
+    elapsed_ms = int((time.time() - t0) * 1000)
     raw = response.content[0].text if response.content else ""
     parsed = parse_json_response(raw)
     description = parsed.get("description", "") if parsed else ""
     objects_str = " ".join(str(o) for o in parsed.get("objects", [])) if parsed else ""
+    in_tok = response.usage.input_tokens if response.usage else 0
+    out_tok = response.usage.output_tokens if response.usage else 0
+    cost = compute_cost(model, in_tok, out_tok, CLAUDE_PRICING)
     with get_connection() as conn:
-        save_ai_analysis(conn, rows_used[0]["id"], "claude", model, "", description, objects_str)
+        save_ai_analysis(conn, rows_used[0]["id"], "claude", model, "", description, objects_str,
+                         input_tokens=in_tok, output_tokens=out_tok,
+                         cost_usd=cost, elapsed_ms=elapsed_ms)
     return True
 
 
