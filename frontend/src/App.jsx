@@ -354,7 +354,7 @@ export default function App() {
         const typeName = { openvino: 'YOLO', gemini: 'Gemini', claude: 'Claude' }[provider] || provider
         const label = `${typeName} · ${cameraId} · ${dateFrom.slice(0, 10)}`
         const params = { camera_id: cameraId, date_from: dateFrom, date_to: dateTo }
-        if (provider === 'openvino') { params.model_name = model; params.confidence = confidence }
+        if (provider === 'openvino') { params.model_name = model; params.confidence = confidence; params.classes = getClassesList() }
         else { params.model = model; params.api_key = apiKey }
         await createTask({ type: provider, params, label })
       }
