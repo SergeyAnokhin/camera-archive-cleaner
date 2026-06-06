@@ -409,6 +409,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           <GeminiAnalysisModal
             fileIds={ids}
             structured={geminiStructured}
+            taskContext={{ cameraId, dateFrom, dateTo }}
             onClose={() => { setGeminiOpen(false); setGeminiStructured(false) }}
             onComplete={() => { recordAiRequest('gemini'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}
           />
@@ -423,6 +424,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         return (
           <ClaudeAnalysisModal
             fileIds={ids}
+            taskContext={{ cameraId, dateFrom, dateTo }}
             onClose={() => setClaudeOpen(false)}
             onComplete={() => { recordAiRequest('claude'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}
           />
@@ -439,6 +441,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           <OpenVinoAnalysisModal
             fileIds={ids}
             model={model}
+            taskContext={{ cameraId, dateFrom, dateTo }}
             onClose={() => setOpenVinoOpen(false)}
             onComplete={() => { recordAiRequest('openvino'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}
           />

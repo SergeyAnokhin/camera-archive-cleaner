@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getCameras, getStatsTotal, getStatsGrouped, previewDeleteRange, confirmDelete, deleteByRange, getPreviews, openvinoAnalyzeRange, geminiAnalyzeBatch, claudeAnalyzeBatch, getClassesList } from './api.js'
+import { getCameras, getStatsTotal, getStatsGrouped, previewDeleteRange, confirmDelete, deleteByRange, getPreviews, openvinoAnalyzeRange, geminiAnalyzeBatch, claudeAnalyzeBatch, getClassesList, createTask, getAiAnalysisInRange } from './api.js'
 import DeleteConfirmModal from './components/DeleteConfirmModal.jsx'
 import Header from './components/Header.jsx'
 import CameraSelector from './components/CameraSelector.jsx'
@@ -10,6 +10,7 @@ import StatsBar from './components/StatsBar.jsx'
 import ScanButton from './components/ScanButton.jsx'
 import ToolsButton from './components/ToolsButton.jsx'
 import TasksScreen from './components/TasksScreen.jsx'
+import TaskResultsModal from './components/TaskResultsModal.jsx'
 import TuningScreen from './components/TuningScreen.jsx'
 import { initFontSize } from './components/tools/settingsIO.js'
 import CellSelBar from './components/CellSelBar.jsx'
@@ -84,6 +85,8 @@ export default function App() {
   const [selAnalyzing, setSelAnalyzing]   = useState(false)
   const [selAnalyzeError, setSelAnalyzeError] = useState(null)
   const [selAnalyzeProgress, setSelAnalyzeProgress] = useState('')
+  const [selTaskSent, setSelTaskSent]     = useState(false)
+  const [selTaskError, setSelTaskError]   = useState(null)
   const [rangeDeletePreview, setRangeDeletePreview]           = useState(null)
   const [rangeDeletePreviewLoading, setRangeDeletePreviewLoading] = useState(false)
   const [rangeDeleteDeleteLoading, setRangeDeleteDeleteLoading]   = useState(false)
@@ -93,6 +96,7 @@ export default function App() {
   const restorePeriodRef = useRef(null)
   const [showTasks, setShowTasks] = useState(false)
   const [showTuning, setShowTuning] = useState(false)
+  const [taskResultsModal, setTaskResultsModal] = useState(null) // {task, results}
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
 
@@ -111,6 +115,8 @@ export default function App() {
     setSelDelError(null)
     setSelDelConfirm(false)
     setSelAnalyzeError(null)
+    setSelTaskSent(false)
+    setSelTaskError(null)
   }, [drillStack, cameraId])
 
   useEffect(() => {
@@ -277,6 +283,86 @@ export default function App() {
     }
   }
 
+  async function handleNavigateFromTask(task) {
+    const params = task.params || {}
+    const camId = params.camera_id
+    if (!camId || !params.date_from || !params.date_to) return
+    try {
+      const results = await getAiAnalysisInRange(camId, params.date_from, params.date_to, task.type)
+      setTaskResultsModal({ task, results })
+    } catch {
+      // fallback: navigate to heatmap
+      _navigateToTaskPeriod(task)
+    }
+  }
+
+  function _navigateToTaskPeriod(task) {
+    const params = task.params || {}
+    const camId = params.camera_id
+    const dateStr = params.date_from
+    if (!camId || !dateStr) return
+    const year  = dateStr.slice(0, 4)
+    const month = dateStr.slice(0, 7)
+    const lastDay = new Date(+year, +month.slice(5), 0).getDate()
+    setCameraId(camId)
+    setDrillStack([
+      { level: 'year',  label: year,  dateFrom: `${year}-01-01T00:00:00`,  dateTo: `${year}-12-31T23:59:59` },
+      { level: 'month', label: month, dateFrom: `${month}-01T00:00:00`, dateTo: `${month}-${String(lastDay).padStart(2,'0')}T23:59:59` },
+    ])
+    setSelectedHour(null)
+    setShowTasks(false)
+    setShowTuning(false)
+  }
+
+  function handleNavigateToHour(timestamp) {
+    // timestamp: "2024-07-30T17:29:54"
+    const date  = timestamp.slice(0, 10)
+    const hour  = timestamp.slice(11, 13)
+    const year  = date.slice(0, 4)
+    const month = date.slice(0, 7)
+    const lastDay = new Date(+year, +month.slice(5), 0).getDate()
+    const taskCamId = taskResultsModal?.task?.params?.camera_id
+    setTaskResultsModal(null)
+    if (taskCamId) setCameraId(taskCamId)
+    setDrillStack([
+      { level: 'year',  label: year,  dateFrom: `${year}-01-01T00:00:00`,  dateTo: `${year}-12-31T23:59:59` },
+      { level: 'month', label: month, dateFrom: `${month}-01T00:00:00`, dateTo: `${month}-${String(lastDay).padStart(2,'0')}T23:59:59` },
+      { level: 'day',   label: date,  dateFrom: `${date}T00:00:00`,      dateTo: `${date}T23:59:59` },
+    ])
+    setSelectedHour({ dateFrom: `${date}T${hour}:00:00`, dateTo: `${date}T${hour}:59:59`, label: `${date} ${hour}:00` })
+    setShowTasks(false)
+    setShowTuning(false)
+  }
+
+  async function handleSendCellsToTask(provider, model, confidence) {
+    setSelTaskSent(false)
+    setSelTaskError(null)
+    const apiKey = provider === 'gemini'
+      ? localStorage.getItem('gemini_api_key') || ''
+      : provider === 'claude'
+        ? localStorage.getItem('claude_api_key') || ''
+        : null
+    if ((provider === 'gemini' || provider === 'claude') && !apiKey) {
+      setSelTaskError(`Нет API ключа ${provider === 'gemini' ? 'Gemini' : 'Claude'}`)
+      return
+    }
+    try {
+      const cells = [...selectedPeriods.values()]
+      for (const cell of cells) {
+        const { dateFrom, dateTo } = getCellDateRange(cell.period)
+        const typeName = { openvino: 'YOLO', gemini: 'Gemini', claude: 'Claude' }[provider] || provider
+        const label = `${typeName} · ${cameraId} · ${dateFrom.slice(0, 10)}`
+        const params = { camera_id: cameraId, date_from: dateFrom, date_to: dateTo }
+        if (provider === 'openvino') { params.model_name = model; params.confidence = confidence }
+        else { params.model = model; params.api_key = apiKey }
+        await createTask({ type: provider, params, label })
+      }
+      setSelTaskSent(true)
+    } catch (e) {
+      setSelTaskError(e.message)
+    }
+  }
+
   async function handleRangeDeletePreview(dateFrom, dateTo, afterConfirmDrillTo) {
     setRangeDeletePreviewLoading(true)
     setRangeDeleteError(null)
@@ -366,7 +452,7 @@ export default function App() {
                 selectedMap={selectedPeriods}
                 onSelectAll={() => setSelectedPeriods(new Map(periods.filter(p => p.total_size_bytes > 0).map(p => [p.period, p])))}
                 onSelectNone={() => setSelectedPeriods(new Map())}
-                onClose={() => { setSelMode(false); setSelDelConfirm(false); setSelectedPeriods(new Map()); setSelAnalyzeError(null) }}
+                onClose={() => { setSelMode(false); setSelDelConfirm(false); setSelectedPeriods(new Map()); setSelAnalyzeError(null); setSelTaskSent(false); setSelTaskError(null) }}
                 onDelete={handleDeleteHours}
                 loading={selDelLoading}
                 error={selDelError}
@@ -376,6 +462,9 @@ export default function App() {
                 analyzing={selAnalyzing}
                 analyzeProgress={selAnalyzeProgress}
                 analyzeError={selAnalyzeError}
+                onSendToTask={handleSendCellsToTask}
+                taskSent={selTaskSent}
+                taskSendError={selTaskError}
               />
             ) : (
               <div style={{ display: 'flex', gap: 'var(--gap-sm)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -406,7 +495,7 @@ export default function App() {
         {showTuning ? (
           <TuningScreen />
         ) : showTasks ? (
-          <TasksScreen cameras={cameras} />
+          <TasksScreen cameras={cameras} onNavigate={handleNavigateFromTask} />
         ) : selectedHour ? (
           <HourViewer
             cameraId={cameraId}
@@ -459,6 +548,15 @@ export default function App() {
         )}
 
       </main>
+
+      {taskResultsModal && (
+        <TaskResultsModal
+          task={taskResultsModal.task}
+          results={taskResultsModal.results}
+          onClose={() => setTaskResultsModal(null)}
+          onNavigateToHour={handleNavigateToHour}
+        />
+      )}
 
       {rangeDeletePreview && (
         <DeleteConfirmModal

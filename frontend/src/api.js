@@ -1,3 +1,5 @@
+import { DETECTION_CLASSES_DEFAULT } from './cocoClasses.js'
+
 const BASE = '/api'
 
 async function get(path) {
@@ -193,8 +195,8 @@ export function claudeAnalyzeBatch({ fileIds, prompt, model, apiKey }) {
   return postJson('/claude_analyze_batch', { file_ids: fileIds, prompt, model, api_key: apiKey })
 }
 
-export function openvinoAnalyzeBatch({ fileIds, modelName, confidence }) {
-  return postJson('/openvino_analyze_batch', { file_ids: fileIds, model_name: modelName, confidence })
+export function openvinoAnalyzeBatch({ fileIds, modelName, confidence, classes = null }) {
+  return postJson('/openvino_analyze_batch', { file_ids: fileIds, model_name: modelName, confidence, classes })
 }
 
 export function getOpenVinoBboxThumbnailUrl(fileId, model, confidence, excluded = '', classes = '') {
@@ -222,12 +224,16 @@ export function getClassesParam() {
 export function getClassesList() {
   try {
     const raw = localStorage.getItem('detection_classes')
-    return raw ? JSON.parse(raw) : null
-  } catch { return null }
+    return raw ? JSON.parse(raw) : DETECTION_CLASSES_DEFAULT
+  } catch { return DETECTION_CLASSES_DEFAULT }
 }
 
 export function openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName, confidence, classes = null }) {
   return postJson('/openvino_analyze_range', { camera_id: cameraId, date_from: dateFrom, date_to: dateTo, model_name: modelName, confidence, classes })
+}
+
+export function getAiAnalysisInRange(cameraId, dateFrom, dateTo, provider = 'openvino') {
+  return get('/ai_analysis_in_range' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo, provider }))
 }
 
 export function getAiObjectsSummary(cameraId, dateFrom, dateTo) {

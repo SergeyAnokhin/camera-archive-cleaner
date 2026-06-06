@@ -36,7 +36,8 @@ const CELL_PROVIDERS = [
 
 export default function CellSelBar({ level, periods, selectedMap, onSelectAll, onSelectNone, onClose,
                        onDelete, loading, error, confirmOpen, onSetConfirmOpen,
-                       onAnalyze, analyzing, analyzeProgress, analyzeError }) {
+                       onAnalyze, analyzing, analyzeProgress, analyzeError,
+                       onSendToTask, taskSent, taskSendError }) {
   const [providerKey, setProviderKey] = useState('openvino')
   const [modelMap, setModelMap] = useState(() => {
     const m = {}
@@ -182,6 +183,28 @@ export default function CellSelBar({ level, periods, selectedMap, onSelectAll, o
             ? <><i className="mdi mdi-loading mdi-spin" /> {analyzeProgress || 'Analyzing...'}</>
             : <><i className="mdi mdi-play-circle-outline" /> Analyze {count > 0 ? `(${count})` : ''}</>}
         </button>
+
+        {/* Send to Task button */}
+        {onSendToTask && (
+          <button className="modal-btn neutral"
+            disabled={count === 0 || analyzing}
+            onClick={() => onSendToTask(providerKey, currentModel, ovConf / 100)}
+            title="Отправить выбранные ячейки в очередь задач"
+            style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', borderColor: 'rgba(99,102,241,0.3)' }}
+          >
+            <i className="mdi mdi-tray-arrow-down" /> В задачи
+          </button>
+        )}
+        {taskSent && (
+          <span style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: '#86efac' }}>
+            <i className="mdi mdi-check-circle-outline" /> Задачи добавлены
+          </span>
+        )}
+        {taskSendError && (
+          <span style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: '#f87171' }}>
+            <i className="mdi mdi-alert-circle-outline" /> {taskSendError}
+          </span>
+        )}
 
         {analyzeError && (
           <details style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: '#f87171', maxWidth: 600 }}>

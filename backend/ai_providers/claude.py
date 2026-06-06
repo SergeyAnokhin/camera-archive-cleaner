@@ -16,6 +16,13 @@ from .common import (
     save_structured,
 )
 
+_SINGLE_PROMPT = (
+    "Analyze this surveillance camera photo. Return JSON only (no markdown fences):\n"
+    '{"description": "1-2 sentences about visible dynamic objects and activity", '
+    '"objects": ["object1", "object2"]}\n'
+    "Use Russian names: человек, мужчина, женщина, ребёнок, кошка, собака, машина, велосипед, etc."
+)
+
 logger = logging.getLogger("api")
 
 
@@ -27,6 +34,38 @@ def _encode_jpeg(images):
         img.convert("RGB").save(buf, format="JPEG", quality=85)
         encoded.append(base64.b64encode(buf.getvalue()).decode())
     return encoded
+
+
+def analyze_single(file_id, model, api_key):
+    """Analyze one photo and save result to DB. Returns True if saved."""
+    try:
+        from anthropic import Anthropic
+    except ImportError:
+        raise RuntimeError("anthropic not installed. Run: pip install anthropic")
+    from database import get_connection, save_ai_analysis
+    rows = fetch_file_rows([file_id])
+    images, rows_used = open_thumbnails(rows)
+    if not images:
+        return False
+    images_b64 = _encode_jpeg(images)
+    content = [
+        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}}
+        for b64 in images_b64
+    ]
+    content.append({"type": "text", "text": _SINGLE_PROMPT})
+    client = Anthropic(api_key=api_key)
+    response = client.messages.create(
+        model=model,
+        max_tokens=1024,
+        messages=[{"role": "user", "content": content}],
+    )
+    raw = response.content[0].text if response.content else ""
+    parsed = parse_json_response(raw)
+    description = parsed.get("description", "") if parsed else ""
+    objects_str = " ".join(str(o) for o in parsed.get("objects", [])) if parsed else ""
+    with get_connection() as conn:
+        save_ai_analysis(conn, rows_used[0]["id"], "claude", model, "", description, objects_str)
+    return True
 
 
 def analyze_batch(file_ids, prompt, model, api_key):

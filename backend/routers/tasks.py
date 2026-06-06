@@ -51,7 +51,7 @@ class CreateTaskRequest(BaseModel):
 
 @router.post("")
 def create_new_task(req: CreateTaskRequest):
-    if req.type not in {"video_thumbnails", "openvino"}:
+    if req.type not in {"video_thumbnails", "openvino", "gemini", "claude"}:
         raise HTTPException(status_code=400, detail=f"Unknown task type: {req.type}")
 
     params = dict(req.params)

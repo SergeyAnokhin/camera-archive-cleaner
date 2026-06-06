@@ -65,7 +65,7 @@ function MetricsChips({ metrics }) {
   )
 }
 
-export default function TasksScreen({ cameras }) {
+export default function TasksScreen({ cameras, onNavigate }) {
   const [tasks, setTasks]         = useState([])
   const [metrics, setMetrics]     = useState(null)
   const [showModal, setShowModal] = useState(false)
@@ -202,6 +202,7 @@ export default function TasksScreen({ cameras }) {
               onResume={() => act(resumeTask, task.id)}
               onCancel={() => act(cancelTask, task.id)}
               onDelete={() => act(deleteTask, task.id)}
+              onViewResults={onNavigate ? (t) => onNavigate(t) : undefined}
             />
           ))}
         </div>

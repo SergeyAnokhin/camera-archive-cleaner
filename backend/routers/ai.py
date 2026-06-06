@@ -105,6 +105,29 @@ def get_ai_analysis(file_ids: str = Query(..., description="Comma-separated file
     ]
 
 
+@router.get("/ai_analysis_in_range", summary="AI analysis results with timestamps for a date range")
+def get_ai_analysis_in_range(
+    camera_id: str = Query(...),
+    date_from: str = Query(...),
+    date_to: str = Query(...),
+    provider: str = Query(default="openvino"),
+):
+    with get_connection() as conn:
+        rows = conn.execute("""
+            SELECT aa.file_id, f.timestamp, aa.objects, aa.model
+            FROM ai_analysis aa
+            JOIN files f ON aa.file_id = f.id
+            WHERE f.camera_id = ? AND f.timestamp >= ? AND f.timestamp <= ?
+              AND aa.provider = ? AND f.file_type = 'photo'
+            ORDER BY f.timestamp
+        """, (camera_id, date_from, date_to, provider)).fetchall()
+    return [
+        {"file_id": r["file_id"], "timestamp": r["timestamp"],
+         "objects": r["objects"], "model": r["model"]}
+        for r in rows
+    ]
+
+
 @router.get("/ai_objects_summary", summary="Unique AI-detected objects for a date range")
 def ai_objects_summary(
     camera_id: Optional[str] = None,

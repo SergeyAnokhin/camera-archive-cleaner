@@ -65,8 +65,9 @@ def metrics_endpoint():
 @app.post("/detect", response_model=DetectResponse, summary="Object detection (YOLO/OpenVINO)")
 def detect_endpoint(req: DetectRequest):
     t_req = time.time()
-    logger.debug("detect request  path=%s  model=%s  conf=%.2f  draw=%s  excluded=%s",
-                 req.path, req.model, req.confidence, req.draw, req.excluded)
+    logger.debug("detect request  path=%s  model=%s  conf=%.2f  draw=%s  excluded=%s  classes=%s",
+                 req.path, req.model, req.confidence, req.draw, req.excluded,
+                 req.classes if req.classes is not None else "all-80")
 
     t_remap = time.time()
     path = config.remap_path(req.path)
@@ -87,8 +88,10 @@ def detect_endpoint(req: DetectRequest):
         raise HTTPException(status_code=500, detail=f"Detection error: {e}")
 
     total_ms = (time.time() - t_req) * 1000
-    logger.info("detect  %-30s  model=%-10s  conf=%.2f  objects=%d  detect=%.0f ms  total=%.0f ms",
-                p.name, req.model, req.confidence, len(objects), elapsed, total_ms)
+    classes_label = f"{len(req.classes)}cls" if req.classes is not None else "all"
+    objects_str = " ".join(objects) if objects else "—"
+    logger.info("detect  %-30s  model=%-10s  conf=%.2f  classes=%-6s  [%s]  detect=%.0f ms  total=%.0f ms",
+                p.name, req.model, req.confidence, classes_label, objects_str, elapsed, total_ms)
     return DetectResponse(objects=objects, annotated_jpeg_b64=jpeg_b64, elapsed_ms=elapsed)
 
 

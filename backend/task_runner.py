@@ -9,7 +9,9 @@ On startup, tasks stuck in 'running'/'pausing' are reset to 'paused'.
 import asyncio
 import json
 import logging
+import random
 import time
+from datetime import datetime
 
 import compute_client
 from compute_cache import video_cache_path
@@ -31,6 +33,16 @@ def init_runner_state() -> None:
         )
 
 
+def _in_time_window(current_hour: int, from_hour: int, to_hour: int) -> bool:
+    """True if current_hour is within [from_hour, to_hour). Handles midnight wrap."""
+    if from_hour == to_hour:
+        return True  # no restriction
+    if from_hour < to_hour:
+        return from_hour <= current_hour < to_hour
+    # Wraps midnight: e.g., 22..6 means 22,23,0,1,2,3,4,5
+    return current_hour >= from_hour or current_hour < to_hour
+
+
 async def task_loop() -> None:
     """Infinite async loop — picks queued tasks and executes them sequentially."""
     while True:
@@ -41,7 +53,20 @@ async def task_loop() -> None:
                     "ORDER BY order_index ASC, created_at ASC LIMIT 1"
                 ).fetchone()
             if row:
-                await _execute_task(dict(row))
+                task = dict(row)
+                params = json.loads(task.get("params") or "{}")
+                from_h = params.get("active_from_hour")
+                to_h = params.get("active_to_hour")
+                if from_h is not None and to_h is not None:
+                    now_h = datetime.now().hour
+                    if not _in_time_window(now_h, int(from_h), int(to_h)):
+                        logger.debug(
+                            "Task %s outside time window (%s–%s), sleeping 60s",
+                            task["id"][:8], from_h, to_h,
+                        )
+                        await asyncio.sleep(60)
+                        continue
+                await _execute_task(task)
             else:
                 await asyncio.sleep(2)
         except asyncio.CancelledError:
@@ -71,6 +96,10 @@ async def _execute_task(task: dict) -> None:
             await _run_video_thumbnails(task_id, params, resume_from)
         elif task_type == "openvino":
             await _run_openvino(task_id, params, resume_from)
+        elif task_type == "gemini":
+            await _run_ai(task_id, params, resume_from, "gemini")
+        elif task_type == "claude":
+            await _run_ai(task_id, params, resume_from, "claude")
         else:
             raise ValueError(f"Unknown task type: {task_type}")
     except asyncio.CancelledError:
@@ -107,10 +136,22 @@ def _make_video_thumb(file_path: str, mode: str, cache_path) -> None:
     cache_path.write_bytes(data)
 
 
-def _detect_and_save(file_id: int, file_path: str, model_name: str, confidence: float) -> None:
-    result = compute_client.detect(file_path, model_name, confidence, frozenset(), draw=False)
+def _detect_and_save(file_id: int, file_path: str, model_name: str, confidence: float,
+                     classes=None) -> None:
+    result = compute_client.detect(file_path, model_name, confidence, frozenset(), draw=False,
+                                   classes=classes)
     with get_connection() as conn:
         save_ai_analysis(conn, file_id, "openvino", model_name, "", "", " ".join(result.objects))
+
+
+def _gemini_single(file_id: int, model: str, api_key: str) -> None:
+    from ai_providers.gemini import analyze_single
+    analyze_single(file_id, model, api_key)
+
+
+def _claude_single(file_id: int, model: str, api_key: str) -> None:
+    from ai_providers.claude import analyze_single
+    analyze_single(file_id, model, api_key)
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +234,7 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
     date_to = params["date_to"]
     model_name = params.get("model_name", "yolov8n")
     confidence = params.get("confidence", 0.25)
+    classes = params.get("classes", None)
 
     with get_connection() as conn:
         total = conn.execute(
@@ -227,7 +269,7 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
         file_path = row["file_path"]
 
         try:
-            await asyncio.to_thread(_detect_and_save, file_id, file_path, model_name, confidence)
+            await asyncio.to_thread(_detect_and_save, file_id, file_path, model_name, confidence, classes)
         except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable) as e:
             raise Exception(f"Compute service unavailable: {e}")
         except Exception as e:
@@ -254,3 +296,80 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
             (final, total, task_id),
         )
     logger.info("✅ Task %s done (%d photos)", task_id[:8], final)
+
+
+async def _run_ai(task_id: str, params: dict, resume_from: int, provider: str) -> None:
+    """Generic per-file AI analysis runner (Gemini or Claude)."""
+    camera_id = params["camera_id"]
+    date_from = params["date_from"]
+    date_to = params["date_to"]
+    model = params["model"]
+    api_key = params["api_key"]
+    delay_min = float(params.get("delay_min_sec", 0))
+    delay_max = float(params.get("delay_max_sec", 0))
+
+    with get_connection() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) AS n FROM files "
+            "WHERE camera_id=? AND timestamp>=? AND timestamp<=? AND file_type='photo'",
+            (camera_id, date_from, date_to),
+        ).fetchone()["n"]
+        rows = conn.execute(
+            "SELECT id, file_path FROM files "
+            "WHERE camera_id=? AND timestamp>=? AND timestamp<=? AND file_type='photo' "
+            "ORDER BY timestamp LIMIT -1 OFFSET ?",
+            (camera_id, date_from, date_to, resume_from),
+        ).fetchall()
+
+    await asyncio.to_thread(_write_progress, task_id, resume_from, total, None, None, None, None)
+
+    t_start = time.time()
+    processed = 0
+    last_save = time.time()
+    fn = _gemini_single if provider == "gemini" else _claude_single
+
+    for i, row in enumerate(rows):
+        status = await asyncio.to_thread(_read_status, task_id)
+        if status in ("pausing", "cancelled"):
+            current = resume_from + processed
+            await asyncio.to_thread(_write_progress, task_id, current, total, None, None, None, None)
+            with get_connection() as conn:
+                conn.execute("UPDATE tasks SET status='paused' WHERE id=?", (task_id,))
+            logger.info("⏸ Task %s paused at %d/%d", task_id[:8], current, total)
+            return
+
+        file_id = row["id"]
+        file_path = row["file_path"]
+
+        try:
+            await asyncio.to_thread(fn, file_id, model, api_key)
+        except Exception as e:
+            logger.warning("AI(%s) task %s error on %s: %s", provider, task_id[:8], file_path, e)
+
+        processed += 1
+        current = resume_from + processed
+        elapsed = time.time() - t_start
+        speed = processed / elapsed if elapsed > 0.1 else None
+        remaining = total - current
+        eta = int(remaining / speed) if speed and speed > 0 else None
+
+        if time.time() - last_save >= _PROGRESS_INTERVAL:
+            await asyncio.to_thread(_write_progress, task_id, current, total,
+                                    file_id, file_path, speed, eta)
+            last_save = time.time()
+
+        # Random delay between requests (not after the last one)
+        if delay_max > 0 and i < len(rows) - 1:
+            delay = random.uniform(max(0.0, delay_min), delay_max)
+            if delay > 0:
+                await asyncio.sleep(delay)
+
+    final = resume_from + processed
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE tasks SET status='completed', completed_at=datetime('now'), "
+            "progress_current=?, progress_total=?, speed_per_sec=NULL, eta_seconds=NULL, "
+            "current_file_id=NULL, current_file_path=NULL WHERE id=?",
+            (final, total, task_id),
+        )
+    logger.info("✅ AI(%s) task %s done (%d photos)", provider, task_id[:8], final)

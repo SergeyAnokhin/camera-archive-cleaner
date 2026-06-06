@@ -2,8 +2,10 @@ import { getThumbnailUrl, getVideoThumbnailUrl } from '../api.js'
 import './TaskCard.css'
 
 const TYPE_CONFIG = {
-  video_thumbnails: { icon: 'mdi-video-outline', label: 'Video Thumbnails' },
-  openvino:         { icon: 'mdi-magnify-scan',  label: 'OpenVINO Detection' },
+  video_thumbnails: { icon: 'mdi-video-outline',  label: 'Video Thumbnails' },
+  openvino:         { icon: 'mdi-magnify-scan',    label: 'OpenVINO Detection' },
+  gemini:           { icon: 'mdi-google',           label: 'Gemini AI Analysis' },
+  claude:           { icon: 'mdi-robot',            label: 'Claude AI Analysis' },
 }
 
 const STATUS_CONFIG = {
@@ -23,6 +25,32 @@ function fmtEta(s) {
   return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`
 }
 
+function fmtDuration(sec) {
+  if (sec == null || sec < 0) return null
+  sec = Math.round(sec)
+  if (sec < 60)   return `${sec} с`
+  if (sec < 3600) {
+    const m = Math.floor(sec / 60), s = sec % 60
+    return s > 0 ? `${m} мин ${s} с` : `${m} мин`
+  }
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60)
+  return m > 0 ? `${h} ч ${m} мин` : `${h} ч`
+}
+
+function fmtCompletedAt(ts) {
+  if (!ts) return null
+  // SQLite datetime('now') returns "YYYY-MM-DD HH:MM:SS" (UTC)
+  const d = new Date(ts.replace(' ', 'T') + 'Z')
+  if (isNaN(d)) return null
+  const now = new Date()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yestStart  = new Date(todayStart - 86400000)
+  const hm = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  if (d >= todayStart)  return `сегодня ${hm}`
+  if (d >= yestStart)   return `вчера ${hm}`
+  return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)} ${hm}`
+}
+
 function fmtSpeed(v) {
   if (!v) return null
   return v >= 1 ? `${v.toFixed(1)}/s` : `${(v * 60).toFixed(1)}/min`
@@ -34,9 +62,17 @@ function shortPath(p) {
   return parts.length > 2 ? `…/${parts.slice(-2).join('/')}` : p
 }
 
+function inTimeWindow(currentHour, fromHour, toHour) {
+  if (fromHour === toHour) return true
+  if (fromHour < toHour) return fromHour <= currentHour && currentHour < toHour
+  return currentHour >= fromHour || currentHour < toHour
+}
+
+function pad2(n) { return String(n).padStart(2, '0') }
+
 export default function TaskCard({
   task,
-  onPause, onResume, onCancel, onDelete,
+  onPause, onResume, onCancel, onDelete, onViewResults,
   onDragStart, onDragOver, onDrop, onDragEnd,
   isDragOver,
 }) {
@@ -56,12 +92,31 @@ export default function TaskCard({
 
   const isQueued = task.status === 'queued'
 
+  // Time-window sleeping check (for queued AI tasks)
+  const fromH = params.active_from_hour
+  const toH   = params.active_to_hour
+  const isSleeping = isQueued && fromH != null && toH != null
+    && !inTimeWindow(new Date().getHours(), Number(fromH), Number(toH))
+  const sleepWindowLabel = fromH != null && toH != null
+    ? `${pad2(fromH)}:00–${pad2(toH)}:00`
+    : ''
+
   const thumbUrl = task.current_file_id
     ? (task.type === 'openvino'
         ? getThumbnailUrl(task.current_file_id)
         : getVideoThumbnailUrl(task.current_file_id, params.thumb_mode || 'four_frames'))
     : null
   const showThumb = thumbUrl && (isActive || task.status === 'paused')
+
+  const isAiTask = task.type === 'gemini' || task.type === 'claude' || task.type === 'openvino'
+  const canViewResults = task.status === 'completed' && isAiTask && onViewResults
+
+  const isFinished = ['completed', 'failed', 'cancelled'].includes(task.status)
+  const durationSec = task.started_at && task.completed_at
+    ? (new Date(task.completed_at.replace(' ', 'T') + 'Z') - new Date(task.started_at.replace(' ', 'T') + 'Z')) / 1000
+    : null
+  const durationStr   = fmtDuration(durationSec)
+  const completedStr  = fmtCompletedAt(task.completed_at)
 
   return (
     <div
@@ -79,10 +134,16 @@ export default function TaskCard({
         <span className="tc__type-name">{typeConf.label}</span>
         <span className={`tc__badge tc__badge--${statusConf.cls}`}>
           {isActive && <i className="mdi mdi-loading mdi-spin tc__badge-spin" />}
+          {isSleeping && <i className="mdi mdi-moon-waning-crescent tc__badge-spin" style={{ animationName: 'none', marginRight: 4 }} />}
           {statusConf.label}
         </span>
 
         <div className="tc__btns">
+          {canViewResults && (
+            <button className="tc__btn tc__btn--accent" title="View results in heatmap" onClick={() => onViewResults(task)}>
+              <i className="mdi mdi-map-search-outline" />
+            </button>
+          )}
           {task.status === 'running' && (
             <button className="tc__btn tc__btn--warn" title="Pause" onClick={onPause}>
               <i className="mdi mdi-pause" />
@@ -106,13 +167,32 @@ export default function TaskCard({
         </div>
       </div>
 
+      {/* ── Sleeping indicator ─────────────────────────────────── */}
+      {isSleeping && (
+        <div style={{
+          fontSize: 'calc(var(--font-base) * 0.8)',
+          color: '#818cf8',
+          padding: '2px 12px 4px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
+        }}>
+          <i className="mdi mdi-clock-outline" />
+          Ожидание временного окна {sleepWindowLabel}
+        </div>
+      )}
+
       {/* ── Subtitle ───────────────────────────────────────────── */}
       <div className="tc__sub">
         <span className="tc__label">{label || '—'}</span>
         <div className="tc__tags">
           {params.model_name  && <span className="tc__tag">{params.model_name}</span>}
+          {params.model       && <span className="tc__tag">{params.model}</span>}
           {params.thumb_mode  && <span className="tc__tag">{params.thumb_mode}</span>}
           {params.confidence != null && <span className="tc__tag">{params.confidence}</span>}
+          {params.delay_max_sec > 0 && (
+            <span className="tc__tag">{params.delay_min_sec}–{params.delay_max_sec}s delay</span>
+          )}
         </div>
       </div>
 
@@ -151,6 +231,18 @@ export default function TaskCard({
           <div className="tc__prog-row">
             <div className="tc__skel-line tc__skel-line--short" />
           </div>
+        </div>
+      )}
+
+      {/* ── Completion meta (duration + finished-at) ─────────────────── */}
+      {isFinished && (durationStr || completedStr) && (
+        <div className="tc__meta">
+          {durationStr && (
+            <span><i className="mdi mdi-timer-outline" /> {durationStr}</span>
+          )}
+          {completedStr && (
+            <span><i className="mdi mdi-clock-check-outline" /> {completedStr}</span>
+          )}
         </div>
       )}
 
