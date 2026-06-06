@@ -35,8 +35,8 @@ OpenVINO stores two separate confidence values:
 |----------|-------|-----------|------|
 | `gemini_analysis` | Gemini Analysis | ✓ | [`viewModes/geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) |
 | `claude_analysis` | Claude Analysis | ✓ | [`viewModes/claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) |
-| `openvino_detection` | OpenVINO Detection | ✓ | [`viewModes/openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) — reads `excluded` from localStorage via `getExcludedParam()` and passes it as a URL param |
-| `openvino_bbox` | OpenVINO Boxes | — | [`viewModes/openvinoBboxMode.js`](../frontend/src/components/viewModes/openvinoBboxMode.js) — same as above but without `isAiMode`; reads confidence from `openvino_confidence` localStorage key |
+| `openvino_detection` | OpenVINO Detection | ✓ | [`viewModes/openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) — calls `/openvino_thumbnail` with model + confidence + classes params |
+| `openvino_bbox` | OpenVINO Boxes | — | [`viewModes/openvinoBboxMode.js`](../frontend/src/components/viewModes/openvinoBboxMode.js) — same but without `isAiMode`; reads confidence from `openvino_confidence` localStorage key |
 
 Modes with `isAiMode: true`:
 - Replace the normal mode-settings panel with `AiModePanel` (model selector + confidence slider for openvino + Run button + stats)
@@ -103,7 +103,7 @@ Opens `OpenVinoAnalysisModal` → `POST /openvino_analyze_batch` → saves to DB
 **Modal files:**
 - [`frontend/src/components/GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) — editable prompt, token stats, cost estimate
 - [`frontend/src/components/ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) — same format
-- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider (reads `openvino_confidence` from localStorage), per-photo object list, ms/photo timing. Each object tag has an **×** button: click → confirm dialog → adds that label to `detection_excluded_objects` in localStorage (tag dims to show it was added)
+- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider (reads `openvino_confidence` from localStorage), per-photo object list, ms/photo timing
 - Shared CSS: [`frontend/src/components/GeminiAnalysisModal.css`](../frontend/src/components/GeminiAnalysisModal.css)
 
 ---
@@ -154,7 +154,7 @@ Returns the same shape as `/openvino_analyze_batch`.
 
 ---
 
-### `GET /openvino_thumbnail/{file_id}?model=yolov8n&confidence=0.25&excluded=стул,bench`
+### `GET /openvino_thumbnail/{file_id}?model=yolov8n&confidence=0.25&classes=0,2,3`
 
 [`backend/routers/thumbnails_api.py`](../backend/routers/thumbnails_api.py) — `get_openvino_thumbnail()`
 
@@ -163,11 +163,11 @@ Returns a JPEG with bounding boxes drawn by YOLO's built-in `.plot()` renderer:
 - Label: `person 0.87`, `cat 0.62` etc. (COCO English name + confidence)
 - Output resized to max 640 × 640 px
 
-**`excluded` param** (comma-separated, Russian or English labels): boxes for those classes are NOT drawn. Objects are still detected and saved to the DB — only the visual overlay is suppressed. The compute-service uses `excluded_to_en()` in `shared/coco_names.py` to convert Russian → COCO English before filtering.
+**`classes` param** (comma-separated COCO class IDs; empty = all 80): restricts YOLO inference to only those classes.
 
-**On cache miss:** the main backend calls the compute-service `POST /detect` (`draw=true`), writes the returned JPEG to the cache, and **also calls `save_ai_analysis()`** to persist ALL detected objects (including excluded ones — frontend filters them for display). Returns `503` if the compute-service is off/unreachable.
+**On cache miss:** the main backend calls the compute-service `POST /detect` (`draw=true`), writes the returned JPEG to the cache, and **also calls `save_ai_analysis()`** to persist detected objects. Returns `503` if the compute-service is off/unreachable.
 
-Cache key: `sha256("v3:{file_id}:{model}:{conf:.2f}:{sorted_excluded}")[:16].jpg`  
+Cache key: `sha256("v5:{file_id}:{model}:{conf:.2f}:{sorted_classes}")[:16].jpg`  
 Directory: `backend/openvino_thumbnails_cache/` — included in `DELETE /all_thumbnails` cleanup.
 
 ### `GET /ai_analysis?file_ids=1,2,3`
@@ -211,18 +211,9 @@ DB helpers: `save_ai_analysis()`, `get_ai_analysis_by_file_ids()` in [`backend/d
 Object words are short Russian (or English) keywords stored space-separated in `ai_analysis.objects`, e.g. `"человек кошка"`.
 
 **[`frontend/src/aiHelpers.js`](../frontend/src/aiHelpers.js)**
-- `OBJECT_EMOJI_DEFAULTS` — maps keyword → emoji character (100+ entries: all 80 COCO classes in English + Russian translations)
-- `resolveAiIcons(objectsStr)` — splits string, filters excluded objects, deduplicates by label, returns `[{ emoji, label }]`
-- `getExcludedObjects()` — reads `detection_excluded_objects` from localStorage, returns a `Set<string>`
+- `resolveAiIcons(objectsStr)` — splits string, deduplicates by label, looks up emoji from `COCO_CLASSES` (both `en` and `ru` keys), returns `[{ emoji, label }]`. Unknown objects → `●`.
 
-**Display:** emoji `<span>` with `title={label}` (native browser tooltip). Unknown objects → `●`.
-
-### Emoji customization (user-configurable)
-
-| localStorage key | Format | Description |
-|---|---|---|
-| `detection_excluded_objects` | JSON array of strings | Objects to hide from all display (emoji icons, hover text, page summary). Backend still saves them to DB. Backend also skips drawing their bounding boxes (passed as `excluded` query param to `/openvino_thumbnail`) |
-| `detection_emoji_overrides` | JSON object `{label: emoji}` | Per-label emoji overrides. Merged on top of `OBJECT_EMOJI_DEFAULTS` at read time |
+Emoji come from [`frontend/src/cocoClasses.js`](../frontend/src/cocoClasses.js) — the single authoritative source of all 80 COCO classes with emojis.
 
 ### COCO classes detected by OpenVINO — Russian translation
 
@@ -254,8 +245,7 @@ Object words are short Russian (or English) keywords stored space-separated in `
 | handbag | сумка |
 | suitcase | чемодан |
 
-All remaining COCO 80 classes (bench, chair, tv, laptop, cell phone, etc.) fall through as English — they have emoji in `OBJECT_EMOJI_DEFAULTS`.  
-`RUSSIAN_TO_COCO` (reverse map) and `excluded_to_en()` live in `shared/coco_names.py` — used by the compute-service to convert user-supplied excluded labels (Russian or English) to COCO English class names for box filtering.
+All remaining COCO 80 classes (bench, chair, tv, laptop, cell phone, etc.) fall through as English — they have emoji in `cocoClasses.js`.
 
 ---
 
@@ -353,7 +343,7 @@ After `handleAnalyzeCells()` completes, App.jsx increments `aiRefreshKey` (integ
 
 - AI data loaded on every page change via `getAiAnalysis(pagePhotoIds)` → stored in `aiAnalysisMap` (Map keyed by `file_id`) in `HourViewer.jsx`
 - **Emoji icons overlay** (top-left corner, `.hv-card-ai-icons`): always visible in all modes; each emoji has `title={label}` browser tooltip
-- **Objects hover text** (`.hv-card-objects-hover`): appears on mouse hover, shows `emoji label` pairs joined by spaces; filtered via `resolveAiIcons()` (respects excluded list)
+- **Objects hover text** (`.hv-card-objects-hover`): appears on mouse hover, shows `emoji label` pairs joined by spaces; resolved via `resolveAiIcons()`
 - **Hover description tooltip** (bottom of card, `.hv-card-ai-desc`): visible only when `mode.isAiMode === true`; shows `image_description`, object tags, model name
 - **OpenVINO auto-refresh**: each `PhotoCard` fires `onImageLoad()` when its bbox thumbnail loads → debounced 1.5 s → single `reloadAiAnalysis()` call refreshes the map after the last image settles
 
@@ -361,7 +351,7 @@ After `handleAnalyzeCells()` completes, App.jsx increments `aiRefreshKey` (integ
 
 **File:** [`frontend/src/components/hour/AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx)
 
-Below the Run button, when at least one photo on the current page has been analysed, a row of emoji appears (`.hv-ai-page-objects`). These are the unique detected objects aggregated across **all photos on the current page** from `aiAnalysisMap`. Filtered via `resolveAiIcons()` (excluded objects are hidden). Each emoji has a `title` tooltip with the Russian/English label.
+Below the Run button, when at least one photo on the current page has been analysed, a row of emoji appears (`.hv-ai-page-objects`). These are the unique detected objects aggregated across **all photos on the current page** from `aiAnalysisMap`. Resolved via `resolveAiIcons()`. Each emoji has a `title` tooltip with the Russian/English label.
 
 ### HeatmapCell — day/hour/month cells
 
@@ -391,8 +381,7 @@ Displayed in `AiModePanel` after each completed analysis.
 | Tab | Setting | localStorage key |
 |-----|---------|-----------------|
 | **Detection** | Default OpenVINO confidence | `mode_params_openvino` → `{confidence: N}` (integer %) |
-| **Detection** | Excluded objects (one per line or comma-separated) | `detection_excluded_objects` (JSON array) |
-| **Detection** | Emoji overrides (`label = emoji` per line) | `detection_emoji_overrides` (JSON object) |
+| **Detection** | Detected YOLO classes (80-class checklist) | `detection_classes` (JSON array of COCO class IDs) |
 | Google AI | API key | `gemini_api_key` |
 | Google AI | Model | `gemini_model` |
 | Google AI | Prompt template | `gemini_structured_prompt` |

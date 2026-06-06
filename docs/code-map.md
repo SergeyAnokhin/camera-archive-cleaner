@@ -94,7 +94,7 @@ Imported by both the main backend and the compute-service.
 | File | Role |
 |---|---|
 | [`contract.py`](../shared/contract.py) | Pydantic API models: `DetectRequest`, `DetectResponse`, `VideoThumbnailRequest`; `VIDEO_THUMB_MODES` |
-| [`coco_names.py`](../shared/coco_names.py) | `COCO_TO_RUSSIAN` map + `excluded_to_en()` |
+| [`coco_names.py`](../shared/coco_names.py) | `COCO_TO_RUSSIAN` map (23 entries used by compute-service to translate YOLO outputs) |
 
 ---
 
@@ -106,7 +106,7 @@ Imported by both the main backend and the compute-service.
 |---|---|
 | [`App.jsx`](../frontend/src/App.jsx) | Root component. Owns all state: selected camera, drill-down level (year/month/day/hour), date range, delete mode. Orchestrates level transitions |
 | [`api.js`](../frontend/src/api.js) | All HTTP calls to the backend. The only file that knows API URLs |
-| [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI display utilities: `OBJECT_EMOJI_DEFAULTS` (100+ label→emoji), `resolveAiIcons(str)` → `[{emoji,label}]`, `getExcludedObjects()` — reads `detection_excluded_objects` from localStorage |
+| [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI display utilities: `resolveAiIcons(str)` → `[{emoji,label}]` — builds emoji lookup from `COCO_CLASSES` (both `en` and `ru` keys) |
 | [`cocoClasses.js`](../frontend/src/cocoClasses.js) | The 80 COCO classes (`{id, en, ru, emoji}`) in class-ID order + `DETECTION_CLASSES_DEFAULT`. Source for the Detection-tab class checklist; IDs flow to YOLO's `classes=` param |
 | [`prompts.js`](../frontend/src/prompts.js) | Single source of truth for all AI prompt templates: `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude), `GEMINI_FREEFORM_PROMPT`, `CELL_ANALYSIS_PROMPT(n)` (heatmap batch). `{n}` = image count |
 | [`main.jsx`](../frontend/src/main.jsx) | React entry point. Mounts `<App />` |
@@ -148,7 +148,7 @@ Imported by both the main backend and the compute-service.
 | [`SliderSetting.jsx`](../frontend/src/components/tools/SliderSetting.jsx) | Reusable labelled range-slider row used across tabs |
 | [`GeneralTab.jsx`](../frontend/src/components/tools/GeneralTab.jsx) | Font size, previews per cell, YAML export/import |
 | [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | Page size, thumb width, hover zoom, diff threshold, video preview, uniformity thresholds |
-| [`DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx) | OpenVINO confidence, detected-classes checklist (80 COCO objects → `detection_classes`), excluded objects, emoji overrides, default-emoji reference |
+| [`DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx) | OpenVINO confidence slider, detected-classes checklist (80 COCO objects → `detection_classes`) |
 | [`GoogleAiTab.jsx`](../frontend/src/components/tools/GoogleAiTab.jsx) | Gemini API key, model, structured prompt template |
 | [`ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx) | Claude API key, model |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
@@ -184,7 +184,7 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 | [`neonMaskMode.js`](../frontend/src/components/viewModes/neonMaskMode.js) | Neon Mask (MOG2 mask in colour) |
 | [`mhiMode.js`](../frontend/src/components/viewModes/mhiMode.js) | MHI — Motion History Image |
 | [`boundingBoxesMode.js`](../frontend/src/components/viewModes/boundingBoxesMode.js) | Bounding Boxes (motion-based rectangles, not YOLO) |
-| [`openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) | OpenVINO Detection — `isAiMode`, calls `/openvino_thumbnail` with model+confidence+excluded params |
+| [`openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) | OpenVINO Detection — `isAiMode`, calls `/openvino_thumbnail` with model+confidence+classes params |
 | [`openvinoBboxMode.js`](../frontend/src/components/viewModes/openvinoBboxMode.js) | OpenVINO Boxes — same URL as openvinoMode but without `isAiMode`, reads confidence from `openvino_confidence` key |
 | [`motionStackingMode.js`](../frontend/src/components/viewModes/motionStackingMode.js) | Motion Stacking (accumulated motion heatmap) |
 | [`geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) | Gemini AI (icon overlay from analysis results) |

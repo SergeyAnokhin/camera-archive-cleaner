@@ -254,7 +254,8 @@ export default function App() {
         for (let i = 0; i < cells.length; i++) {
           setSelAnalyzeProgress(`${i + 1}/${cells.length}`)
           const { dateFrom, dateTo } = getCellDateRange(cells[i].period)
-          await openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName: model, confidence, classes: getClassesList() })
+          const videoMode = localStorage.getItem('video_preview_mode') || 'none'
+          await openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName: model, confidence, classes: getClassesList(), videoThumbMode: videoMode })
         }
       } else {
         const apiKey = localStorage.getItem(provider === 'gemini' ? 'gemini_api_key' : 'claude_api_key')

@@ -70,17 +70,10 @@ FastAPI app on port `8001` — [`compute-service/app.py`](../compute-service/app
 | Method | Path | In | Out |
 |---|---|---|---|
 | `GET` | `/health` | — | `{status, capabilities}` |
-| `POST` | `/detect` | `{path, model, confidence, excluded, classes, draw}` | `{objects, annotated_jpeg_b64, elapsed_ms}` |
+| `POST` | `/detect` | `{path, model, confidence, classes, draw}` | `{objects, annotated_jpeg_b64, elapsed_ms}` |
 | `POST` | `/video/thumbnail` | `{path, mode}` | binary `image/jpeg` or `image/gif` |
 
-`classes` (optional list of COCO class IDs) restricts the YOLO inference itself —
-the model only looks for those classes, so others never appear in `objects`. This
-is distinct from `excluded`, which only hides classes from the drawn boxes/display.
-`/detect` returns **all** detected (non-restricted) objects (Russian) plus, when `draw=true`, the
-bounding-box JPEG (base64) with excluded classes removed — both in one call so a
-single inference serves both the `/openvino_thumbnail` image and the
-`ai_analysis` DB write. `/video/thumbnail` has no objects to return, so it
-streams the image bytes directly.
+`classes` (optional list of COCO class IDs) restricts the YOLO inference — the model only looks for those classes, so others never appear in `objects`. `/detect` returns all detected objects (Russian) plus, when `draw=true`, the bounding-box JPEG (base64) — both in one call so a single inference serves both the `/openvino_thumbnail` image and the `ai_analysis` DB write. `/video/thumbnail` streams the image bytes directly.
 
 ---
 
@@ -112,7 +105,7 @@ machine.
 | [`compute-service/config.py`](../compute-service/config.py) | Path-remap config (env driven) |
 | [`compute-service/export_models.py`](../compute-service/export_models.py) | **Build-time only** — downloads yolov8n/s/m `.pt` weights, exports each to OpenVINO IR (`models/<name>_openvino_model/`), removes the `.pt` files. Run by the Dockerfile `RUN` step; never executed at runtime |
 | [`shared/contract.py`](../shared/contract.py) | Pydantic API models — shared by both backends |
-| [`shared/coco_names.py`](../shared/coco_names.py) | COCO→Russian map + `excluded_to_en` |
+| [`shared/coco_names.py`](../shared/coco_names.py) | `COCO_TO_RUSSIAN` map (23 entries; others fall back to English) |
 | [`backend/compute_client.py`](../backend/compute_client.py) | HTTP client used by the main backend |
 | [`backend/compute_config.py`](../backend/compute_config.py) | Routing config (`compute_config.json`) |
 | [`backend/compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO + video thumbnails |

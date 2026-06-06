@@ -33,10 +33,9 @@ def _base_url() -> str:
 
 
 def detect(path: str, model: str, confidence: float,
-           excluded, draw: bool = True, classes=None) -> DetectResponse:
+           draw: bool = True, classes=None) -> DetectResponse:
     url = _base_url()
     req = DetectRequest(path=path, model=model, confidence=confidence,
-                        excluded=list(excluded),
                         classes=list(classes) if classes else None, draw=draw)
     try:
         resp = httpx.post(f"{url}/detect", json=req.model_dump(), timeout=_DETECT_TIMEOUT)

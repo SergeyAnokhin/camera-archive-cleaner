@@ -13,8 +13,10 @@ import random
 import time
 from datetime import datetime
 
+import base64
+
 import compute_client
-from compute_cache import video_cache_path
+from compute_cache import ov_cache_path, video_cache_path, OV_THUMB_DIR, VID_THUMB_DIR
 from database import (
     get_connection, save_ai_analysis,
     update_task_progress, update_task_status,
@@ -137,11 +139,14 @@ def _make_video_thumb(file_path: str, mode: str, cache_path) -> None:
 
 
 def _detect_and_save(file_id: int, file_path: str, model_name: str, confidence: float,
-                     classes=None) -> None:
-    result = compute_client.detect(file_path, model_name, confidence, frozenset(), draw=False,
-                                   classes=classes)
+                     classes=None, classes_tuple=None) -> None:
+    result = compute_client.detect(file_path, model_name, confidence, draw=True, classes=classes)
     with get_connection() as conn:
         save_ai_analysis(conn, file_id, "openvino", model_name, "", "", " ".join(result.objects))
+    if result.annotated_jpeg_b64:
+        cache_path = ov_cache_path(file_id, model_name, confidence, classes_tuple)
+        OV_THUMB_DIR.mkdir(exist_ok=True)
+        cache_path.write_bytes(base64.b64decode(result.annotated_jpeg_b64))
 
 
 def _gemini_single(file_id: int, model: str, api_key: str) -> None:
@@ -235,6 +240,8 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
     model_name = params.get("model_name", "yolov8n")
     confidence = params.get("confidence", 0.25)
     classes = params.get("classes", None)
+    video_thumb_mode = params.get("video_thumb_mode")
+    classes_tuple = tuple(sorted(classes)) if classes else None
 
     with get_connection() as conn:
         total = conn.execute(
@@ -269,7 +276,8 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
         file_path = row["file_path"]
 
         try:
-            await asyncio.to_thread(_detect_and_save, file_id, file_path, model_name, confidence, classes)
+            await asyncio.to_thread(_detect_and_save, file_id, file_path, model_name, confidence,
+                                    classes, classes_tuple)
         except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable) as e:
             raise Exception(f"Compute service unavailable: {e}")
         except Exception as e:
@@ -288,6 +296,10 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
             last_save = time.time()
 
     final = resume_from + processed
+
+    if video_thumb_mode and video_thumb_mode != "none":
+        await asyncio.to_thread(_pregen_video_thumbs_sync, camera_id, date_from, date_to, video_thumb_mode)
+
     with get_connection() as conn:
         conn.execute(
             "UPDATE tasks SET status='completed', completed_at=datetime('now'), "
@@ -296,6 +308,33 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
             (final, total, task_id),
         )
     logger.info("✅ Task %s done (%d photos)", task_id[:8], final)
+
+
+def _pregen_video_thumbs_sync(camera_id, date_from, date_to, mode):
+    """Pre-generate and cache video thumbnails for all video files in range (sync, for asyncio.to_thread)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, file_path FROM files "
+            "WHERE camera_id=? AND timestamp>=? AND timestamp<=? AND file_type='video' "
+            "ORDER BY timestamp",
+            (camera_id, date_from, date_to),
+        ).fetchall()
+    generated = 0
+    for row in rows:
+        cache_path = video_cache_path(row["id"], mode)
+        if cache_path.exists():
+            continue
+        try:
+            data, _ = compute_client.video_thumbnail(row["file_path"], mode)
+            VID_THUMB_DIR.mkdir(exist_ok=True)
+            cache_path.write_bytes(data)
+            generated += 1
+        except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable):
+            raise
+        except Exception as e:
+            logger.warning("Video thumb error %s: %s", row["file_path"], e)
+    if generated:
+        logger.info("🎬 Video thumbnails (%s): %d сгенерировано", mode, generated)
 
 
 async def _run_ai(task_id: str, params: dict, resume_from: int, provider: str) -> None:

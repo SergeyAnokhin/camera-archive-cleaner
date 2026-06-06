@@ -1,9 +1,7 @@
 """COCO class names → Russian keywords.
 
-Cross-boundary contract: the Russian words here must match OBJECT_EMOJI_DEFAULTS
-in frontend/src/aiHelpers.js. Change one side, change both.
-
-Used by the compute-service to translate YOLO detections.
+Used by the compute-service to translate YOLO detections to Russian.
+The authoritative emoji mapping lives in frontend/src/cocoClasses.js.
 """
 
 COCO_TO_RUSSIAN: dict[str, str] = {
@@ -31,16 +29,3 @@ COCO_TO_RUSSIAN: dict[str, str] = {
     'handbag':    'сумка',
     'suitcase':   'чемодан',
 }
-
-# Reverse map: Russian label → COCO English class name
-RUSSIAN_TO_COCO: dict[str, str] = {v: k for k, v in COCO_TO_RUSSIAN.items()}
-
-
-def excluded_to_en(excluded_labels: set[str]) -> set[str]:
-    """Convert a set of excluded labels (Russian or English) → COCO English class names."""
-    result = set()
-    for label in excluded_labels:
-        lo = label.lower()
-        en = RUSSIAN_TO_COCO.get(lo)
-        result.add(en if en else lo)
-    return result

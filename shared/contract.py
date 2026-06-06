@@ -14,14 +14,13 @@ class DetectRequest(BaseModel):
     path: str
     model: str = "yolov8n"
     confidence: float = 0.25
-    excluded: list[str] = []
     classes: list[int] | None = None  # COCO class IDs to detect; None = all 80
     draw: bool = True
 
 
 class DetectResponse(BaseModel):
     """`objects` lists every detected class (Russian). `annotated_jpeg_b64` is the
-    bounding-box JPEG (base64) with excluded classes removed — present iff draw=True."""
+    bounding-box JPEG (base64) — present iff draw=True."""
     objects: list[str]
     annotated_jpeg_b64: str | None = None
     elapsed_ms: int = 0

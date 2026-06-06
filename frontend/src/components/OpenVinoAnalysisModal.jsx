@@ -5,20 +5,18 @@ import './GeminiAnalysisModal.css'
 
 const CONFIDENCE_KEY = 'openvino_confidence'
 const DEFAULT_CONFIDENCE = 0.25
-const EXCLUDED_OBJECTS_KEY = 'detection_excluded_objects'
 
 // taskContext: { cameraId, dateFrom, dateTo } — if provided, shows "Send to Task" button
 export default function OpenVinoAnalysisModal({ fileIds, model, taskContext, onClose, onComplete, onTaskCreated }) {
   const [confidence, setConfidence] = useState(
     () => parseFloat(localStorage.getItem(CONFIDENCE_KEY) || DEFAULT_CONFIDENCE)
   )
-  const [running, setRunning]           = useState(false)
-  const [progress, setProgress]         = useState(null)   // { current, total }
-  const [allResults, setAllResults]     = useState([])
-  const [error, setError]               = useState(null)
-  const [justExcluded, setJustExcluded] = useState(new Set())
-  const [taskSent, setTaskSent]         = useState(false)
-  const [taskError, setTaskError]       = useState(null)
+  const [running, setRunning]       = useState(false)
+  const [progress, setProgress]     = useState(null)   // { current, total }
+  const [allResults, setAllResults] = useState([])
+  const [error, setError]           = useState(null)
+  const [taskSent, setTaskSent]     = useState(false)
+  const [taskError, setTaskError]   = useState(null)
 
   useEffect(() => {
     function onKey(e) {
@@ -32,16 +30,6 @@ export default function OpenVinoAnalysisModal({ fileIds, model, taskContext, onC
     const v = parseFloat(e.target.value)
     setConfidence(v)
     localStorage.setItem(CONFIDENCE_KEY, v)
-  }
-
-  function handleExcludeObj(label) {
-    if (!window.confirm(`Добавить «${label}» в исключённые объекты?`)) return
-    const existing = (() => { try { return JSON.parse(localStorage.getItem(EXCLUDED_OBJECTS_KEY) || '[]') } catch { return [] } })()
-    const lower = label.toLowerCase()
-    if (!existing.includes(lower)) {
-      localStorage.setItem(EXCLUDED_OBJECTS_KEY, JSON.stringify([...existing, lower]))
-    }
-    setJustExcluded(prev => new Set([...prev, lower]))
   }
 
   async function handleRun() {
@@ -219,12 +207,6 @@ export default function OpenVinoAnalysisModal({ fileIds, model, taskContext, onC
                               {icons.map(ic => (
                                 <span key={ic.label} className="gai-obj-tag">
                                   {ic.emoji} {ic.label}
-                                  <span
-                                    className="gai-obj-exclude"
-                                    style={{ opacity: justExcluded.has(ic.label.toLowerCase()) ? 0.3 : undefined }}
-                                    title="Добавить в исключённые объекты"
-                                    onClick={e => { e.stopPropagation(); handleExcludeObj(ic.label) }}
-                                  >×</span>
                                 </span>
                               ))}
                             </div>

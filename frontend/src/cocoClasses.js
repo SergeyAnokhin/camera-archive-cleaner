@@ -1,7 +1,7 @@
 // The 80 COCO classes that YOLO / OpenVINO can detect, in class-ID order.
 // `id` is the YOLO class index (passed to the model's `classes=` param so it
 // only looks for the selected objects). `ru` is the Russian label shown in the
-// UI, `emoji` mirrors OBJECT_EMOJI_DEFAULTS in aiHelpers.js.
+// UI. `emoji` is the authoritative emoji for each class — used by aiHelpers.js.
 export const COCO_CLASSES = [
   { id: 0,  en: 'person',         ru: 'человек',              emoji: '👤' },
   { id: 1,  en: 'bicycle',        ru: 'велосипед',            emoji: '🚲' },

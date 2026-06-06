@@ -32,7 +32,11 @@ try:
 except ImportError:
     _psutil = None
 
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(message)s")
+# Уровень лога compute-сервиса. Меняй только здесь.
+# logging.WARNING  — только ошибки
+# logging.INFO     — старт моделей + одна строка на detect/video (рекомендуется)
+# logging.DEBUG    — подробная разбивка по стадиям (image open, YOLO, draw, encode)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("compute")
 
 _SILENT_RE = re.compile(r'"(?:GET|HEAD) /(?:api/health|health|metrics)\b')
@@ -95,8 +99,8 @@ def metrics_endpoint():
 @app.post("/detect", response_model=DetectResponse, summary="Object detection (YOLO/OpenVINO)")
 def detect_endpoint(req: DetectRequest):
     t_req = time.time()
-    logger.debug("detect request  path=%s  model=%s  conf=%.2f  draw=%s  excluded=%s  classes=%s",
-                 req.path, req.model, req.confidence, req.draw, req.excluded,
+    logger.debug("detect request  path=%s  model=%s  conf=%.2f  draw=%s  classes=%s",
+                 req.path, req.model, req.confidence, req.draw,
                  req.classes if req.classes is not None else "all-80")
 
     t_remap = time.time()
@@ -112,7 +116,7 @@ def detect_endpoint(req: DetectRequest):
 
     try:
         objects, jpeg_b64, elapsed = detection.detect(
-            path, req.model, req.confidence, req.excluded, req.draw, req.classes)
+            path, req.model, req.confidence, req.draw, req.classes)
     except Exception as e:
         logger.error("Detection failed for %s: %s", path, e)
         raise HTTPException(status_code=500, detail=f"Detection error: {e}")

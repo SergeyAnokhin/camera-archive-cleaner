@@ -199,18 +199,10 @@ export function openvinoAnalyzeBatch({ fileIds, modelName, confidence, classes =
   return postJson('/openvino_analyze_batch', { file_ids: fileIds, model_name: modelName, confidence, classes })
 }
 
-export function getOpenVinoBboxThumbnailUrl(fileId, model, confidence, excluded = '', classes = '') {
+export function getOpenVinoBboxThumbnailUrl(fileId, model, confidence, classes = '') {
   let url = `${BASE}/openvino_thumbnail/${fileId}?model=${encodeURIComponent(model)}&confidence=${confidence}`
-  if (excluded) url += `&excluded=${encodeURIComponent(excluded)}`
   if (classes) url += `&classes=${encodeURIComponent(classes)}`
   return url
-}
-
-export function getExcludedParam() {
-  try {
-    const raw = localStorage.getItem('detection_excluded_objects')
-    return raw ? JSON.parse(raw).join(',') : ''
-  } catch { return '' }
 }
 
 // Selected COCO class IDs as a comma-separated string. Falls back to defaults if never saved.
@@ -229,8 +221,8 @@ export function getClassesList() {
   } catch { return DETECTION_CLASSES_DEFAULT }
 }
 
-export function openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName, confidence, classes = null }) {
-  return postJson('/openvino_analyze_range', { camera_id: cameraId, date_from: dateFrom, date_to: dateTo, model_name: modelName, confidence, classes })
+export function openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName, confidence, classes = null, videoThumbMode = null }) {
+  return postJson('/openvino_analyze_range', { camera_id: cameraId, date_from: dateFrom, date_to: dateTo, model_name: modelName, confidence, classes, video_thumb_mode: videoThumbMode || null })
 }
 
 export function getAiAnalysisInRange(cameraId, dateFrom, dateTo, provider = 'openvino') {

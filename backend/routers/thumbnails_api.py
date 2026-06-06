@@ -130,13 +130,11 @@ def get_openvino_thumbnail(
     file_id: int,
     model: str = Query(default="yolov8n"),
     confidence: float = Query(default=0.25, ge=0.05, le=0.95),
-    excluded: str = Query(default=""),  # comma-separated Russian/English labels
     classes: str = Query(default=""),   # comma-separated COCO class IDs (empty = all)
 ):
-    excluded_labels = frozenset(e.strip().lower() for e in excluded.split(',') if e.strip())
     class_ids = tuple(int(c) for c in classes.split(',') if c.strip()) or None
 
-    cache_path = ov_cache_path(file_id, model, confidence, excluded_labels, class_ids)
+    cache_path = ov_cache_path(file_id, model, confidence, class_ids)
     if cache_path.exists():
         return FileResponse(str(cache_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
@@ -149,8 +147,7 @@ def get_openvino_thumbnail(
 
     try:
         result = compute_client.detect(
-            file_row["file_path"], model, confidence, excluded_labels, draw=True,
-            classes=class_ids)
+            file_row["file_path"], model, confidence, draw=True, classes=class_ids)
     except compute_client.ComputeDisabled:
         raise HTTPException(status_code=503, detail="Compute-service is disabled")
     except compute_client.ComputeUnavailable as e:
@@ -162,7 +159,6 @@ def get_openvino_thumbnail(
     OV_THUMB_DIR.mkdir(exist_ok=True)
     cache_path.write_bytes(base64.b64decode(result.annotated_jpeg_b64))
 
-    # Save ALL detected objects to ai_analysis (including excluded — icons/display filters them)
     with get_connection() as conn:
         save_ai_analysis(conn, file_id, "openvino", model, "", "", " ".join(result.objects))
 

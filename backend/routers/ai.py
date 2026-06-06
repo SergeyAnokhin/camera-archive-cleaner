@@ -71,12 +71,15 @@ class OpenVinoRangeRequest(BaseModel):
     model_name: str = "yolov8n"
     confidence: float = 0.25
     classes: Optional[list[int]] = None
+    video_thumb_mode: Optional[str] = None
 
 
 @router.post("/openvino_analyze_range", summary="Local object detection for all photos in a date range")
 def openvino_analyze_range(req: OpenVinoRangeRequest):
     try:
-        return openvino.analyze_range(req.camera_id, req.date_from, req.date_to, req.model_name, req.confidence, req.classes)
+        return openvino.analyze_range(req.camera_id, req.date_from, req.date_to,
+                                      req.model_name, req.confidence, req.classes,
+                                      req.video_thumb_mode)
     except compute_client.ComputeDisabled:
         raise HTTPException(status_code=503, detail="Compute-service is disabled")
     except compute_client.ComputeUnavailable as e:

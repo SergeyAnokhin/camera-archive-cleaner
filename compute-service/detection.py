@@ -5,7 +5,7 @@ import logging
 import time
 from pathlib import Path
 
-from shared.coco_names import COCO_TO_RUSSIAN, excluded_to_en
+from shared.coco_names import COCO_TO_RUSSIAN
 
 logger = logging.getLogger("compute")
 
@@ -31,12 +31,11 @@ def load_yolo(model_name: str):
 
 
 def detect(image_path: str, model: str, confidence: float,
-           excluded: list[str], draw: bool, classes: list[int] | None = None):
+           draw: bool, classes: list[int] | None = None):
     """Run detection on one image.
 
     Returns (objects_ru, annotated_jpeg_b64_or_None, elapsed_ms).
-    `objects_ru` lists every detected class. The annotated image (if draw=True)
-    has excluded classes removed before the boxes are rendered.
+    `objects_ru` lists every detected class (Russian where mapped, English otherwise).
     `classes` restricts YOLO inference to the given COCO class IDs (None = all).
     """
     from PIL import Image as PILImage
@@ -73,13 +72,6 @@ def detect(image_path: str, model: str, confidence: float,
     jpeg_b64 = None
     if draw:
         t_draw = time.time()
-        excluded_en = excluded_to_en(set(excluded))
-        if excluded_en and len(results[0].boxes):
-            keep = [
-                yolo.names[int(cls_id)].lower() not in excluded_en
-                for cls_id in results[0].boxes.cls.tolist()
-            ]
-            results[0].boxes = results[0].boxes[keep]
         annotated_bgr = results[0].plot(line_width=3, font_size=12)
         logger.debug("  [4a] plot boxes        %.1f ms", (time.time() - t_draw) * 1000)
 

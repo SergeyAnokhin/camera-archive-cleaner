@@ -78,7 +78,7 @@ compute-service is disabled or unreachable.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/openvino_thumbnail/{file_id}` | Returns a JPEG with YOLO bounding boxes drawn. Params: `model` (default `yolov8n`), `confidence` (default `0.25`), `excluded` (comma-separated labels), `classes` (comma-separated COCO class IDs; empty = all 80). `classes` restricts YOLO inference (passed as `classes=`) and is part of the cache key. Caches on first request; **also saves detected objects to `ai_analysis`** on cache miss. Cache: `backend/openvino_thumbnails_cache/` |
+| `GET` | `/openvino_thumbnail/{file_id}` | Returns a JPEG with YOLO bounding boxes drawn. Params: `model` (default `yolov8n`), `confidence` (default `0.25`), `classes` (comma-separated COCO class IDs; empty = all 80). `classes` restricts YOLO inference and is part of the cache key. Caches on first request; **also saves detected objects to `ai_analysis`** on cache miss. Cache: `backend/openvino_thumbnails_cache/` |
 | `POST` | `/openvino_analyze_batch` | Run YOLO on a list of photos. Body: `file_ids`, `model_name`, `confidence`, `classes` (optional list of COCO class IDs, `null` = all). Saves results to `ai_analysis`. Returns `{elapsed_ms, images_used, saved_count, results}` |
 | `POST` | `/openvino_analyze_range` | Same as `/openvino_analyze_batch` but fetches all photos in a date range. Body: `camera_id`, `date_from`, `date_to`, `model_name`, `confidence`, `classes` (optional). Used by heatmap batch analysis |
 
