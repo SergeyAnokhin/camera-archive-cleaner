@@ -1,4 +1,5 @@
 import './Header.css'
+import ServiceStatus from './ServiceStatus.jsx'
 
 function StatChip({ icon, value, label }) {
   return (
@@ -17,20 +18,23 @@ export default function Header({ totals }) {
         <i className="mdi mdi-cctv" />
         <span>Camera Archive</span>
       </div>
-      <div className="header-stats">
-        {totals ? (
-          <>
-            <StatChip icon="mdi-database" value={`${totals.total_size_gb.toFixed(2)} GB`} label="total" />
-            <StatChip icon="mdi-camera" value={totals.photo_count.toLocaleString()} label="photos" />
-            <StatChip icon="mdi-video" value={totals.video_count.toLocaleString()} label="videos" />
-          </>
-        ) : (
-          <>
-            <div className="stat-chip skeleton stat-chip-skeleton" />
-            <div className="stat-chip skeleton stat-chip-skeleton" />
-            <div className="stat-chip skeleton stat-chip-skeleton" />
-          </>
-        )}
+      <div className="header-right">
+        <ServiceStatus />
+        <div className="header-stats">
+          {totals ? (
+            <>
+              <StatChip icon="mdi-database" value={`${totals.total_size_gb.toFixed(2)} GB`} label="total" />
+              <StatChip icon="mdi-camera" value={totals.photo_count.toLocaleString()} label="photos" />
+              <StatChip icon="mdi-video" value={totals.video_count.toLocaleString()} label="videos" />
+            </>
+          ) : (
+            <>
+              <div className="stat-chip skeleton stat-chip-skeleton" />
+              <div className="stat-chip skeleton stat-chip-skeleton" />
+              <div className="stat-chip skeleton stat-chip-skeleton" />
+            </>
+          )}
+        </div>
       </div>
     </header>
   )

@@ -245,6 +245,10 @@ export function getAiAnalysis(fileIds) {
   return get('/ai_analysis?file_ids=' + fileIds.join(','))
 }
 
+export function getServicesStatus() {
+  return get('/services/status')
+}
+
 export function getComputeConfig() {
   return get('/compute/config')
 }
