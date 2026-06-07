@@ -131,6 +131,11 @@
   padding: 6px 10px;
 }
 
+.ts__btn--paused {
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
 /* ── Error banner ─────────────────────────────────────────────── */
 .ts__error-banner {
   background: #450a0a;

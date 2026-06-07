@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getTasks, createTask, deleteTask, pauseTask, resumeTask, cancelTask,
-  reorderTasks, getTaskMetrics,
+  reorderTasks, getTaskMetrics, pauseAllTasks, resumeAllTasks,
 } from '../api.js'
 import TaskCard from './TaskCard.jsx'
 import NewTaskModal from './NewTaskModal.jsx'
@@ -66,17 +66,23 @@ function MetricsChips({ metrics }) {
 }
 
 export default function TasksScreen({ cameras, onNavigate }) {
-  const [tasks, setTasks]         = useState([])
-  const [metrics, setMetrics]     = useState(null)
-  const [showModal, setShowModal] = useState(false)
-  const [error, setError]         = useState(null)
-  const [dragIdx, setDragIdx]     = useState(null)
-  const [overIdx, setOverIdx]     = useState(null)
+  const [tasks, setTasks]               = useState([])
+  const [globalPaused, setGlobalPaused] = useState(false)
+  const [metrics, setMetrics]           = useState(null)
+  const [showModal, setShowModal]       = useState(false)
+  const [error, setError]               = useState(null)
+  const [dragIdx, setDragIdx]           = useState(null)
+  const [overIdx, setOverIdx]           = useState(null)
   const pollRef    = useRef(null)
   const metricsRef = useRef(null)
 
   const fetchTasks = useCallback(async () => {
-    try { setTasks(await getTasks()); setError(null) }
+    try {
+      const data = await getTasks()
+      setTasks(data.tasks)
+      setGlobalPaused(data.global_paused)
+      setError(null)
+    }
     catch (e) { setError(e.message) }
   }, [])
 
@@ -163,6 +169,15 @@ export default function TasksScreen({ cameras, onNavigate }) {
           {hasDone && (
             <button className="modal-btn neutral ts__clear-btn" onClick={clearDone}>
               <i className="mdi mdi-broom" />
+            </button>
+          )}
+          {tasks.length > 0 && (
+            <button
+              className={`modal-btn neutral${globalPaused ? ' ts__btn--paused' : ''}`}
+              title={globalPaused ? 'Возобновить очередь' : 'Приостановить очередь'}
+              onClick={() => act(globalPaused ? resumeAllTasks : pauseAllTasks)}
+            >
+              <i className={`mdi ${globalPaused ? 'mdi-play' : 'mdi-pause'}`} />
             </button>
           )}
           <button className="modal-btn accent" onClick={() => setShowModal(true)}>

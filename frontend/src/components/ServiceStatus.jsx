@@ -61,10 +61,7 @@ function ServiceChip({ name, url, docsUrl, up, cpuPct, memPct, memUsed }) {
 export default function ServiceStatus() {
   const [status, setStatus] = useState(null)
   const [backendUp, setBackendUp] = useState(false)
-  const [computeUrl, setComputeUrl] = useState(null)
-  const [computeUp, setComputeUp] = useState(false)
 
-  // Poll backend for status + compute URL
   useEffect(() => {
     let cancelled = false
     async function poll() {
@@ -75,13 +72,16 @@ export default function ServiceStatus() {
             const data = await res.json()
             setStatus(data)
             setBackendUp(true)
-            setComputeUrl(data.compute?.url || null)
           } else {
             setBackendUp(false)
+            setStatus(null)
           }
         }
       } catch {
-        if (!cancelled) setBackendUp(false)
+        if (!cancelled) {
+          setBackendUp(false)
+          setStatus(null)
+        }
       }
       if (!cancelled) setTimeout(poll, 1000)
     }
@@ -89,23 +89,7 @@ export default function ServiceStatus() {
     return () => { cancelled = true }
   }, [])
 
-  // Poll compute /health directly from browser (independent of backend)
-  useEffect(() => {
-    if (!computeUrl) return
-    let cancelled = false
-    async function poll() {
-      try {
-        const res = await fetch(`${computeUrl}/health`)
-        if (!cancelled) setComputeUp(res.ok)
-      } catch {
-        if (!cancelled) setComputeUp(false)
-      }
-      if (!cancelled) setTimeout(poll, 1000)
-    }
-    poll()
-    return () => { cancelled = true }
-  }, [computeUrl])
-
+  if (!status && !backendUp) return null
   if (!status) return null
 
   const backendUrl = status.backend_url || (window.location.origin + '/api')
@@ -113,6 +97,8 @@ export default function ServiceStatus() {
 
   const compute = status.compute
   const showCompute = compute?.mode !== 'off'
+  const computeUrl = compute?.url || null
+  const computeUp = compute?.reachable ?? false
   const computeDocsUrl = computeUrl ? `${computeUrl}/docs` : null
 
   return (

@@ -25,6 +25,16 @@ from database import (
 logger = logging.getLogger("api")
 
 _PROGRESS_INTERVAL = 5.0  # seconds between DB progress writes
+_global_paused = False
+
+
+def get_global_paused() -> bool:
+    return _global_paused
+
+
+def set_global_paused(value: bool) -> None:
+    global _global_paused
+    _global_paused = value
 
 
 def init_runner_state() -> None:
@@ -49,6 +59,9 @@ async def task_loop() -> None:
     """Infinite async loop — picks queued tasks and executes them sequentially."""
     while True:
         try:
+            if _global_paused:
+                await asyncio.sleep(2)
+                continue
             with get_connection() as conn:
                 row = conn.execute(
                     "SELECT * FROM tasks WHERE status='queued' "

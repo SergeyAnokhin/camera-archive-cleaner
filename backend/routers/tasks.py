@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 import compute_client
+import task_runner
 from compute_config import load_config
 from database import (
     get_connection, get_all_tasks, get_task, create_task,
@@ -40,7 +41,8 @@ def _row_to_dict(row) -> dict:
 @router.get("")
 def list_tasks():
     with get_connection() as conn:
-        return [_row_to_dict(r) for r in get_all_tasks(conn)]
+        tasks = [_row_to_dict(r) for r in get_all_tasks(conn)]
+    return {"tasks": tasks, "global_paused": task_runner.get_global_paused()}
 
 
 class CreateTaskRequest(BaseModel):
@@ -96,6 +98,20 @@ def reorder_task_list(req: ReorderRequest):
     with get_connection() as conn:
         reorder_tasks(conn, req.order)
     return {"ok": True}
+
+
+@router.put("/pause_all")
+def pause_all():
+    task_runner.set_global_paused(True)
+    logger.info("⏸ Global queue pause enabled")
+    return {"ok": True, "global_paused": True}
+
+
+@router.put("/resume_all")
+def resume_all():
+    task_runner.set_global_paused(False)
+    logger.info("▶ Global queue pause cleared")
+    return {"ok": True, "global_paused": False}
 
 
 @router.delete("/{task_id}")

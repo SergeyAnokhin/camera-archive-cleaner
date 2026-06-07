@@ -259,6 +259,14 @@ export function getTasks() {
   return get('/tasks')
 }
 
+export function pauseAllTasks() {
+  return sendJson('PUT', '/tasks/pause_all', {})
+}
+
+export function resumeAllTasks() {
+  return sendJson('PUT', '/tasks/resume_all', {})
+}
+
 export function createTask({ type, params, label }) {
   return postJson('/tasks', { type, params, label })
 }
