@@ -12,8 +12,10 @@ import SelectionBar from './hour/SelectionBar.jsx'
 import DistributionChart from './hour/DistributionChart.jsx'
 import ModeSettingsPanel from './hour/ModeSettingsPanel.jsx'
 import AiModePanel from './hour/AiModePanel.jsx'
+import Lightbox from './hour/Lightbox.jsx'
 import { useHourKeyboard } from './hour/useHourKeyboard.js'
 import { useHourDelete } from './hour/useHourDelete.js'
+import { markHourViewed } from '../viewedStatus.js'
 import {
   getPageSize, getHoverZoom, getThumbWidth, buildInitialModeParams,
   saveModeParams, recordAiRequest, VIEW_MODE_KEY,
@@ -45,6 +47,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [aiStatsKey, setAiStatsKey]         = useState(0)
 
   const [focusedFileIndex, setFocusedFileIndex] = useState(null)
+  const [lightboxIndex, setLightboxIndex] = useState(null)
   const gridRef = useRef(null)
   const anchorIdxRef = useRef(null)
   const anchorActionRef = useRef(null)  // true = selecting, false = deselecting
@@ -85,6 +88,10 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       document.removeEventListener('thumb-width-change', onThumbWidth)
     }
   }, [])
+
+  useEffect(() => {
+    markHourViewed(cameraId, dateFrom)
+  }, [cameraId, dateFrom])
 
   useEffect(() => {
     getDistribution(cameraId, dateFrom, dateTo)
@@ -193,6 +200,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     handleDeletePreview: del.handleDeletePreview,
     handleDeleteAll: del.handleDeleteAll,
     handleDeleteHourPreview: del.handleDeleteHourPreview,
+    lightboxOpen: lightboxIndex !== null,
   })
 
   const enabledModes = getEnabledViewModes()
@@ -342,6 +350,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
                   selected={selectedIds.has(file.id)}
                   onToggle={toggleSelect}
                   isFocused={index === focusedFileIndex}
+                  onOpenLightbox={setLightboxIndex}
                 />
               : <PhotoCard
                   key={file.id}
@@ -357,6 +366,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
                   isFocused={index === focusedFileIndex}
                   aiData={aiAnalysisMap.get(file.id) ?? null}
                   onImageLoad={activeMode.aiProvider === 'openvino' ? handleOpenVinoImageLoad : undefined}
+                  onOpenLightbox={setLightboxIndex}
                 />
           )}
         </div>
@@ -431,6 +441,15 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         )
       })()}
 
+      {lightboxIndex !== null && (
+        <Lightbox
+          files={files}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+        />
+      )}
+
       {openVinoOpen && (() => {
         const photoFiles = files.filter(f => f.file_type === 'photo')
         const ids = selectedIds.size > 0
@@ -472,6 +491,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             <Kbd>PgUp PgDn</Kbd> page &nbsp;·&nbsp;
             <Kbd>M</Kbd> / <Kbd>P</Kbd> mode ±1 &nbsp;·&nbsp;
             <Kbd>N</Kbd> peek original &nbsp;·&nbsp;
+            <Kbd>S</Kbd> save (in viewer) &nbsp;·&nbsp;
+            <Kbd>T</Kbd> save preview (in viewer) &nbsp;·&nbsp;
             <Kbd>Ctrl+R</Kbd> refresh &nbsp;·&nbsp;
             <Kbd>Ctrl+A</Kbd> select all &nbsp;·&nbsp;
             <Kbd>Space</Kbd> select &nbsp;·&nbsp;

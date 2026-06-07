@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { getCameras, getStatsTotal, getStatsGrouped, previewDeleteRange, confirmDelete, deleteByRange, getPreviews, openvinoAnalyzeRange, geminiAnalyzeBatch, claudeAnalyzeBatch, getClassesList, createTask, getAiAnalysisInRange } from './api.js'
 import DeleteConfirmModal from './components/DeleteConfirmModal.jsx'
 import Header from './components/Header.jsx'
@@ -20,6 +20,7 @@ import {
   loadNavState, saveNavState,
 } from './components/navUtils.js'
 import { CELL_ANALYSIS_PROMPT } from './prompts.js'
+import { computeViewedStatusMap, cacheDataHours } from './viewedStatus.js'
 
 const _nav = loadNavState()
 
@@ -97,6 +98,7 @@ export default function App() {
   const [showTasks, setShowTasks] = useState(false)
   const [showTuning, setShowTuning] = useState(false)
   const [taskResultsModal, setTaskResultsModal] = useState(null) // {task, results}
+  const [viewedRefreshKey, setViewedRefreshKey] = useState(0)
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
 
@@ -107,6 +109,13 @@ export default function App() {
     function onSettingChange() { setPreviewsPerCell(getPreviewsPerCell()) }
     document.addEventListener('previews-per-cell-change', onSettingChange)
     return () => document.removeEventListener('previews-per-cell-change', onSettingChange)
+  }, [])
+
+  // Refresh viewed status whenever an hour is marked viewed in HourViewer
+  useEffect(() => {
+    function onViewed() { setViewedRefreshKey(k => k + 1) }
+    document.addEventListener('hour-viewed-change', onViewed)
+    return () => document.removeEventListener('hour-viewed-change', onViewed)
   }, [])
 
   useEffect(() => {
@@ -152,7 +161,17 @@ export default function App() {
       dateFrom: top?.dateFrom ?? null,
       dateTo:   top?.dateTo   ?? null,
     })
-      .then(data => setPeriods(computeIntensity(data.periods ?? [])))
+      .then(data => {
+        const computed = computeIntensity(data.periods ?? [])
+        setPeriods(computed)
+        if (currentLevel === 'hour' && cameraId) {
+          const dayDate = drillStack[drillStack.length - 1]?.dateFrom?.substring(0, 10)
+          if (dayDate) {
+            const nonEmptyHours = computed.filter(p => p.bucket > 0).map(p => p.period.padStart(2, '0'))
+            cacheDataHours(cameraId, dayDate, nonEmptyHours)
+          }
+        }
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [drillStack, cameraId, currentLevel, refreshKey, selectedHour])
@@ -197,6 +216,14 @@ export default function App() {
       )
     }
   }, [periods])
+
+  const viewedStatusMap = useMemo(() => {
+    if (selectedHour) return new Map()
+    const contextDateFrom = drillStack[drillStack.length - 1]?.dateFrom ?? null
+    return computeViewedStatusMap(periods, currentLevel, contextDateFrom, cameraId)
+  // viewedRefreshKey is intentionally the trigger for recomputing from localStorage
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periods, currentLevel, cameraId, drillStack, viewedRefreshKey])
 
   // Heatmap keyboard navigation (only active when HourViewer is not open)
   useHeatmapKeyboard({
@@ -522,6 +549,7 @@ export default function App() {
               onTogglePeriod={handleTogglePeriod}
               aiRefreshKey={aiRefreshKey}
               focusedPeriod={focusedPeriod}
+              viewedStatusMap={viewedStatusMap}
             />
             {!loading && periods.length > 0 && (
               <StatsBar periods={periods} level={currentLevel} />

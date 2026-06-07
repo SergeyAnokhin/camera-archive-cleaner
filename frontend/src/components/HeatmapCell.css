@@ -198,3 +198,16 @@
 .heatmap-cell.light .cell-uniformity-alert {
   background: rgba(255, 255, 255, 0.40);
 }
+
+/* ── Viewed status strip (bottom edge of cell) ── */
+.cell-viewed-strip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  pointer-events: none;
+}
+.cell-viewed-partial { background: rgba(251, 191, 36, 0.75); } /* amber */
+.cell-viewed-full    { background: rgba(74, 222, 128, 0.80); } /* green */

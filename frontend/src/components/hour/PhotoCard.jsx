@@ -1,19 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { getMediaUrl } from '../../api.js'
 import { resolveAiIcons } from '../../aiHelpers.js'
 import { formatTime } from './hourUtils.js'
 import './PhotoCard.css'
 
-function downloadName(file) {
-  const ext = file.file_path?.slice(file.file_path.lastIndexOf('.')) || '.jpg'
-  const stamp = (file.timestamp || '').replace(/[:T]/g, '-')
-  return `snapshot_${stamp}${ext}`
-}
-
-export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused, aiData, onImageLoad }) {
+export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused, aiData, onImageLoad, onOpenLightbox }) {
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
-  const [fullscreen, setFullscreen] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
   const cardRef = useRef(null)
   const imgRef  = useRef(null)
@@ -21,15 +13,6 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
   useEffect(() => {
     if (isFocused) cardRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [isFocused])
-
-  useEffect(() => {
-    if (!fullscreen) return
-    function onKey(e) {
-      if (e.key === 'Escape' || e.key === 'Backspace') { e.stopImmediatePropagation(); setFullscreen(false) }
-    }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [fullscreen])
 
   const src = mode.getImageUrl(file, { pagePhotoIds, params })
 
@@ -44,7 +27,7 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
   }, [src])
 
   function handleClick(e) {
-    if (selectionMode) { onToggle(file, index, e.shiftKey) } else { setFullscreen(true) }
+    if (selectionMode) { onToggle(file, index, e.shiftKey) } else { onOpenLightbox?.(index) }
   }
 
   const aiIcons = aiData?.objects ? resolveAiIcons(aiData.objects) : []
@@ -114,20 +97,6 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
           </div>
         )}
       </div>
-      {!selectionMode && fullscreen && (
-        <div className="hv-lightbox" onClick={() => setFullscreen(false)}>
-          <img src={getMediaUrl(file.id)} alt={formatTime(file.timestamp)} className="hv-lightbox-img" />
-          <a
-            href={getMediaUrl(file.id)}
-            download={downloadName(file)}
-            className="hv-lightbox-download"
-            onClick={e => e.stopPropagation()}
-            title="Скачать оригинал"
-          >
-            <i className="mdi mdi-download" /> Скачать
-          </a>
-        </div>
-      )}
     </>
   )
 }

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import VideoModal from './VideoModal.jsx'
 import { formatTime } from './hourUtils.js'
 import { getVideoThumbnailUrl } from '../../api.js'
 import './VideoCard.css'
@@ -8,8 +7,7 @@ function readPreviewMode() {
   return localStorage.getItem('video_preview_mode') || 'none'
 }
 
-export default function VideoCard({ file, selectionMode, selected, onToggle, index, isFocused }) {
-  const [modalOpen, setModalOpen] = useState(false)
+export default function VideoCard({ file, selectionMode, selected, onToggle, index, isFocused, onOpenLightbox }) {
   const [previewMode, setPreviewMode] = useState(readPreviewMode)
   const [thumbError, setThumbError] = useState(false)
   const cardRef = useRef(null)
@@ -25,7 +23,7 @@ export default function VideoCard({ file, selectionMode, selected, onToggle, ind
   }, [])
 
   function handleClick(e) {
-    if (selectionMode) { onToggle(file, index, e.shiftKey) } else { setModalOpen(true) }
+    if (selectionMode) { onToggle(file, index, e.shiftKey) } else { onOpenLightbox?.(index) }
   }
 
   const showThumb = previewMode !== 'none' && !thumbError
@@ -58,7 +56,6 @@ export default function VideoCard({ file, selectionMode, selected, onToggle, ind
         <span className="hv-card-time hv-video-time-overlay">{formatTime(file.timestamp)}</span>
         {showThumb && <i className="mdi mdi-video hv-video-badge" />}
       </div>
-      {!selectionMode && modalOpen && <VideoModal file={file} onClose={() => setModalOpen(false)} />}
     </>
   )
 }

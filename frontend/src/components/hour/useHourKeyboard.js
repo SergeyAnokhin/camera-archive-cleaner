@@ -18,6 +18,7 @@ export function useHourKeyboard(ctx) {
     setPage, setFocusedFileIndex, setViewMode, setSelectionMode,
     setSelectedMap, setInternalRefreshKey, setPeekOriginal,
     toggleSelectionMode, handleDeletePreview, handleDeleteAll, handleDeleteHourPreview,
+    lightboxOpen,
   } = ctx
 
   function getGridCols() {
@@ -56,6 +57,7 @@ export function useHourKeyboard(ctx) {
   useEffect(() => {
     if (selectionMode) return
     function onKey(e) {
+      if (lightboxOpen) return
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'SELECT') return
       if (e.key === 'Escape') {
@@ -137,12 +139,13 @@ export function useHourKeyboard(ctx) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectionMode, totalPages, files, selectedIds, onBack, focusedFileIndex])
+  }, [selectionMode, totalPages, files, selectedIds, onBack, focusedFileIndex, lightboxOpen])
 
   // ── Selection-mode keys ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectionMode) return
     function onKey(e) {
+      if (lightboxOpen) return
       const tag = document.activeElement?.tagName
       if (tag === 'INPUT' || tag === 'SELECT') return
 
@@ -210,5 +213,5 @@ export function useHourKeyboard(ctx) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectionMode, files, selectedIds, focusedFileIndex])
+  }, [selectionMode, files, selectedIds, focusedFileIndex, lightboxOpen])
 }

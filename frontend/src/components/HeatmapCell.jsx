@@ -47,7 +47,7 @@ function dateRangeForCell(period, level, contextDateFrom) {
   return null
 }
 
-export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selected, onToggle, isFocused, aiRefreshKey }) {
+export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previewsPerCell, contextDateFrom, selectionMode, selected, onToggle, isFocused, aiRefreshKey, viewedStatus }) {
   const [previewIds, setPreviewIds]   = useState([])
   const [aiObjects, setAiObjects]     = useState([])
   const [uniformity, setUniformity]   = useState(null)
@@ -173,6 +173,12 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
           </div>
         )
       })()}
+      {!isEmpty && viewedStatus !== 'none' && (
+        <span
+          className={`cell-viewed-strip cell-viewed-${viewedStatus}`}
+          title={viewedStatus === 'full' ? 'Просмотрено полностью' : 'Частично просмотрено'}
+        />
+      )}
     </div>
   )
 }
