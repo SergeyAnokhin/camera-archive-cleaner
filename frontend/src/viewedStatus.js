@@ -1,8 +1,10 @@
 // Viewed status — localStorage-backed, no API calls.
 // Each opened hour is recorded. Cells at day/month/year level aggregate.
 
-function viewedKey(cameraId) { return `viewed_hours_${cameraId}` }
-function dataHoursKey(cameraId) { return `data_hours_${cameraId}` }
+function viewedKey(cameraId)     { return `viewed_hours_${cameraId}` }
+function dataHoursKey(cameraId)  { return `data_hours_${cameraId}` }
+function dataDaysKey(cameraId)   { return `data_days_${cameraId}` }
+function dataMonthsKey(cameraId) { return `data_months_${cameraId}` }
 
 export function markHourViewed(cameraId, dateFrom) {
   // dateFrom like "2024-01-15T09:00:00" → key "2024-01-15T09"
@@ -18,32 +20,40 @@ export function markHourViewed(cameraId, dateFrom) {
 }
 
 export function cacheDataHours(cameraId, date, hours) {
-  // hours: ["09", "10"] — string array of hours that have data for this date
+  // hours: ["09", "10"] — hours with data for this date
+  _cacheChildSet(dataHoursKey(cameraId), date, hours)
+}
+
+export function cacheDataDays(cameraId, month, days) {
+  // days: ["2024-01-15", "2024-01-20"] — days with data in this month
+  _cacheChildSet(dataDaysKey(cameraId), month, days)
+}
+
+export function cacheDataMonths(cameraId, year, months) {
+  // months: ["2024-01", "2024-03"] — months with data in this year
+  _cacheChildSet(dataMonthsKey(cameraId), year, months)
+}
+
+function _cacheChildSet(key, parent, children) {
   try {
-    const raw = localStorage.getItem(dataHoursKey(cameraId))
+    const raw = localStorage.getItem(key)
     const obj = raw ? JSON.parse(raw) : {}
-    obj[date] = hours
-    localStorage.setItem(dataHoursKey(cameraId), JSON.stringify(obj))
+    obj[parent] = children
+    localStorage.setItem(key, JSON.stringify(obj))
   } catch {}
 }
 
-function getViewedSet(cameraId) {
+function _readMap(key) {
   try {
-    const raw = localStorage.getItem(viewedKey(cameraId))
-    if (!raw) return new Set()
-    return new Set(Object.keys(JSON.parse(raw)))
-  } catch { return new Set() }
-}
-
-function getDataHoursMap(cameraId) {
-  try {
-    const raw = localStorage.getItem(dataHoursKey(cameraId))
+    const raw = localStorage.getItem(key)
     return raw ? JSON.parse(raw) : {}
   } catch { return {} }
 }
 
 // Returns 'none' | 'partial' | 'full'
-function _computeStatus(period, level, contextDateFrom, viewedSet, dataHoursMap) {
+// Rule for aggregation: 'none' children (no data / unvisited) are ignored.
+// Only 'partial' children lower the result from 'full' to 'partial'.
+function _computeStatus(period, level, contextDateFrom, viewedSet, dataHoursMap, dataDaysMap, dataMonthsMap) {
   if (level === 'hour') {
     if (!contextDateFrom) return 'none'
     const date = contextDateFrom.substring(0, 10)
@@ -63,26 +73,34 @@ function _computeStatus(period, level, contextDateFrom, viewedSet, dataHoursMap)
   }
 
   if (level === 'month') {
-    const [y, m] = period.split('-')
-    const daysInMonth = new Date(+y, +m, 0).getDate()
+    // Use cached list of data days if available; otherwise iterate all possible days.
+    const knownDataDays = dataDaysMap[period] ?? null
+    const days = knownDataDays ?? (() => {
+      const [y, m] = period.split('-')
+      const n = new Date(+y, +m, 0).getDate()
+      return Array.from({ length: n }, (_, i) => `${period}-${String(i + 1).padStart(2, '0')}`)
+    })()
+
     let anyViewed = false, allFull = true
-    for (let d = 1; d <= daysInMonth; d++) {
-      const date = `${period}-${String(d).padStart(2, '0')}`
-      const s = _computeStatus(date, 'day', null, viewedSet, dataHoursMap)
+    for (const date of days) {
+      const s = _computeStatus(date, 'day', null, viewedSet, dataHoursMap, dataDaysMap, dataMonthsMap)
       if (s !== 'none') anyViewed = true
-      if (s !== 'full') allFull = false
+      if (s === 'partial') allFull = false   // 'none' = unknown/empty → ignored
     }
     if (!anyViewed) return 'none'
     return allFull ? 'full' : 'partial'
   }
 
   if (level === 'year') {
+    const knownDataMonths = dataMonthsMap[period] ?? null
+    const months = knownDataMonths ?? Array.from({ length: 12 }, (_, i) =>
+      `${period}-${String(i + 1).padStart(2, '0')}`)
+
     let anyViewed = false, allFull = true
-    for (let mo = 1; mo <= 12; mo++) {
-      const month = `${period}-${String(mo).padStart(2, '0')}`
-      const s = _computeStatus(month, 'month', null, viewedSet, dataHoursMap)
+    for (const month of months) {
+      const s = _computeStatus(month, 'month', null, viewedSet, dataHoursMap, dataDaysMap, dataMonthsMap)
       if (s !== 'none') anyViewed = true
-      if (s !== 'full') allFull = false
+      if (s === 'partial') allFull = false   // 'none' = unknown/empty → ignored
     }
     if (!anyViewed) return 'none'
     return allFull ? 'full' : 'partial'
@@ -93,12 +111,19 @@ function _computeStatus(period, level, contextDateFrom, viewedSet, dataHoursMap)
 
 export function computeViewedStatusMap(periods, level, contextDateFrom, cameraId) {
   if (!cameraId) return new Map()
-  const viewedSet = getViewedSet(cameraId)
-  const dataHoursMap = getDataHoursMap(cameraId)
+  const viewedSet   = _readMap(viewedKey(cameraId))    // plain object for quick has()
+  const viewedSetObj = viewedSet                        // kept as object; use `in` operator
+  const viewedSetProxy = { has: k => k in viewedSetObj }
+  const dataHoursMap  = _readMap(dataHoursKey(cameraId))
+  const dataDaysMap   = _readMap(dataDaysKey(cameraId))
+  const dataMonthsMap = _readMap(dataMonthsKey(cameraId))
   const result = new Map()
   for (const cell of periods) {
     if (cell.bucket > 0) {
-      result.set(cell.period, _computeStatus(cell.period, level, contextDateFrom, viewedSet, dataHoursMap))
+      result.set(cell.period, _computeStatus(
+        cell.period, level, contextDateFrom,
+        viewedSetProxy, dataHoursMap, dataDaysMap, dataMonthsMap,
+      ))
     }
   }
   return result

@@ -20,7 +20,7 @@ import {
   loadNavState, saveNavState,
 } from './components/navUtils.js'
 import { CELL_ANALYSIS_PROMPT } from './prompts.js'
-import { computeViewedStatusMap, cacheDataHours } from './viewedStatus.js'
+import { computeViewedStatusMap, cacheDataHours, cacheDataDays, cacheDataMonths } from './viewedStatus.js'
 
 const _nav = loadNavState()
 
@@ -164,11 +164,26 @@ export default function App() {
       .then(data => {
         const computed = computeIntensity(data.periods ?? [])
         setPeriods(computed)
-        if (currentLevel === 'hour' && cameraId) {
-          const dayDate = drillStack[drillStack.length - 1]?.dateFrom?.substring(0, 10)
-          if (dayDate) {
-            const nonEmptyHours = computed.filter(p => p.bucket > 0).map(p => p.period.padStart(2, '0'))
-            cacheDataHours(cameraId, dayDate, nonEmptyHours)
+        if (cameraId) {
+          const ctx = drillStack[drillStack.length - 1]
+          if (currentLevel === 'hour') {
+            const dayDate = ctx?.dateFrom?.substring(0, 10)
+            if (dayDate) {
+              cacheDataHours(cameraId, dayDate,
+                computed.filter(p => p.bucket > 0).map(p => p.period.padStart(2, '0')))
+            }
+          } else if (currentLevel === 'day') {
+            const month = ctx?.dateFrom?.substring(0, 7)
+            if (month) {
+              cacheDataDays(cameraId, month,
+                computed.filter(p => p.bucket > 0).map(p => p.period))
+            }
+          } else if (currentLevel === 'month') {
+            const year = ctx?.dateFrom?.substring(0, 4)
+            if (year) {
+              cacheDataMonths(cameraId, year,
+                computed.filter(p => p.bucket > 0).map(p => p.period))
+            }
           }
         }
       })
