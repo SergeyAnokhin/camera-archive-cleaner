@@ -100,3 +100,36 @@ def compute_status():
     except compute_client.ComputeUnavailable as e:
         result["error"] = str(e)
     return result
+
+
+class ComputePingRequest(BaseModel):
+    mode: str
+    remote_url: str = ""
+
+
+@router.post("/compute/ping", summary="Test reachability of given compute settings without saving")
+def compute_ping(req: ComputePingRequest):
+    """Tests the compute-service at the given mode/url without persisting the config."""
+    if req.mode == "off":
+        return {"mode": "off", "url": None, "reachable": False, "capabilities": []}
+
+    if req.mode == "local":
+        url = compute_config._LOCAL_URL
+    elif req.mode == "remote":
+        url = req.remote_url.rstrip("/") if req.remote_url else None
+    else:
+        return {"mode": req.mode, "url": None, "reachable": False, "error": f"Unknown mode '{req.mode}'"}
+
+    result = {"mode": req.mode, "url": url, "reachable": False, "capabilities": []}
+    if not url:
+        result["error"] = "Remote URL is not configured"
+        return result
+    try:
+        resp = httpx.get(f"{url}/health", timeout=3.0)
+        resp.raise_for_status()
+        info = resp.json()
+        result["reachable"] = True
+        result["capabilities"] = info.get("capabilities", [])
+    except Exception as e:
+        result["error"] = str(e)
+    return result

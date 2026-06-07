@@ -254,6 +254,10 @@ export function saveComputeConfig(mode, remoteUrl) {
   return putJson('/compute/config', { mode, remote_url: remoteUrl })
 }
 
+export function pingComputeConfig(mode, remoteUrl) {
+  return postJson('/compute/ping', { mode, remote_url: remoteUrl })
+}
+
 // Tasks
 export function getTasks() {
   return get('/tasks')

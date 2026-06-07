@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getComputeConfig, saveComputeConfig, getComputeStatus } from '../../api.js'
+import { getComputeConfig, saveComputeConfig, pingComputeConfig } from '../../api.js'
 import { COMPUTE_MODE_KEY, COMPUTE_URL_KEY } from './settingsConfig.js'
 import './ComputeTab.css'
 
@@ -47,7 +47,7 @@ export default function ComputeTab() {
     setTesting(true)
     setStatus(null)
     try {
-      setStatus(await getComputeStatus())
+      setStatus(await pingComputeConfig(mode, url))
     } catch (e) {
       setStatus({ error: e.message })
     } finally {

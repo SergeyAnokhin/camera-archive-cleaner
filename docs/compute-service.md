@@ -160,3 +160,146 @@ uvicorn app:app --host 0.0.0.0 --port 8001
 Then set **Tools → Compute → Удалённо** with that machine's URL. Exported
 OpenVINO models go in `compute-service/models/` (see
 [`docs/ai-analysis.md`](ai-analysis.md#openvino-model-runtime)).
+
+---
+
+## Running on a separate Windows machine (no Docker, no k3s)
+
+This is the recommended path when you have a powerful Windows PC and want the
+k3s cluster's backend pod to offload detection work to it.
+
+### Step 1 — Install Python and dependencies
+
+```powershell
+# Python 3.11 or 3.12 recommended. Check:
+python --version
+
+# Clone or copy the repo onto this machine. Then:
+cd C:\path\to\camera-snapshots-cleaner-claude\compute-service
+pip install -r requirements.txt
+```
+
+> **CPU-only torch** — `requirements.txt` installs the CPU build. If CUDA is
+> available and you want GPU acceleration, replace the torch line:
+> ```
+> pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+> ```
+
+### Step 2 — Export OpenVINO models (once)
+
+Speeds up inference 2–5× on Intel CPUs. Skip if you only want the PyTorch path.
+
+```powershell
+cd C:\path\to\camera-snapshots-cleaner-claude\compute-service
+python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='openvino')"
+python -c "from ultralytics import YOLO; YOLO('yolov8s.pt').export(format='openvino')"
+python -c "from ultralytics import YOLO; YOLO('yolov8m.pt').export(format='openvino')"
+New-Item -ItemType Directory -Force models
+Move-Item yolov8n_openvino_model models\
+Move-Item yolov8s_openvino_model models\
+Move-Item yolov8m_openvino_model models\
+```
+
+### Step 3 — Configure path remapping
+
+The main backend stores file paths as seen on the NAS (e.g.
+`\\192.168.1.99\Camera\Foscam\snap\...`). The Windows compute machine may have
+that share mounted at a different path (e.g. `Z:\Foscam\snap\...`). Set two
+env vars to remap the prefix:
+
+```powershell
+$env:COMPUTE_PATH_REMAP_FROM = "\\192.168.1.99\Camera"
+$env:COMPUTE_PATH_REMAP_TO   = "Z:"
+```
+
+If both machines see the share at the same path, leave both empty.
+
+### Step 4 — Open Windows Firewall
+
+The k3s backend needs to reach port 8001 on this machine.
+
+```powershell
+# Run in an elevated (Administrator) PowerShell:
+New-NetFirewallRule `
+  -DisplayName "Camera Compute Service" `
+  -Direction Inbound `
+  -Protocol TCP `
+  -LocalPort 8001 `
+  -Action Allow
+```
+
+Verify from another machine: `curl http://<windows-ip>:8001/health`
+
+### Step 5 — Start the compute-service
+
+```powershell
+cd C:\path\to\camera-snapshots-cleaner-claude\compute-service
+$env:COMPUTE_PATH_REMAP_FROM = "\\192.168.1.99\Camera"
+$env:COMPUTE_PATH_REMAP_TO   = "Z:"
+uvicorn app:app --host 0.0.0.0 --port 8001
+```
+
+`--host 0.0.0.0` makes it listen on all interfaces (not just localhost).
+Leave this terminal open. The service starts and logs model load times.
+
+### Step 6 — Point the backend to this machine
+
+**If the backend is running locally (dev mode):**  
+Open **Tools → Compute → Удалённо**, enter `http://<windows-ip>:8001`, click
+**Сохранить**. The **Проверить связь** button tests the URL you entered *before*
+saving — no need to save first.
+
+**If the backend is running in k3s:**  
+Edit `deploy/helm/camera-cleaner/values.yaml` — update the initContainer seed
+in `backend.computeConfigSeed` (or the `compute_config.json` PVC entry) to:
+
+```json
+{"mode": "remote", "remote_url": "http://192.168.1.x:8001"}
+```
+
+where `192.168.1.x` is the Windows machine's LAN IP. The backend pod will call
+that address directly. Make sure the k3s node(s) can reach that IP — they are
+on the same LAN, so no extra routing is normally needed. Confirm with:
+
+```bash
+kubectl -n camera-cleaner exec deploy/camera-cleaner-backend -- \
+  curl -s http://192.168.1.x:8001/health
+```
+
+---
+
+## Running via Docker (standalone, no k3s)
+
+Use this if you want to avoid installing Python and dependencies locally, but
+still run the compute-service outside of k3s (e.g. `docker run` on the Windows
+machine using Docker Desktop).
+
+### Build the image
+
+Build from the **repo root** (the Dockerfile needs `shared/`):
+
+```bash
+docker build -f compute-service/Dockerfile -t camera-compute .
+```
+
+Build takes ~4–5 min the first time (downloads + exports YOLO models). The
+resulting image contains the OpenVINO IR models baked in.
+
+### Run
+
+```bash
+docker run -d \
+  --name camera-compute \
+  -p 8001:8001 \
+  -e COMPUTE_PATH_REMAP_FROM="\\\\192.168.1.99\\Camera" \
+  -e COMPUTE_PATH_REMAP_TO="/camera" \
+  -v //192.168.1.99/Camera:/camera:ro \
+  camera-compute
+```
+
+> On Windows with Docker Desktop, use `//server/share` (forward-slash) for
+> volume mounts. The env var values still use the Windows path as stored in the
+> backend DB, and the container path for `_TO`.
+
+Expose port 8001, open the Windows Firewall rule (Step 4 above), and point the
+backend to `http://<windows-ip>:8001` as in Step 6.
