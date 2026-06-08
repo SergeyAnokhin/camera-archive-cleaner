@@ -113,16 +113,16 @@ def compute_ping(req: ComputePingRequest):
     if req.mode == "off":
         return {"mode": "off", "url": None, "reachable": False, "capabilities": []}
 
-    if req.mode == "local":
-        url = compute_config._LOCAL_URL
-    elif req.mode == "remote":
+    if req.mode == "kubernetes":
+        url = compute_config._KUBERNETES_URL
+    elif req.mode in ("local", "remote"):
         url = req.remote_url.rstrip("/") if req.remote_url else None
     else:
         return {"mode": req.mode, "url": None, "reachable": False, "error": f"Unknown mode '{req.mode}'"}
 
     result = {"mode": req.mode, "url": url, "reachable": False, "capabilities": []}
     if not url:
-        result["error"] = "Remote URL is not configured"
+        result["error"] = "URL не задан"
         return result
     try:
         resp = httpx.get(f"{url}/health", timeout=3.0)

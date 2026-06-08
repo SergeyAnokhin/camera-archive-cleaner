@@ -15,8 +15,8 @@ logger = logging.getLogger("api")
 _CONFIG_PATH = Path(__file__).parent / "compute_config.json"
 _KUBERNETES_URL = "http://camera-cleaner-compute:8001"
 _DEFAULT = {"mode": "kubernetes", "remote_url": ""}
-VALID_MODES = ("off", "kubernetes", "remote")
-_LEGACY_ALIASES = {"local": "kubernetes"}
+VALID_MODES = ("off", "kubernetes", "local", "remote")
+_LEGACY_ALIASES = {}  # no legacy aliases; "local" is now a distinct mode
 
 
 def load_config() -> dict:
@@ -48,4 +48,5 @@ def effective_url() -> str | None:
         return None
     if cfg["mode"] == "kubernetes":
         return _KUBERNETES_URL
+    # local and remote both store their target in remote_url
     return cfg["remote_url"].rstrip("/") or None
