@@ -102,11 +102,16 @@ def compute_status():
     return result
 
 
-@router.get("/compute/client-ip", summary="Return the calling client's IP as seen by the backend")
+@router.get("/compute/client-ip", summary="Return the real client IP as seen by the backend")
 def compute_client_ip(request: Request):
-    """Used by the frontend to discover which IP the backend sees for this browser,
-    so the user can point the backend at their local compute-service."""
-    return {"ip": request.client.host if request.client else "unknown"}
+    """Returns the browser's real LAN IP (not the Kubernetes pod IP).
+    Traefik adds X-Forwarded-For with the original client IP; we use that first."""
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        ip = xff.split(",")[0].strip()
+    else:
+        ip = request.client.host if request.client else "unknown"
+    return {"ip": ip}
 
 
 class ComputePingRequest(BaseModel):
