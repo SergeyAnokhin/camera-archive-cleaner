@@ -39,8 +39,10 @@ export const VIDEO_PREVIEW_OPTIONS = [
   { value: 'none',           label: 'Нет (иконка камеры)' },
   { value: 'first_frame',    label: 'Первый кадр' },
   { value: 'last_frame',     label: 'Последний кадр' },
-  { value: 'four_frames',    label: '4 кадра (2×2 сетка)' },
-  { value: 'max_change_gif', label: 'GIF — максимальное изменение' },
+  { value: 'four_frames',      label: '4 кадра (2×2 сетка)' },
+  { value: 'max_change_gif',   label: 'GIF — максимальное изменение (2 кадра)' },
+  { value: 'four_frames_gif',  label: 'GIF — 4 кадра равномерно' },
+  { value: 'max_change_4_gif', label: 'GIF — 4 кадра с максимальным изменением' },
 ]
 
 export const GEMINI_API_KEY_KEY = 'gemini_api_key'

@@ -94,6 +94,63 @@ def make_video_thumbnail(file_path: str, mode: str) -> tuple[bytes, str]:
             grid.save(buf, "JPEG", quality=82)
             return buf.getvalue(), "image/jpeg"
 
+        if mode == "four_frames_gif":
+            positions = [0, total // 3, 2 * total // 3, max(0, total - 2)]
+            frames = []
+            for pos in positions:
+                f = _read_frame(cap, pos)
+                if f is not None:
+                    frames.append(_resize_to(Image.fromarray(f), SINGLE_W, SINGLE_H))
+            if not frames:
+                raise ValueError("Cannot read any frames")
+            quantized = [f.quantize(colors=256, method=Image.Quantize.MEDIANCUT) for f in frames]
+            quantized[0].save(buf, "GIF", save_all=True, append_images=quantized[1:],
+                              loop=0, duration=500, optimize=False)
+            return buf.getvalue(), "image/gif"
+
+        if mode == "max_change_4_gif":
+            n_samples = min(40, max(2, total))
+            sample_positions = [int(i * (total - 1) / (n_samples - 1)) for i in range(n_samples)]
+
+            frame_first = _read_frame(cap, 0)
+            frame_last = _read_frame(cap, max(0, total - 2))
+            if frame_first is None:
+                raise ValueError("Cannot read first frame")
+            if frame_last is None:
+                frame_last = frame_first
+
+            gray_first = np.mean(frame_first.astype(np.float32), axis=2)
+            gray_last = np.mean(frame_last.astype(np.float32), axis=2)
+
+            best_from_first_diff, best_from_first = -1.0, None
+            best_from_last_diff, best_from_last = -1.0, None
+
+            for pos in sample_positions[1:-1]:
+                f = _read_frame(cap, pos)
+                if f is None:
+                    continue
+                gray = np.mean(f.astype(np.float32), axis=2)
+                d_first = float(np.mean(np.abs(gray_first - gray)))
+                d_last = float(np.mean(np.abs(gray_last - gray)))
+                if d_first > best_from_first_diff:
+                    best_from_first_diff = d_first
+                    best_from_first = f
+                if d_last > best_from_last_diff:
+                    best_from_last_diff = d_last
+                    best_from_last = f
+
+            if best_from_first is None:
+                best_from_first = frame_last
+            if best_from_last is None:
+                best_from_last = frame_last
+
+            raw = [frame_first, best_from_first, best_from_last, frame_last]
+            imgs = [_resize_to(Image.fromarray(f), SINGLE_W, SINGLE_H) for f in raw]
+            quantized = [img.quantize(colors=256, method=Image.Quantize.MEDIANCUT) for img in imgs]
+            quantized[0].save(buf, "GIF", save_all=True, append_images=quantized[1:],
+                              loop=0, duration=500, optimize=False)
+            return buf.getvalue(), "image/gif"
+
         # max_change_gif
         n_samples = min(40, max(2, total))
         sample_positions = [int(i * (total - 1) / (n_samples - 1)) for i in range(n_samples)]

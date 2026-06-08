@@ -5,7 +5,7 @@ Both sides import these models so the request/response shapes can never drift.
 from pydantic import BaseModel
 
 # Video preview modes understood by the compute-service.
-VIDEO_THUMB_MODES = ("first_frame", "last_frame", "four_frames", "max_change_gif")
+VIDEO_THUMB_MODES = ("first_frame", "last_frame", "four_frames", "max_change_gif", "four_frames_gif", "max_change_4_gif")
 
 
 class DetectRequest(BaseModel):

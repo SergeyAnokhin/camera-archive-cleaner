@@ -180,7 +180,7 @@ def get_video_thumbnail(
             raise HTTPException(status_code=400, detail="video_thumbnail only available for video files")
 
     cache_path = video_cache_path(file_id, mode)
-    media_type = "image/gif" if mode == "max_change_gif" else "image/jpeg"
+    media_type = "image/gif" if mode.endswith("_gif") else "image/jpeg"
     if cache_path.exists():
         return FileResponse(str(cache_path), media_type=media_type, headers=_THUMB_CACHE_HEADERS)
 

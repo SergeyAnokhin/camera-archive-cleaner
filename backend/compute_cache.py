@@ -24,5 +24,5 @@ def ov_cache_path(file_id: int, model: str, confidence: float,
 
 def video_cache_path(file_id: int, mode: str) -> Path:
     """Cache path for a video preview thumbnail."""
-    ext = "gif" if mode == "max_change_gif" else "jpg"
+    ext = "gif" if mode.endswith("_gif") else "jpg"
     return VID_THUMB_DIR / f"{file_id}_{mode}.{ext}"

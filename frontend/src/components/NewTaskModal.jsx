@@ -3,10 +3,12 @@ import { getStatsTotal, getCameraDateRange } from '../api.js'
 import './NewTaskModal.css'
 
 const VIDEO_MODES = [
-  { value: 'four_frames',    label: '2×2 grid (4 frames)' },
-  { value: 'first_frame',    label: 'First frame' },
-  { value: 'last_frame',     label: 'Last frame' },
-  { value: 'max_change_gif', label: 'Max-change GIF' },
+  { value: 'four_frames',      label: '2×2 grid (4 frames)' },
+  { value: 'first_frame',      label: 'First frame' },
+  { value: 'last_frame',       label: 'Last frame' },
+  { value: 'max_change_gif',   label: 'GIF — max-change (2 frames)' },
+  { value: 'four_frames_gif',  label: 'GIF — 4 frames evenly spaced' },
+  { value: 'max_change_4_gif', label: 'GIF — 4 frames max-change' },
 ]
 
 const OPENVINO_MODELS = [
