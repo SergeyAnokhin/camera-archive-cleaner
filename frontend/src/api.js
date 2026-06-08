@@ -258,6 +258,10 @@ export function pingComputeConfig(mode, remoteUrl) {
   return postJson('/compute/ping', { mode, remote_url: remoteUrl })
 }
 
+export function getComputeClientIp() {
+  return get('/compute/client-ip')
+}
+
 // Tasks
 export function getTasks() {
   return get('/tasks')

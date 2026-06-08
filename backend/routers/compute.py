@@ -102,6 +102,13 @@ def compute_status():
     return result
 
 
+@router.get("/compute/client-ip", summary="Return the calling client's IP as seen by the backend")
+def compute_client_ip(request: Request):
+    """Used by the frontend to discover which IP the backend sees for this browser,
+    so the user can point the backend at their local compute-service."""
+    return {"ip": request.client.host if request.client else "unknown"}
+
+
 class ComputePingRequest(BaseModel):
     mode: str
     remote_url: str = ""

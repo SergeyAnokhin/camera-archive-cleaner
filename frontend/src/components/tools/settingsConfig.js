@@ -107,5 +107,8 @@ export const MOTION_MODE_KEYS = [
 // Compute-service routing — local cache of the server-side config.
 // Source of truth is the backend (compute_config.json); these keys let the
 // frontend read the mode synchronously (e.g. to hide heavy view modes).
-export const COMPUTE_MODE_KEY = 'compute_mode'
-export const COMPUTE_URL_KEY  = 'compute_remote_url'
+export const COMPUTE_MODE_KEY    = 'compute_mode'
+export const COMPUTE_URL_KEY     = 'compute_remote_url'
+// UI-level mode label — "browser" means auto-detected browser-local, stored separately
+// from the backend mode (which is always "remote" for browser-local).
+export const COMPUTE_MODE_UI_KEY = 'compute_mode_ui'
