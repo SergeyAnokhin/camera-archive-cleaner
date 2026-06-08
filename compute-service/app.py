@@ -61,17 +61,18 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     logging.getLogger("uvicorn.access").addFilter(_SilentFilter())
+    config.log_config()
 
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     if exc.status_code == 404:
         logger.warning(
-            "404 %s %s  client=%s  user-agent=%s  referer=%s",
+            "404 %s %s  detail=%r  client=%s  user-agent=%s",
             request.method, request.url.path,
+            exc.detail,
             request.client.host if request.client else "?",
             request.headers.get("user-agent", "—"),
-            request.headers.get("referer", "—"),
         )
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 

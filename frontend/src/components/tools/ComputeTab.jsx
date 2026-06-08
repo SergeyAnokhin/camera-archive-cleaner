@@ -4,16 +4,16 @@ import { COMPUTE_MODE_KEY, COMPUTE_URL_KEY } from './settingsConfig.js'
 import './ComputeTab.css'
 
 const MODES = [
-  { value: 'off',    label: 'Отключён',
+  { value: 'off',        label: 'Отключён',
     hint: 'Тяжёлые расчёты недоступны. Режим OpenVINO и превью видео скрыты.' },
-  { value: 'local',  label: 'Локально',
-    hint: 'Compute-сервис на этой машине (http://localhost:8001).' },
-  { value: 'remote', label: 'Удалённо',
+  { value: 'kubernetes', label: 'Kubernetes',
+    hint: 'Автоматический поиск через DNS кластера (camera-cleaner-compute:8001).' },
+  { value: 'remote',     label: 'Удалённо',
     hint: 'Compute-сервис на другой машине — укажите адрес ниже.' },
 ]
 
 export default function ComputeTab() {
-  const [mode, setMode]       = useState('local')
+  const [mode, setMode]       = useState('kubernetes')
   const [url, setUrl]         = useState('')
   const [loaded, setLoaded]   = useState(false)
   const [saving, setSaving]   = useState(false)
@@ -63,7 +63,7 @@ export default function ComputeTab() {
         <div className="modal-section-title">Compute-сервис (тяжёлые расчёты)</div>
         <div className="modal-setting-hint">
           Детекция объектов (YOLO/OpenVINO) и обработка видео выполняются отдельным
-          сервисом. Его можно отключить, запустить локально или вынести на другую машину.
+          сервисом. Его можно отключить, найти через DNS кластера или указать адрес вручную.
         </div>
         <div className="compute-modes">
           {MODES.map(m => (

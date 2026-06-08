@@ -202,17 +202,39 @@ Move-Item yolov8m_openvino_model models\
 
 ### Step 3 — Configure path remapping
 
-The main backend stores file paths as seen on the NAS (e.g.
-`\\192.168.1.99\Camera\Foscam\snap\...`). The Windows compute machine may have
-that share mounted at a different path (e.g. `Z:\Foscam\snap\...`). Set two
-env vars to remap the prefix:
+The backend stores file paths **as they are recorded in its database**. What
+that prefix looks like depends on how the backend runs:
 
+| Backend deployment | Path prefix in DB | Example |
+|---|---|---|
+| Local dev (`npm start`) | Windows UNC path | `\\192.168.1.91\Camera\Foscam\snap\file.jpg` |
+| k3s (Helm chart, `mountPath: /camera`) | Linux path inside pod | `/camera/Foscam/snap/file.jpg` |
+
+Set the two env vars to remap the prefix from what the DB stores to what
+this Windows machine can open:
+
+**Local dev backend → Windows compute machine** (same UNC path, no remap needed):
 ```powershell
-$env:COMPUTE_PATH_REMAP_FROM = "\\192.168.1.99\Camera"
-$env:COMPUTE_PATH_REMAP_TO   = "Z:"
+# leave both empty — no remap
 ```
 
-If both machines see the share at the same path, leave both empty.
+**k3s backend → Windows compute machine** (Linux pod path → Windows UNC):
+
+PowerShell:
+```powershell
+$env:COMPUTE_PATH_REMAP_FROM = "/camera"
+$env:COMPUTE_PATH_REMAP_TO   = "\\192.168.1.91\Camera"
+```
+
+Bash (Git Bash / MSYS2 — use single quotes so backslashes are literal):
+```bash
+export COMPUTE_PATH_REMAP_FROM="/camera"
+export COMPUTE_PATH_REMAP_TO='\\192.168.1.91\Camera'
+```
+
+The Windows machine accesses the NAS directly via UNC — no need to mount
+the share as a drive letter. The path after remapping looks like
+`\\192.168.1.91\Camera\Foscam\snap\file.jpg` which Windows opens natively.
 
 ### Step 4 — Open Windows Firewall
 
@@ -232,10 +254,25 @@ Verify from another machine: `curl http://<windows-ip>:8001/health`
 
 ### Step 5 — Start the compute-service
 
+PowerShell:
 ```powershell
 cd C:\path\to\camera-snapshots-cleaner-claude\compute-service
-$env:COMPUTE_PATH_REMAP_FROM = "\\192.168.1.99\Camera"
-$env:COMPUTE_PATH_REMAP_TO   = "Z:"
+
+# k3s backend (mountPath: /camera) → Windows UNC:
+$env:COMPUTE_PATH_REMAP_FROM = "/camera"
+$env:COMPUTE_PATH_REMAP_TO   = "\\192.168.1.91\Camera"
+
+uvicorn app:app --host 0.0.0.0 --port 8001
+```
+
+Bash (Git Bash / MSYS2):
+```bash
+cd /c/path/to/camera-snapshots-cleaner-claude/compute-service
+
+# k3s backend (mountPath: /camera) → Windows UNC (single quotes — backslashes literal):
+export COMPUTE_PATH_REMAP_FROM="/camera"
+export COMPUTE_PATH_REMAP_TO='\\192.168.1.91\Camera'
+
 uvicorn app:app --host 0.0.0.0 --port 8001
 ```
 
@@ -262,8 +299,9 @@ that address directly. Make sure the k3s node(s) can reach that IP — they are
 on the same LAN, so no extra routing is normally needed. Confirm with:
 
 ```bash
+# curl нет в python:slim — используй wget:
 kubectl -n camera-cleaner exec deploy/camera-cleaner-backend -- \
-  curl -s http://192.168.1.x:8001/health
+  wget -qO- http://192.168.1.x:8001/health
 ```
 
 ---
