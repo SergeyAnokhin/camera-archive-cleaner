@@ -102,6 +102,24 @@ def compute_status():
     return result
 
 
+@router.get("/compute/discover", summary="Scan well-known in-cluster URLs and return the first reachable compute-service")
+def compute_discover():
+    """Tries localhost:8001 (local/docker-compose) and the k3s Helm chart Service DNS name.
+    Returns the first URL that responds to /health, or found=False if none work."""
+    candidates = [
+        "http://localhost:8001",
+        "http://camera-cleaner-compute:8001",   # Helm chart: fullnameOverride=camera-cleaner
+    ]
+    for url in candidates:
+        try:
+            resp = httpx.get(f"{url}/health", timeout=2.0)
+            if resp.status_code == 200:
+                return {"found": True, "url": url, "health": resp.json()}
+        except Exception:
+            continue
+    return {"found": False, "url": None, "health": None}
+
+
 @router.get("/compute/client-ip", summary="Return the real client IP as seen by the backend")
 def compute_client_ip(request: Request):
     """Returns the browser's real LAN IP (not the Kubernetes pod IP).

@@ -262,6 +262,10 @@ export function getComputeClientIp() {
   return get('/compute/client-ip')
 }
 
+export function discoverCompute() {
+  return get('/compute/discover')
+}
+
 // Tasks
 export function getTasks() {
   return get('/tasks')

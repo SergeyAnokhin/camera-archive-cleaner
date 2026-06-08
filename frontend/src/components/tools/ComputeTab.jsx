@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { getComputeConfig, saveComputeConfig, pingComputeConfig, getComputeClientIp } from '../../api.js'
+import { getComputeConfig, saveComputeConfig, pingComputeConfig, discoverCompute } from '../../api.js'
 import { COMPUTE_MODE_KEY, COMPUTE_URL_KEY, COMPUTE_MODE_UI_KEY } from './settingsConfig.js'
 import './ComputeTab.css'
 
-// Four modes — "cluster" maps to backend "local", "browser" maps to backend "remote" + auto-IP
 const MODES = [
   {
     value: 'off',
@@ -13,50 +12,86 @@ const MODES = [
   {
     value: 'cluster',
     label: 'Кластер (бэкенд-сервер)',
-    hint: 'Compute-сервис запущен в том же окружении, что и бэкенд — Kubernetes, Docker или localhost.',
+    hint: 'Compute-сервис в том же окружении, что и бэкенд — Kubernetes, Docker или localhost.',
   },
   {
     value: 'browser',
     label: 'Эта машина',
-    hint: 'Compute-сервис запущен на компьютере, с которого открыт этот сайт. IP определяется автоматически.',
+    hint: 'Compute-сервис на компьютере, где открыт этот сайт. IP определяется через браузер.',
   },
   {
     value: 'remote',
     label: 'Свой адрес',
-    hint: 'Compute-сервис по произвольному адресу — введите URL ниже.',
+    hint: 'Compute-сервис по произвольному URL — введите адрес ниже.',
   },
 ]
 
 const URL_RE = /^https?:\/\/[\w%.:-]+:\d+/
 
-function toBackendArgs(uiMode, url, detectedUrl) {
-  if (uiMode === 'off')     return { mode: 'off',    remoteUrl: '' }
-  if (uiMode === 'cluster') return { mode: 'local',  remoteUrl: '' }
-  if (uiMode === 'browser') return { mode: 'remote', remoteUrl: detectedUrl }
-  return { mode: 'remote', remoteUrl: url }
+// Get the machine's own LAN IP via WebRTC (no server needed, works behind NAT/k8s proxies)
+function getWebRTCLocalIP() {
+  return new Promise((resolve, reject) => {
+    const pc = new RTCPeerConnection({ iceServers: [] })
+    let resolved = false
+    const timer = setTimeout(() => {
+      pc.close()
+      reject(new Error('WebRTC timeout (3 s)'))
+    }, 3000)
+
+    pc.createDataChannel('')
+    pc.onicecandidate = e => {
+      if (!e || !e.candidate || resolved) return
+      // ICE candidate string contains the IP: "candidate:... IP ..."
+      const m = /(\d{1,3}(?:\.\d{1,3}){3})/.exec(e.candidate.candidate)
+      if (m && !m[1].startsWith('127.') && !m[1].startsWith('169.254.')) {
+        resolved = true
+        clearTimeout(timer)
+        pc.close()
+        resolve(m[1])
+      }
+    }
+    pc.createOffer()
+      .then(o => pc.setLocalDescription(o))
+      .catch(e => { clearTimeout(timer); reject(e) })
+  })
 }
 
-function toUiMode(backendMode, savedUiMode) {
-  if (backendMode === 'off')   return 'off'
-  if (backendMode === 'local') return 'cluster'
-  if (backendMode === 'remote' && savedUiMode === 'browser') return 'browser'
+function toBackendArgs(uiMode, clusterUrl, browserUrl, remoteUrl) {
+  if (uiMode === 'off')     return { mode: 'off',    remoteUrl: '' }
+  if (uiMode === 'cluster') return { mode: 'remote', remoteUrl: clusterUrl }
+  if (uiMode === 'browser') return { mode: 'remote', remoteUrl: browserUrl }
+  return { mode: 'remote', remoteUrl }
+}
+
+function toUiMode(backendMode, backendUrl, savedUiMode) {
+  if (backendMode === 'off')  return 'off'
+  if (backendMode === 'local') return 'cluster'   // old-style local (same-machine dev)
+  // remote — distinguish by saved UI preference
+  if (savedUiMode === 'cluster') return 'cluster'
+  if (savedUiMode === 'browser') return 'browser'
   return 'remote'
 }
 
 export default function ComputeTab() {
   const [uiMode, setUiMode]           = useState('cluster')
-  const [url, setUrl]                 = useState('')         // for 'remote' mode
-  const [detectedUrl, setDetectedUrl] = useState('')         // for 'browser' mode
+  // cluster mode: url discovered via /compute/discover
+  const [clusterUrl, setClusterUrl]   = useState('')
+  const [clusterDiscovered, setClusterDiscovered] = useState(false)
+  // browser mode: IP detected via WebRTC, user-editable
+  const [browserUrl, setBrowserUrl]   = useState('http://:8001')
+  // remote mode: manual input
+  const [remoteUrl, setRemoteUrl]     = useState('')
+
   const [loaded, setLoaded]           = useState(false)
   const [saving, setSaving]           = useState(false)
   const [savedMsg, setSavedMsg]       = useState('')
-  const [probes, setProbes]           = useState(null)       // {backend, browser}
+  const [probes, setProbes]           = useState(null)
   const [checking, setChecking]       = useState(false)
 
   const abortRef = useRef(null)
 
-  // Run probes. backend = /compute/ping result; browser = direct fetch to localhost (browser mode only)
-  const runCheck = useCallback(async (mode, checkUrl) => {
+  // ── Probe runner ──────────────────────────────────────────────────────────
+  const runCheck = useCallback(async (mode, cUrl, bUrl, rUrl) => {
     if (abortRef.current) abortRef.current.abort()
     const ac = new AbortController()
     abortRef.current = ac
@@ -67,30 +102,45 @@ export default function ComputeTab() {
     setProbes(null)
 
     try {
-      let backendProbe = null
-      let browserProbe = null
-      let resolvedUrl  = checkUrl
-
-      if (mode === 'browser') {
-        // Step 1: get real client IP from backend (Traefik X-Forwarded-For)
-        let ip = 'unknown'
+      if (mode === 'cluster') {
+        // Backend discovers by itself
+        let discovered
         try {
-          const res = await getComputeClientIp()
-          ip = res.ip
-        } catch (_) {}
-        if (ac.signal.aborted) return
-        resolvedUrl = `http://${ip}:8001`
-        setDetectedUrl(resolvedUrl)
-
-        // Step 2: backend pings detected URL
-        try {
-          backendProbe = await pingComputeConfig('remote', resolvedUrl)
+          discovered = await discoverCompute()
         } catch (e) {
-          backendProbe = { reachable: false, url: resolvedUrl, error: e.message }
+          discovered = { found: false }
         }
         if (ac.signal.aborted) return
-
-        // Step 3: browser pings localhost:8001 directly (compute service is on this machine)
+        if (discovered.found) {
+          setClusterUrl(discovered.url)
+          setClusterDiscovered(true)
+          setProbes({
+            backend: {
+              reachable: true,
+              url: discovered.url,
+              capabilities: discovered.health?.capabilities || [],
+            },
+          })
+        } else {
+          setClusterUrl('')
+          setClusterDiscovered(false)
+          setProbes({
+            backend: { reachable: false, url: '(не найдено)', error: 'localhost:8001 и camera-cleaner-compute:8001 недоступны' },
+          })
+        }
+      } else if (mode === 'browser') {
+        // Backend probe: use the browserUrl that was set (WebRTC result)
+        let backendProbe = null
+        let browserProbe = null
+        if (URL_RE.test(bUrl)) {
+          try {
+            backendProbe = await pingComputeConfig('remote', bUrl)
+          } catch (e) {
+            backendProbe = { reachable: false, url: bUrl, error: e.message }
+          }
+        }
+        if (ac.signal.aborted) return
+        // Browser probe: direct localhost:8001 fetch
         try {
           const h = await fetch('http://localhost:8001/health', {
             signal: AbortSignal.timeout(3000),
@@ -99,80 +149,108 @@ export default function ComputeTab() {
         } catch (e) {
           browserProbe = { reachable: false, url: 'http://localhost:8001', error: e.message }
         }
-      } else if (mode === 'cluster') {
-        try {
-          backendProbe = await pingComputeConfig('local', '')
-        } catch (e) {
-          backendProbe = { reachable: false, url: 'http://localhost:8001', error: e.message }
-        }
+        if (!ac.signal.aborted) setProbes({ backend: backendProbe, browser: browserProbe })
       } else {
-        // remote — only check if URL looks valid
-        if (!URL_RE.test(checkUrl)) {
-          setChecking(false)
-          setProbes(null)
-          return
-        }
+        // remote
+        if (!URL_RE.test(rUrl)) { setChecking(false); setProbes(null); return }
+        let backendProbe
         try {
-          backendProbe = await pingComputeConfig('remote', checkUrl)
+          backendProbe = await pingComputeConfig('remote', rUrl)
         } catch (e) {
-          backendProbe = { reachable: false, url: checkUrl, error: e.message }
+          backendProbe = { reachable: false, url: rUrl, error: e.message }
         }
+        if (!ac.signal.aborted) setProbes({ backend: backendProbe })
       }
-
-      if (!ac.signal.aborted) setProbes({ backend: backendProbe, browser: browserProbe })
     } finally {
       if (!ac.signal.aborted) setChecking(false)
     }
   }, [])
 
-  // Load config on mount
+  // ── WebRTC detect (only called for browser mode) ──────────────────────────
+  const detectBrowserIP = useCallback(async () => {
+    try {
+      const ip = await getWebRTCLocalIP()
+      const url = `http://${ip}:8001`
+      setBrowserUrl(url)
+      return url
+    } catch (_) {
+      // WebRTC failed — leave field editable, user fills manually
+      return null
+    }
+  }, [])
+
+  // ── Load config on mount ──────────────────────────────────────────────────
   useEffect(() => {
     getComputeConfig()
       .then(cfg => {
         const savedUi  = localStorage.getItem(COMPUTE_MODE_UI_KEY) || ''
-        const ui       = toUiMode(cfg.mode, savedUi)
-        const remoteUrl = cfg.remote_url || ''
+        const ui       = toUiMode(cfg.mode, cfg.remote_url || '', savedUi)
         setUiMode(ui)
-        setUrl(remoteUrl)
-        if (ui === 'browser') setDetectedUrl(remoteUrl)
+        const savedUrl = cfg.remote_url || ''
+        if (ui === 'cluster') { setClusterUrl(savedUrl); if (savedUrl) setClusterDiscovered(true) }
+        if (ui === 'browser') setBrowserUrl(savedUrl || 'http://:8001')
+        if (ui === 'remote')  setRemoteUrl(savedUrl)
         setLoaded(true)
       })
       .catch(() => setLoaded(true))
   }, [])
 
-  // Auto-check when mode switches (after initial load)
+  // ── Auto-check on mode switch ─────────────────────────────────────────────
   useEffect(() => {
     if (!loaded) return
     setProbes(null)
-    const t = setTimeout(() => {
-      if (uiMode === 'remote') return  // handled by URL effect
-      runCheck(uiMode, uiMode === 'browser' ? detectedUrl : '')
-    }, 150)
+
+    if (uiMode === 'remote') return  // handled by URL effect
+
+    if (uiMode === 'browser') {
+      // Detect IP first, then check
+      ;(async () => {
+        const detected = await detectBrowserIP()
+        const url = detected || browserUrl
+        runCheck('browser', clusterUrl, url, remoteUrl)
+      })()
+      return
+    }
+
+    const t = setTimeout(() => runCheck(uiMode, clusterUrl, browserUrl, remoteUrl), 150)
     return () => clearTimeout(t)
   }, [uiMode, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-check when URL changes in remote mode (debounced 600ms)
+  // ── Auto-check when remote URL changes ───────────────────────────────────
   useEffect(() => {
     if (!loaded || uiMode !== 'remote') return
     setProbes(null)
-    if (!URL_RE.test(url)) return
-    const t = setTimeout(() => runCheck('remote', url), 600)
+    if (!URL_RE.test(remoteUrl)) return
+    const t = setTimeout(() => runCheck('remote', clusterUrl, browserUrl, remoteUrl), 600)
     return () => clearTimeout(t)
-  }, [url, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [remoteUrl, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Re-check browser mode when URL is edited ─────────────────────────────
+  useEffect(() => {
+    if (!loaded || uiMode !== 'browser') return
+    if (!URL_RE.test(browserUrl)) return
+    const t = setTimeout(() => runCheck('browser', clusterUrl, browserUrl, remoteUrl), 600)
+    return () => clearTimeout(t)
+  }, [browserUrl, loaded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Save ──────────────────────────────────────────────────────────────────
   async function handleSave() {
-    if (uiMode === 'browser' && !detectedUrl) {
-      setSavedMsg('Подождите — IP ещё определяется')
+    if (uiMode === 'cluster' && !clusterUrl) {
+      setSavedMsg('Ошибка: сервис не обнаружен — проверьте состояние кластера')
+      return
+    }
+    if (uiMode === 'browser' && !URL_RE.test(browserUrl)) {
+      setSavedMsg('Ошибка: IP не определён — проверьте или введите вручную')
       return
     }
     setSaving(true)
     setSavedMsg('')
     try {
-      const { mode, remoteUrl } = toBackendArgs(uiMode, url, detectedUrl)
-      const cfg = await saveComputeConfig(mode, remoteUrl)
+      const args = toBackendArgs(uiMode, clusterUrl, browserUrl, remoteUrl)
+      const cfg  = await saveComputeConfig(args.mode, args.remoteUrl)
       localStorage.setItem(COMPUTE_MODE_UI_KEY, uiMode)
-      localStorage.setItem(COMPUTE_MODE_KEY, cfg.mode)
-      localStorage.setItem(COMPUTE_URL_KEY, cfg.remote_url || '')
+      localStorage.setItem(COMPUTE_MODE_KEY,    cfg.mode)
+      localStorage.setItem(COMPUTE_URL_KEY,     cfg.remote_url || '')
       setSavedMsg('Сохранено')
     } catch (e) {
       setSavedMsg('Ошибка: ' + e.message)
@@ -185,20 +263,18 @@ export default function ComputeTab() {
 
   return (
     <>
-      {/* Mode selection */}
+      {/* Mode cards */}
       <div className="modal-section">
         <div className="modal-section-title">Compute-сервис (тяжёлые расчёты)</div>
         <div className="modal-setting-hint">
-          Детекция объектов (YOLO/OpenVINO) и обработка видео. Статус обновляется
+          Детекция объектов (YOLO/OpenVINO) и обработка видео. Проверка выполняется
           автоматически при переключении режима.
         </div>
         <div className="compute-modes">
           {MODES.map(m => (
             <label key={m.value} className={`compute-mode${uiMode === m.value ? ' active' : ''}`}>
               <input
-                type="radio"
-                name="compute-mode"
-                value={m.value}
+                type="radio" name="compute-mode" value={m.value}
                 checked={uiMode === m.value}
                 onChange={() => { setUiMode(m.value); setSavedMsg('') }}
               />
@@ -211,7 +287,33 @@ export default function ComputeTab() {
         </div>
       </div>
 
-      {/* URL input for remote mode */}
+      {/* Cluster: show discovered URL */}
+      {uiMode === 'cluster' && clusterDiscovered && clusterUrl && (
+        <div className="modal-section">
+          <div className="modal-setting-hint">
+            Обнаружен в кластере: <strong>{clusterUrl}</strong>
+          </div>
+        </div>
+      )}
+
+      {/* Browser: editable URL (pre-filled by WebRTC) */}
+      {uiMode === 'browser' && (
+        <div className="modal-section">
+          <div className="modal-section-title">Адрес на этой машине</div>
+          <input
+            className="compute-url-input"
+            type="text"
+            placeholder="http://192.168.1.21:8001"
+            value={browserUrl}
+            onChange={e => { setBrowserUrl(e.target.value); setSavedMsg('') }}
+          />
+          <div className="modal-setting-hint">
+            IP определяется через браузер (WebRTC). Если неверный — исправьте вручную.
+          </div>
+        </div>
+      )}
+
+      {/* Remote: manual URL */}
       {uiMode === 'remote' && (
         <div className="modal-section">
           <div className="modal-section-title">Адрес сервиса</div>
@@ -219,8 +321,8 @@ export default function ComputeTab() {
             className="compute-url-input"
             type="text"
             placeholder="http://192.168.1.50:8001"
-            value={url}
-            onChange={e => { setUrl(e.target.value); setSavedMsg('') }}
+            value={remoteUrl}
+            onChange={e => { setRemoteUrl(e.target.value); setSavedMsg('') }}
           />
           <div className="modal-setting-hint">
             Проверка выполняется автоматически по мере ввода.
@@ -228,7 +330,7 @@ export default function ComputeTab() {
         </div>
       )}
 
-      {/* Status probes */}
+      {/* Probes */}
       {uiMode !== 'off' && (
         <div className="modal-section">
           {checking ? (
@@ -236,22 +338,16 @@ export default function ComputeTab() {
           ) : probes ? (
             <div className="compute-probe-rows">
               {probes.backend && (
-                <ProbeRow
-                  label="Бэкенд"
-                  probe={probes.backend}
-                  extra={uiMode === 'browser' ? `→ ${detectedUrl}` : undefined}
-                />
+                <ProbeRow label="Бэкенд" probe={probes.backend} />
               )}
               {probes.browser && (
-                <ProbeRow
-                  label="Браузер"
-                  probe={probes.browser}
-                  extra="→ localhost:8001"
-                />
+                <ProbeRow label="Браузер" probe={probes.browser} />
               )}
             </div>
-          ) : uiMode === 'remote' && !URL_RE.test(url) ? (
+          ) : uiMode === 'remote' && !URL_RE.test(remoteUrl) ? (
             <div className="compute-status off">— Введите URL для автопроверки</div>
+          ) : uiMode === 'browser' && !URL_RE.test(browserUrl) ? (
+            <div className="compute-status off">— Определение IP…</div>
           ) : null}
         </div>
       )}
@@ -261,7 +357,7 @@ export default function ComputeTab() {
         <button
           className="modal-btn"
           onClick={handleSave}
-          disabled={saving || (uiMode === 'browser' && !detectedUrl)}
+          disabled={saving || uiMode === 'off'}
         >
           <i className="mdi mdi-content-save" /> Сохранить
         </button>
@@ -271,19 +367,17 @@ export default function ComputeTab() {
   )
 }
 
-function ProbeRow({ label, probe, extra }) {
-  const ok = probe.reachable
+function ProbeRow({ label, probe }) {
+  const ok = probe?.reachable
+  if (!probe) return null
   return (
     <div className={`compute-probe-row ${ok ? 'ok' : 'err'}`}>
       <span className="probe-label">{label}</span>
       <span className="probe-detail">
-        {ok ? '🟢' : '🔴'}
-        {' '}
         {ok
-          ? `Доступен${extra ? ` ${extra}` : (probe.url ? ` — ${probe.url}` : '')}`
-          : `Недоступен${probe.url ? ` — ${probe.url}` : ''}${probe.error ? ` (${probe.error})` : ''}`
+          ? `🟢 Доступен — ${probe.url}${probe.capabilities?.length ? ' · ' + probe.capabilities.join(', ') : ''}`
+          : `🔴 Недоступен${probe.url ? ' — ' + probe.url : ''}${probe.error ? ' (' + probe.error + ')' : ''}`
         }
-        {ok && probe.capabilities?.length > 0 && ` · ${probe.capabilities.join(', ')}`}
       </span>
     </div>
   )
