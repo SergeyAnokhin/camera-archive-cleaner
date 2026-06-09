@@ -80,20 +80,10 @@ Initial value for motion modes is taken from `diff_threshold` (the global defaul
 
 | localStorage key | Default | Description |
 |---|---|---|
-| `mode_params_openvino` | `{"confidence":25}` | Default OpenVINO confidence % (10–80). Also used by AiModePanel slider. Written by both the Detection tab and the AiModePanel slider |
+| `openvino_model` | `yolov8n` | Selected YOLO model. Options: `yolov8n`, `yolov8s`, `yolov8m`. Written **only** by the Detection tab. `AiModePanel` and `CellSelBar` display this value read-only |
+| `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Written by the Detection tab. Read-only in `AiModePanel` and `CellSelBar` |
 | `detection_classes` | `[0,14,15,16,24,26]` (JSON array of COCO class IDs) | Which YOLO classes the model is allowed to detect — passed as the `classes=` inference param so other classes are skipped entirely. Defaults: человек, птица, кошка, собака, рюкзак, сумка. UI: 80-class emoji checklist in the Detection tab (Все / Ничего / По умолчанию). Class list lives in [`frontend/src/cocoClasses.js`](../frontend/src/cocoClasses.js). Empty/unset → detect all 80 |
-
-## OpenVINO (local AI) settings
-
-> **Two places, one concept — don't confuse them:**
-> - **Default threshold** → Tools modal → Detection tab → writes `mode_params_openvino` (JSON, integer %). This is only the starting value loaded when the hour viewer opens.
-> - **Live threshold** → `AiModePanel` slider in HourViewer → reads and writes the same `mode_params_openvino.confidence` key in real time. The slider in the UI *is* the authoritative value while browsing; the Detection tab just sets its initial default.
-> - **`openvino_confidence`** (float 0–1) is a *separate* key used only by `OpenVinoAnalysisModal` (the standalone "Run" modal). It is **not** the same as `mode_params_openvino.confidence`.
-
-| localStorage key | Default | Description |
-|---|---|---|
-| `openvino_model` | `yolov8n` | Selected YOLO model. Options: `yolov8n`, `yolov8s`, `yolov8m`. Written by the AiModePanel dropdown and the heatmap CellSelBar |
-| `openvino_confidence` | `0.25` | Float 0–1. Used **only** by `OpenVinoAnalysisModal` (the standalone "Run" button). Do not confuse with `mode_params_openvino.confidence` (integer %) used by AiModePanel |
+| `openvino_confidence` | `0.25` | Float 0–1. Used **only** by `OpenVinoAnalysisModal` (the standalone "Run" button). Separate from `mode_params_openvino_detection.confidence` |
 
 ---
 

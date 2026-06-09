@@ -11,7 +11,7 @@ The app supports two types of AI analysis:
 - **Cloud AI** (Gemini, Claude) — sends photos to an external API, receives a natural-language description + object list per photo. Requires an API key and internet access.
 - **Local AI** (OpenVINO) — runs YOLOv8 object detection on the local machine, no API key or internet required. Detects objects from the COCO 80-class vocabulary (people, animals, vehicles, etc.) and draws bounding boxes.
 
-Results from all providers are stored in the same `ai_analysis` table and displayed as icons on photo cards and heatmap cells.
+Results are stored in two separate tables: cloud AI (Gemini/Claude) in `ai_analysis`, local detection (OpenVINO) in `object_detection`. Both are displayed as icons on photo cards and heatmap cells.
 
 ---
 
@@ -39,7 +39,7 @@ OpenVINO stores two separate confidence values:
 | `openvino_bbox` | OpenVINO Boxes | — | [`viewModes/openvinoBboxMode.js`](../frontend/src/components/viewModes/openvinoBboxMode.js) — same but without `isAiMode`; reads confidence from `openvino_confidence` localStorage key |
 
 Modes with `isAiMode: true`:
-- Replace the normal mode-settings panel with `AiModePanel` (model selector + confidence slider for openvino + Run button + stats)
+- Replace the normal mode-settings panel with `AiModePanel` (read-only model label + confidence display for openvino + Run button + stats)
 - Enable the per-card hover description tooltip
 
 **OpenVINO Detection** combines visualization and analysis in one mode:
@@ -83,7 +83,7 @@ GET /openvino_thumbnail/{file_id}?model=…&confidence=…
     └─ cache miss → run YOLO
                     draw bounding boxes  (results[0].plot())
                     save JPEG to openvino_thumbnails_cache/
-                    save_ai_analysis() → ai_analysis table
+                    save_object_detection() → object_detection table
                     return JPEG
     │
     ▼ (PhotoCard.onLoad fires)
@@ -137,7 +137,7 @@ Request: `{ file_ids, model_name, confidence }`
 
 1. For each photo, calls the compute-service `POST /detect` (`draw=false`) — see [`compute-service.md`](compute-service.md)
 2. The compute-service runs YOLOv8 detection and maps COCO English → Russian via `COCO_TO_RUSSIAN`
-3. Saves each result via `save_ai_analysis()` with `provider='openvino'`, empty `scene_description`/`image_description`
+3. Saves each result via `save_object_detection()` to the `object_detection` table
 4. Returns: `{ elapsed_ms, images_used, saved_count, results: { file_id: [ru_word, ...] } }`
 
 Returns `503` if the compute-service is off or unreachable. Objects are stored as Russian words so they match the existing `AI_ICON_MAP` in `aiHelpers.js`.
@@ -165,14 +165,20 @@ Returns a JPEG with bounding boxes drawn by YOLO's built-in `.plot()` renderer:
 
 **`classes` param** (comma-separated COCO class IDs; empty = all 80): restricts YOLO inference to only those classes.
 
-**On cache miss:** the main backend calls the compute-service `POST /detect` (`draw=true`), writes the returned JPEG to the cache, and **also calls `save_ai_analysis()`** to persist detected objects. Returns `503` if the compute-service is off/unreachable.
+**On cache miss:** the main backend calls the compute-service `POST /detect` (`draw=true`), writes the returned JPEG to the cache, and **also calls `save_object_detection()`** to persist detected objects in the `object_detection` table. Returns `503` if the compute-service is off/unreachable.
 
 Cache key: `sha256("v5:{file_id}:{model}:{conf:.2f}:{sorted_classes}")[:16].jpg`  
 Directory: `backend/openvino_thumbnails_cache/` — included in `DELETE /all_thumbnails` cleanup.
 
 ### `GET /ai_analysis?file_ids=1,2,3`
 
-Returns saved analysis rows for the given file IDs. Called by `HourViewer` on every page change to populate the icon/tooltip map.
+Returns merged results for the given file IDs. Queries both `ai_analysis` (Gemini/Claude) and `object_detection` (OpenVINO) and returns one entry per file:
+
+```json
+[{ "file_id": 42, "detection": {"model": "yolov8n", "objects": "человек машина", "analyzed_at": "…"}, "ai": {"provider": "gemini", "model": "…", "scene_description": "…", "image_description": "…", "objects": "…"} }]
+```
+
+Either `detection` or `ai` (or both) may be `null` if the photo hasn't been processed by that provider. Called by `HourViewer` on every page change to populate the icon/tooltip map.
 
 ### `GET /ai_objects_summary?camera_id=&date_from=&date_to=`
 
@@ -184,25 +190,18 @@ Returns unique object words across all `ai_analysis` rows for files in the given
 
 ## Database schema
 
-Table `ai_analysis` in [`backend/database.py`](../backend/database.py):
+Two tables in [`backend/database.py`](../backend/database.py); see [`docs/database.md`](database.md) for full column details.
 
-```sql
-CREATE TABLE IF NOT EXISTS ai_analysis (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    file_id           INTEGER NOT NULL UNIQUE,        -- one row per photo
-    provider          TEXT    NOT NULL DEFAULT 'gemini',
-    model             TEXT    NOT NULL,
-    analyzed_at       TEXT    NOT NULL DEFAULT (datetime('now')),
-    scene_description TEXT,   -- shared scene sentence (empty for OpenVINO)
-    image_description TEXT,   -- per-image description (empty for OpenVINO)
-    objects           TEXT,   -- space-separated object words
-    FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
-);
-```
+| Table | Used for | UNIQUE key |
+|---|---|---|
+| `ai_analysis` | Gemini / Claude results | `file_id` — cloud provider overwrites on re-run |
+| `object_detection` | OpenVINO / YOLO results | `file_id` — detection overwrites on re-run |
 
-**UPSERT rule:** `UNIQUE(file_id)` — whichever analysis ran last wins. Running any provider on the same photo overwrites the previous result.
+Both have `FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE`.
 
-DB helpers: `save_ai_analysis()`, `get_ai_analysis_by_file_ids()` in [`backend/database.py`](../backend/database.py).
+Running detection and cloud AI on the same photo no longer conflicts — each has its own row in its own table.
+
+DB helpers: `save_ai_analysis()`, `save_object_detection()`, `get_combined_analysis_by_file_ids()` in [`backend/database.py`](../backend/database.py).
 
 ---
 
@@ -317,8 +316,8 @@ When selection mode is active, the **CellSelBar** appears in [`frontend/src/App.
 
 **Row 2 — AI analysis panel:**
 - **Provider dropdown**: OpenVINO Detection / Gemini Analysis / Claude Analysis
-- **Model dropdown**: provider-specific models (same list as HourViewer's AiModePanel)
-- **Threshold slider** (OpenVINO only): 10–80 %, default 25 %
+- **Model label** (read-only): shows current model from global settings (Tools modal) with a cog icon
+- **Threshold label** (OpenVINO only): shows current confidence % from global settings (read-only)
 - **Analyze (N)** button — runs analysis on all selected cells
 
 ### What "Analyze" does per provider
@@ -380,7 +379,8 @@ Displayed in `AiModePanel` after each completed analysis.
 
 | Tab | Setting | localStorage key |
 |-----|---------|-----------------|
-| **Detection** | Default OpenVINO confidence | `mode_params_openvino` → `{confidence: N}` (integer %) |
+| **Detection** | YOLO model | `openvino_model` (default `yolov8n`; options: `yolov8n/s/m`) |
+| **Detection** | Default OpenVINO confidence | `mode_params_openvino_detection` → `{confidence: N}` (integer %) |
 | **Detection** | Detected YOLO classes (80-class checklist) | `detection_classes` (JSON array of COCO class IDs) |
 | Google AI | API key | `gemini_api_key` |
 | Google AI | Model | `gemini_model` |
@@ -388,5 +388,4 @@ Displayed in `AiModePanel` after each completed analysis.
 | Claude AI | API key | `claude_api_key` |
 | Claude AI | Model | `claude_model` |
 
-OpenVINO model is set inline via the AiModePanel model dropdown (writes `openvino_model`).  
-`openvino_confidence` (float) is written only by `OpenVinoAnalysisModal` (the "Run" modal) — the AiModePanel slider uses `modeParams.confidence` (integer %) from `mode_params_openvino` instead.
+**Model selection is centralised in the Tools modal only.** `AiModePanel` and `CellSelBar` show the active model as a read-only label. `NewTaskModal` reads model/mode from localStorage and shows a read-only summary for the selected task type.

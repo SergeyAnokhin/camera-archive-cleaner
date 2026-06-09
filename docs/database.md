@@ -42,22 +42,63 @@ Thumbnails older than 30 days are purged automatically via `pop_old_basic_thumbn
 
 ---
 
-### `ai_analysis` — AI analysis results
+### `ai_analysis` — Cloud AI analysis results (Gemini / Claude only)
 
-Results from all three AI providers (Gemini, Claude, OpenVINO). One row per file. Re-running any provider overwrites the existing row (`ON CONFLICT(file_id) DO UPDATE`).
+Results from cloud providers only (Gemini, Claude). One row per file. Re-running any provider overwrites the existing row (`ON CONFLICT(file_id) DO UPDATE`).
+
+> **Note:** OpenVINO/YOLO results are stored in `object_detection` (separate table). Running detection and cloud AI on the same photo no longer conflicts.
 
 | Column | Type | Description |
 |---|---|---|
 | `id` | INTEGER PK | Auto-increment |
 | `file_id` | INTEGER UNIQUE | FK → `files.id` (CASCADE DELETE) |
-| `provider` | TEXT | AI provider: `'gemini'`, `'claude'`, or `'openvino'` |
-| `model` | TEXT | Model name (e.g. `gemini-2.5-flash`, `yolov8n`) |
+| `provider` | TEXT | AI provider: `'gemini'` or `'claude'` |
+| `model` | TEXT | Model name (e.g. `gemini-2.5-flash`) |
 | `analyzed_at` | TEXT | Analysis timestamp |
-| `scene_description` | TEXT | Scene type (street, yard, parking, etc.). Empty for OpenVINO |
-| `image_description` | TEXT | Detailed description of what is visible in the frame. Empty for OpenVINO |
+| `scene_description` | TEXT | Scene type (street, yard, parking, etc.) |
+| `image_description` | TEXT | Detailed description of what is visible in the frame |
 | `objects` | TEXT | Space-separated list of detected object keywords |
+| `input_tokens` | INTEGER | Input tokens consumed |
+| `output_tokens` | INTEGER | Output tokens consumed |
+| `cost_usd` | REAL | Estimated cost in USD |
+| `elapsed_ms` | INTEGER | Analysis time in milliseconds |
 
 **Index:** `idx_ai_analysis_file` — `(file_id)`.
+
+---
+
+### `object_detection` — OpenVINO / YOLO detection results
+
+One row per photo, written by OpenVINO detection (both batch endpoint and thumbnail cache miss). Separate from `ai_analysis` so detection and cloud AI coexist for the same photo.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | INTEGER PK | Auto-increment |
+| `file_id` | INTEGER UNIQUE | FK → `files.id` (CASCADE DELETE) |
+| `model` | TEXT | YOLO model name (`yolov8n`, `yolov8s`, `yolov8m`) |
+| `objects` | TEXT | Space-separated Russian/English object words |
+| `elapsed_ms` | INTEGER | Detection time in milliseconds |
+| `analyzed_at` | TEXT | Detection timestamp |
+
+**Index:** `idx_obj_det_file` — `(file_id)`.
+
+**Migration:** on first startup after this table is added, all rows with `provider='openvino'` are moved from `ai_analysis` to `object_detection` automatically.
+
+---
+
+### `video_previews` — video thumbnail cache records
+
+One row per video file; tracks which preview mode was used so stale entries can be invalidated when the mode changes.
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | INTEGER PK | Auto-increment |
+| `file_id` | INTEGER UNIQUE | FK → `files.id` (CASCADE DELETE) |
+| `mode` | TEXT | Preview mode (`first_frame`, `four_frames`, `max_change_gif`, etc.) |
+| `thumb_path` | TEXT | Path to the cached thumbnail file |
+| `created_at` | TEXT | Generation timestamp |
+
+**Index:** `idx_vid_prev_file` — `(file_id)`.
 
 ---
 
@@ -111,12 +152,14 @@ in the router, not by SQLite).
 
 ## Cascade deletes
 
-Deleting a row from `files` automatically removes related rows in `thumbnails` and `ai_analysis` (`ON DELETE CASCADE`).
+Deleting a row from `files` automatically removes related rows in all dependent tables (`ON DELETE CASCADE`).
 
 ```
 files
-  ├── thumbnails   (CASCADE DELETE)
-  └── ai_analysis  (CASCADE DELETE)
+  ├── thumbnails       (CASCADE DELETE)
+  ├── ai_analysis      (CASCADE DELETE)
+  ├── object_detection (CASCADE DELETE)
+  └── video_previews   (CASCADE DELETE)
 ```
 
 ---
@@ -136,11 +179,21 @@ thumbnails.py ──► save_thumbnail_path() ──► thumbnails
                                     │
 /gemini_analyze_batch (POST)        │
 /claude_analyze_batch (POST)        │
+    │                               │
+    ▼                               │
+AI provider ──► save_ai_analysis() ──► ai_analysis (Gemini/Claude only)
+
 /openvino_analyze_batch (POST)      │
 /openvino_thumbnail/{id} (GET)      │
     │                               │
     ▼                               │
-AI provider ──► save_ai_analysis() ──► ai_analysis
+openvino.py ──► save_object_detection() ──► object_detection
+
+/video_thumbnail/{id} (GET)         │
+task_runner.py (video_thumbnails)   │
+    │                               │
+    ▼                               │
+thumbnails_api.py ──► save_video_preview() ──► video_previews
 ```
 
-Cloud providers (Gemini/Claude) reach `ai_analysis` via the `ai_providers/` package; OpenVINO writes there both from `ai_providers/openvino.py` and as a side effect of the `/openvino_thumbnail` endpoint on cache miss.
+`/ai_analysis?file_ids=…` returns a **merged** response — one entry per file combining both tables: `{file_id, detection: {model, objects, analyzed_at}|null, ai: {provider, model, ...}|null}`.

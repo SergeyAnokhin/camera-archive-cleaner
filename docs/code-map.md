@@ -17,7 +17,7 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` |
 | [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
 | [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks, processes files one by one, writes progress to DB every 5 s. Supports pause/resume by checking task status between files |
-| [`database.py`](../backend/database.py) | SQLite: table schema, all SQL queries (upsert, aggregations, pagination, AI analysis). The only file that touches the DB |
+| [`database.py`](../backend/database.py) | SQLite: table schema + migrations, all SQL queries. Tables: `files`, `thumbnails`, `ai_analysis` (Gemini/Claude), `object_detection` (OpenVINO), `video_previews`, `tasks`, `tuning_sessions`. The only file that touches the DB |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames (Foscam patterns + mtime fallback); writes to DB |
 | [`config.py`](../backend/config.py) | Parses `cameras.yaml` → `Camera` dataclass (id, name, path_snapshots, path_videos) |
 | [`thumbnails.py`](../backend/thumbnails.py) | Basic 256×256 JPEG thumbnails (Pillow). Cache in `thumbnails_cache/`. Used by `/thumbnail/{id}` |
@@ -135,7 +135,7 @@ Imported by both the main backend and the compute-service.
 | [`TasksScreen.jsx`](../frontend/src/components/TasksScreen.jsx) | Tasks screen — polls `/tasks` every 3 s, shows system metrics bar + task card list, hosts NewTaskModal |
 | [`TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx) | Model tuning screen (whole feature in one file): session sidebar + 3-step panel (upload, ground truth, golden-section benchmark, results charts). See [`docs/tuning.md`](tuning.md) |
 | [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card component: type icon, status badge, animated progress bar, speed/ETA, current-file thumbnail preview, pause/resume/cancel/delete/reorder buttons |
-| [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a new task: type selector cards (video\_thumbnails/openvino), camera+date-range picker, type-specific params, file-count estimate |
+| [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a new task: type selector cards (video\_thumbnails/openvino/gemini/claude), camera+date-range picker, read-only "НАСТРОЙКИ (ИЗ TOOLS)" summary showing active model/mode per task type |
 
 ### Tools modal tabs (`frontend/src/components/tools/`)
 
@@ -148,11 +148,11 @@ Imported by both the main backend and the compute-service.
 | [`SliderSetting.jsx`](../frontend/src/components/tools/SliderSetting.jsx) | Reusable labelled range-slider row used across tabs |
 | [`GeneralTab.jsx`](../frontend/src/components/tools/GeneralTab.jsx) | Font size, previews per cell, YAML export/import |
 | [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | Page size, thumb width, hover zoom, diff threshold, video preview, uniformity thresholds |
-| [`DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx) | OpenVINO confidence slider, detected-classes checklist (80 COCO objects → `detection_classes`) |
+| [`DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx) | YOLO model selector (`openvino_model`), OpenVINO confidence slider, detected-classes checklist (80 COCO objects → `detection_classes`) |
 | [`GoogleAiTab.jsx`](../frontend/src/components/tools/GoogleAiTab.jsx) | Gemini API key, model, structured prompt template |
 | [`ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx) | Claude API key, model |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
-| [`MaintenanceTab.jsx`](../frontend/src/components/tools/MaintenanceTab.jsx) | Clear database, clear all thumbnails, storage info |
+| [`MaintenanceTab.jsx`](../frontend/src/components/tools/MaintenanceTab.jsx) | Clear database, clear all thumbnails, storage info. Date-range picker (auto-filled from camera's range) — all cleanup operations filter to the selected range |
 
 ### Hour viewer parts (`frontend/src/components/hour/`)
 
@@ -167,7 +167,7 @@ Imported by both the main backend and the compute-service.
 | [`DistributionChart.jsx`](../frontend/src/components/hour/DistributionChart.jsx) | 60-bar per-minute distribution chart; click a bar to jump to its page. Shows AF/SE/BC uniformity badges (green/yellow/red) in the header |
 | [`SelectionBar.jsx`](../frontend/src/components/hour/SelectionBar.jsx) | Selection-mode toolbar: select all/none, selection stats, delete |
 | [`ModeSettingsPanel.jsx`](../frontend/src/components/hour/ModeSettingsPanel.jsx) | Slider panel for non-AI view modes with tunable params (e.g. motion threshold) |
-| [`AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx) | AI mode panel: compact 2-row layout — label+model+run on row 1, threshold (OpenVINO)/stats/emojis on row 2. Exports `AI_PROVIDER_CONFIG` |
+| [`AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx) | AI mode panel: compact 2-row layout — label + read-only model label + run on row 1, threshold display (OpenVINO)/stats/emojis on row 2. Exports `AI_PROVIDER_CONFIG` |
 | [`useHourKeyboard.js`](../frontend/src/components/hour/useHourKeyboard.js) | Custom hook holding all keyboard handling: peek original, browse-mode keys, selection-mode keys |
 | [`useHourDelete.js`](../frontend/src/components/hour/useHourDelete.js) | Custom hook holding all delete logic: per-file/whole-page delete (preview → confirm) and whole-hour delete. Owns the delete-related state + the two `DeleteConfirmModal` data sources |
 
