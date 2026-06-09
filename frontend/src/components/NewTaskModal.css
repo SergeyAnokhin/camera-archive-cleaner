@@ -145,6 +145,29 @@
   text-align: right;
 }
 
+/* ── Settings summary ────────────────────────────────────── */
+.ntm__settings-summary {
+  background: rgba(14, 165, 233, 0.05);
+  border-bottom: 1px solid rgba(14, 165, 233, 0.15) !important;
+}
+
+.ntm__summary-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: calc(var(--font-base) * 0.85);
+  color: var(--text-muted);
+}
+
+.ntm__summary-row i {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.ntm__summary-row strong {
+  color: var(--text-primary);
+}
+
 /* ── Estimate ─────────────────────────────────────────────── */
 .ntm__estimate {
   padding: 8px 20px;

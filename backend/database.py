@@ -15,6 +15,8 @@ def get_connection() -> sqlite3.Connection:
 def init_db() -> None:
     with get_connection() as conn:
         init_ai_analysis_table(conn)
+        init_object_detection_table(conn)
+        init_video_previews_table(conn)
         init_tasks_table(conn)
         init_tuning_table(conn)
         conn.executescript("""
@@ -306,6 +308,75 @@ def init_ai_analysis_table(conn: sqlite3.Connection) -> None:
             pass
 
 
+def init_object_detection_table(conn: sqlite3.Connection) -> None:
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS object_detection (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id     INTEGER NOT NULL UNIQUE,
+            model       TEXT    NOT NULL,
+            objects     TEXT,
+            elapsed_ms  INTEGER NOT NULL DEFAULT 0,
+            analyzed_at TEXT    NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_obj_det_file ON object_detection(file_id);
+    """)
+    # Migration: move existing openvino rows from ai_analysis to object_detection
+    try:
+        conn.execute("""
+            INSERT OR IGNORE INTO object_detection (file_id, model, objects, elapsed_ms, analyzed_at)
+            SELECT file_id, model, objects, elapsed_ms, analyzed_at
+            FROM ai_analysis WHERE provider='openvino'
+        """)
+        conn.execute("DELETE FROM ai_analysis WHERE provider='openvino'")
+    except Exception:
+        pass
+
+
+def save_object_detection(conn: sqlite3.Connection, file_id: int, model: str,
+                          objects: str, elapsed_ms: int = 0) -> None:
+    conn.execute(
+        """
+        INSERT INTO object_detection (file_id, model, objects, elapsed_ms, analyzed_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(file_id) DO UPDATE SET
+            model      = excluded.model,
+            objects    = excluded.objects,
+            elapsed_ms = excluded.elapsed_ms,
+            analyzed_at = excluded.analyzed_at
+        """,
+        (file_id, model, objects, elapsed_ms),
+    )
+
+
+def init_video_previews_table(conn: sqlite3.Connection) -> None:
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS video_previews (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            file_id    INTEGER NOT NULL UNIQUE,
+            mode       TEXT    NOT NULL,
+            thumb_path TEXT    NOT NULL,
+            created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_vid_prev_file ON video_previews(file_id);
+    """)
+
+
+def save_video_preview(conn: sqlite3.Connection, file_id: int, mode: str, thumb_path: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO video_previews (file_id, mode, thumb_path, created_at)
+        VALUES (?, ?, ?, datetime('now'))
+        ON CONFLICT(file_id) DO UPDATE SET
+            mode       = excluded.mode,
+            thumb_path = excluded.thumb_path,
+            created_at = excluded.created_at
+        """,
+        (file_id, mode, thumb_path),
+    )
+
+
 def save_ai_analysis(conn: sqlite3.Connection, file_id: int, provider: str, model: str,
                      scene_description: str, image_description: str, objects: str,
                      input_tokens: int = 0, output_tokens: int = 0,
@@ -427,12 +498,45 @@ def reorder_tasks(conn: sqlite3.Connection, order_list: list[dict]) -> None:
         )
 
 
-def get_ai_analysis_by_file_ids(conn: sqlite3.Connection, file_ids: list[int]) -> list:
+def get_combined_analysis_by_file_ids(conn: sqlite3.Connection, file_ids: list[int]) -> list:
+    """Return merged detection + AI analysis records, one dict per file_id."""
     if not file_ids:
         return []
     ph = ",".join("?" * len(file_ids))
-    return conn.execute(
-        f"SELECT file_id, provider, model, analyzed_at, scene_description, image_description, objects "
-        f"FROM ai_analysis WHERE file_id IN ({ph})",
-        file_ids,
-    ).fetchall()
+    ai_rows = {
+        r["file_id"]: r for r in conn.execute(
+            f"SELECT file_id, provider, model, analyzed_at, "
+            f"scene_description, image_description, objects "
+            f"FROM ai_analysis WHERE file_id IN ({ph})",
+            file_ids,
+        ).fetchall()
+    }
+    det_rows = {
+        r["file_id"]: r for r in conn.execute(
+            f"SELECT file_id, model, objects, analyzed_at "
+            f"FROM object_detection WHERE file_id IN ({ph})",
+            file_ids,
+        ).fetchall()
+    }
+    all_ids = set(ai_rows) | set(det_rows)
+    result = []
+    for fid in all_ids:
+        ai = ai_rows.get(fid)
+        det = det_rows.get(fid)
+        result.append({
+            "file_id": fid,
+            "detection": {
+                "model": det["model"],
+                "objects": det["objects"],
+                "analyzed_at": det["analyzed_at"],
+            } if det else None,
+            "ai": {
+                "provider": ai["provider"],
+                "model": ai["model"],
+                "analyzed_at": ai["analyzed_at"],
+                "scene_description": ai["scene_description"],
+                "image_description": ai["image_description"],
+                "objects": ai["objects"],
+            } if ai else None,
+        })
+    return result

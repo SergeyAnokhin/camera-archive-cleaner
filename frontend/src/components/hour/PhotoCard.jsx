@@ -30,7 +30,11 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
     if (selectionMode) { onToggle(file, index, e.shiftKey) } else { onOpenLightbox?.(index) }
   }
 
-  const aiIcons = aiData?.objects ? resolveAiIcons(aiData.objects) : []
+  // New format: aiData = { detection: {...}|null, ai: {...}|null }
+  const detectionObjects = aiData?.detection?.objects || ''
+  const aiObjects        = aiData?.ai?.objects        || ''
+  const currentObjects   = mode.aiProvider === 'openvino' ? detectionObjects : aiObjects
+  const aiIcons = currentObjects ? resolveAiIcons(currentObjects) : []
 
   return (
     <>
@@ -78,22 +82,22 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
           </div>
         )}
 
-        {/* AI description tooltip on hover — only in AI mode */}
-        {aiData?.image_description && !selectionMode && mode.isAiMode && (
+        {/* AI description tooltip on hover — only in non-openvino AI mode */}
+        {aiData?.ai?.image_description && !selectionMode && mode.isAiMode && mode.aiProvider !== 'openvino' && (
           <div
             className={`hv-card-ai-desc${descExpanded ? ' expanded' : ''}`}
             onClick={e => { e.stopPropagation(); setDescExpanded(v => !v) }}
             title={descExpanded ? 'Нажмите чтобы свернуть' : 'Нажмите чтобы развернуть'}
           >
-            <div className="hv-card-ai-desc-text">{aiData.image_description}</div>
-            {aiData.objects && (
+            <div className="hv-card-ai-desc-text">{aiData.ai.image_description}</div>
+            {aiData.ai.objects && (
               <div className="hv-card-ai-desc-objects">
-                {aiData.objects.split(/\s+/).filter(Boolean).map((o, i) => (
+                {aiData.ai.objects.split(/\s+/).filter(Boolean).map((o, i) => (
                   <span key={i} className="hv-card-ai-tag">{o}</span>
                 ))}
               </div>
             )}
-            <div className="hv-card-ai-desc-model">{aiData.model}</div>
+            <div className="hv-card-ai-desc-model">{aiData.ai.model}</div>
           </div>
         )}
       </div>

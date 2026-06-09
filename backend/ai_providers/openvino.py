@@ -9,7 +9,7 @@ import time
 
 import compute_client
 from compute_cache import ov_cache_path, video_cache_path, OV_THUMB_DIR, VID_THUMB_DIR
-from database import get_connection, get_file_by_id, save_ai_analysis
+from database import get_connection, get_file_by_id, save_object_detection
 
 logger = logging.getLogger("api")
 
@@ -39,8 +39,7 @@ def analyze_batch(file_ids, model_name="yolov8n", confidence=0.25, classes=None)
                     row["file_path"], model_name, confidence, draw=True,
                     classes=classes)
                 images_used += 1
-                save_ai_analysis(conn, fid, "openvino", model_name, "", "",
-                                 " ".join(result.objects))
+                save_object_detection(conn, fid, model_name, " ".join(result.objects))
                 results_out[fid] = result.objects
                 saved_count += 1
 

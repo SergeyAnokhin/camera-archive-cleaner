@@ -3,7 +3,7 @@ import {
   clearDatabase, clearAllThumbnails, clearThumbnails,
   clearDiffThumbnails, clearDiffZoomThumbnails, clearErosionThumbnails,
   clearMotionThumbnails, clearVideoThumbnails, clearOpenVinoThumbnails,
-  vacuumDatabase, getStorageInfo,
+  vacuumDatabase, getStorageInfo, getCameraDateRange,
 } from '../../api.js'
 
 function fmtBytes(b) {
@@ -12,6 +12,10 @@ function fmtBytes(b) {
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`
   if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`
   return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
+function toDateInput(isoStr) {
+  return isoStr ? isoStr.slice(0, 16) : ''
 }
 
 function ActionRow({ name, desc, sizeLabel, danger, onAction, busy, result, renderResult }) {
@@ -82,6 +86,9 @@ function useAsync() {
 
 export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras }) {
   const [storageInfo, setStorageInfo] = useState(null)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo]     = useState('')
+  const [datesFilled, setDatesFilled] = useState(false)
 
   const camName = cameras?.find(c => c.id === cameraId)?.name ?? cameraId ?? '—'
 
@@ -97,27 +104,44 @@ export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras })
     getStorageInfo().then(setStorageInfo).catch(() => {})
   }, [])
 
+  // Auto-fill date range from camera on mount / camera change
+  useEffect(() => {
+    if (!cameraId) return
+    getCameraDateRange(cameraId)
+      .then(range => {
+        if (range.date_from && range.date_to) {
+          setDateFrom(toDateInput(range.date_from))
+          setDateTo(toDateInput(range.date_to))
+          setDatesFilled(true)
+        }
+      })
+      .catch(() => {})
+  }, [cameraId])
+
   function refreshStorage() {
     getStorageInfo().then(setStorageInfo).catch(() => {})
   }
 
+  const df = dateFrom ? dateFrom + ':00' : null
+  const dt = dateTo   ? dateTo   + ':00' : null
+
   async function handleClearAllThumbs() {
-    await allThumb.run(() => clearAllThumbnails(cameraId))
+    await allThumb.run(() => clearAllThumbnails(cameraId, df, dt))
     refreshStorage()
   }
 
   async function handleClearBasic() {
-    await basicThumb.run(() => clearThumbnails(cameraId))
+    await basicThumb.run(() => clearThumbnails(cameraId, df, dt))
     refreshStorage()
   }
 
   async function handleClearMotion() {
     await motionThumb.run(async () => {
       const results = await Promise.all([
-        clearDiffThumbnails(cameraId),
-        clearDiffZoomThumbnails(cameraId),
-        clearErosionThumbnails(cameraId),
-        clearMotionThumbnails(cameraId),
+        clearDiffThumbnails(cameraId, df, dt),
+        clearDiffZoomThumbnails(cameraId, df, dt),
+        clearErosionThumbnails(cameraId, df, dt),
+        clearMotionThumbnails(cameraId, df, dt),
       ])
       const total = results.reduce((s, r) => s + (r.deleted_files || 0), 0)
       return { total }
@@ -126,17 +150,17 @@ export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras })
   }
 
   async function handleClearVideo() {
-    await videoThumb.run(() => clearVideoThumbnails(cameraId))
+    await videoThumb.run(() => clearVideoThumbnails(cameraId, df, dt))
     refreshStorage()
   }
 
   async function handleClearOpenVino() {
-    await ovThumb.run(() => clearOpenVinoThumbnails(cameraId))
+    await ovThumb.run(() => clearOpenVinoThumbnails(cameraId, df, dt))
     refreshStorage()
   }
 
   async function handleClearDb() {
-    const r = await dbClear.run(() => clearDatabase(cameraId))
+    const r = await dbClear.run(() => clearDatabase(cameraId, df, dt))
     if (r?.ok) onDatabaseCleared()
     refreshStorage()
   }
@@ -156,10 +180,50 @@ export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras })
         <div className="modal-section" style={{ paddingBottom: 6 }}>
           <div className="modal-setting-hint">
             <i className="mdi mdi-cctv" style={{ marginRight: 5 }} />
-            Все операции — только для камеры: <strong>{camName}</strong>
+            Камера: <strong>{camName}</strong>
           </div>
         </div>
       )}
+
+      {/* Date range filter */}
+      <div className="modal-section">
+        <div className="modal-section-title">Диапазон дат</div>
+        <div className="modal-setting-hint" style={{ marginBottom: 8 }}>
+          Все операции очистки применяются только к файлам в этом диапазоне.
+          {datesFilled && <span style={{ color: '#86efac', marginLeft: 6 }}>
+            <i className="mdi mdi-check-circle" style={{ marginRight: 3 }} />
+            авто-заполнено из камеры
+          </span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            type="datetime-local"
+            className="modal-text-input"
+            value={dateFrom}
+            onChange={e => { setDateFrom(e.target.value); setDatesFilled(false) }}
+            style={{ flex: 1, minWidth: 170, colorScheme: 'dark' }}
+          />
+          <span style={{ color: 'var(--text-dim)', fontSize: 'calc(var(--font-base) * 0.85)' }}>→</span>
+          <input
+            type="datetime-local"
+            className="modal-text-input"
+            value={dateTo}
+            onChange={e => { setDateTo(e.target.value); setDatesFilled(false) }}
+            style={{ flex: 1, minWidth: 170, colorScheme: 'dark' }}
+          />
+          <button className="modal-btn neutral" onClick={() => {
+            setDateFrom(''); setDateTo(''); setDatesFilled(false)
+          }}>
+            <i className="mdi mdi-close" /> Весь диапазон
+          </button>
+        </div>
+        {(df || dt) && (
+          <div className="modal-setting-hint" style={{ marginTop: 6, color: '#60a5fa' }}>
+            <i className="mdi mdi-filter-outline" style={{ marginRight: 4 }} />
+            Фильтр активен: {df ? df.slice(0, 16) : '…'} → {dt ? dt.slice(0, 16) : '…'}
+          </div>
+        )}
+      </div>
 
       {/* Thumbnail cleanup */}
       <div className="modal-section">
@@ -202,11 +266,7 @@ export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras })
 
         <ActionRow
           name="Детекция объектов (OpenVINO)"
-          desc={
-            cameraId
-              ? 'Результаты из БД (ai_analysis) для этой камеры. Диск-кэш с bbox очищается при глобальной очистке.'
-              : 'Результаты детекции в БД + превьюшки с bounding-box на диске'
-          }
+          desc="Записи object_detection в БД для выбранного диапазона. Диск-кэш с bbox очищается при глобальной очистке."
           onAction={handleClearOpenVino}
           busy={ovThumb.busy}
           result={ovThumb.result}
@@ -220,7 +280,7 @@ export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras })
 
         <ActionRow
           name="Видео-превьюшки"
-          desc="Кэш превью для видеофайлов (первый кадр, сетка, GIF)"
+          desc="Кэш превью для видеофайлов (первый кадр, сетка, GIF) + записи в БД"
           onAction={handleClearVideo}
           busy={videoThumb.busy}
           result={videoThumb.result}
@@ -235,7 +295,7 @@ export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras })
         <ActionRow
           danger
           name="Очистить записи файлов"
-          desc={`Удалить все записи${cameraId ? ` камеры «${camName}»` : ''} из БД (файлы на диске не трогаются)`}
+          desc={`Удалить записи${cameraId ? ` камеры «${camName}»` : ''} из БД за выбранный диапазон (файлы на диске не трогаются)`}
           sizeLabel={dbSizeStr}
           onAction={handleClearDb}
           busy={dbClear.busy}

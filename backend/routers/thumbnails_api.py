@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 
 import compute_client
 from compute_cache import OV_THUMB_DIR, VID_THUMB_DIR, ov_cache_path, video_cache_path
-from database import get_connection, get_file_by_id, save_ai_analysis
+from database import get_connection, get_file_by_id, save_object_detection, save_video_preview
 from shared.contract import VIDEO_THUMB_MODES
 from thumbnails import get_or_create_thumbnail
 from diff_thumbnails import get_or_create_diff_thumbnail
@@ -160,7 +160,7 @@ def get_openvino_thumbnail(
     cache_path.write_bytes(base64.b64decode(result.annotated_jpeg_b64))
 
     with get_connection() as conn:
-        save_ai_analysis(conn, file_id, "openvino", model, "", "", " ".join(result.objects))
+        save_object_detection(conn, file_id, model, " ".join(result.objects))
 
     return FileResponse(str(cache_path), media_type="image/jpeg", headers=_THUMB_CACHE_HEADERS)
 
@@ -182,6 +182,8 @@ def get_video_thumbnail(
     cache_path = video_cache_path(file_id, mode)
     media_type = "image/gif" if mode.endswith("_gif") else "image/jpeg"
     if cache_path.exists():
+        with get_connection() as conn:
+            save_video_preview(conn, file_id, mode, str(cache_path))
         return FileResponse(str(cache_path), media_type=media_type, headers=_THUMB_CACHE_HEADERS)
 
     try:
@@ -193,4 +195,6 @@ def get_video_thumbnail(
 
     VID_THUMB_DIR.mkdir(exist_ok=True)
     cache_path.write_bytes(data)
+    with get_connection() as conn:
+        save_video_preview(conn, file_id, mode, str(cache_path))
     return FileResponse(str(cache_path), media_type=media_type, headers=_THUMB_CACHE_HEADERS)

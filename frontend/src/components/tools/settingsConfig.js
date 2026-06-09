@@ -91,6 +91,14 @@ export const OV_CONFIDENCE_KEY = 'mode_params_openvino_detection'
 export const OV_CONFIDENCE_DEFAULT = 25
 export const DETECTION_CLASSES_KEY = 'detection_classes'
 
+export const OV_MODEL_KEY     = 'openvino_model'
+export const OV_MODEL_DEFAULT = 'yolov8n'
+export const OV_MODELS = [
+  { value: 'yolov8n', label: 'YOLOv8n — nano (быстро)' },
+  { value: 'yolov8s', label: 'YOLOv8s — small' },
+  { value: 'yolov8m', label: 'YOLOv8m — medium (точнее)' },
+]
+
 export const UNIFORMITY_METHOD_KEY     = 'uniformity_method'
 export const UNIFORMITY_METHOD_DEFAULT = 'combined'
 

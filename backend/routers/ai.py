@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 import compute_client
 from ai_providers import claude, gemini, openvino
-from database import get_ai_analysis_by_file_ids, get_connection
+from database import get_combined_analysis_by_file_ids, get_connection
 
 router = APIRouter()
 logger = logging.getLogger("api")
@@ -93,19 +93,7 @@ def get_ai_analysis(file_ids: str = Query(..., description="Comma-separated file
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid file_ids")
     with get_connection() as conn:
-        rows = get_ai_analysis_by_file_ids(conn, ids)
-    return [
-        {
-            "file_id": r["file_id"],
-            "provider": r["provider"],
-            "model": r["model"],
-            "analyzed_at": r["analyzed_at"],
-            "scene_description": r["scene_description"],
-            "image_description": r["image_description"],
-            "objects": r["objects"],
-        }
-        for r in rows
-    ]
+        return get_combined_analysis_by_file_ids(conn, ids)
 
 
 @router.get("/ai_analysis_in_range", summary="AI analysis results with timestamps for a date range")
@@ -116,15 +104,26 @@ def get_ai_analysis_in_range(
     provider: str = Query(default="openvino"),
 ):
     with get_connection() as conn:
-        rows = conn.execute("""
-            SELECT aa.file_id, f.timestamp, aa.objects, aa.model,
-                   aa.input_tokens, aa.output_tokens, aa.cost_usd, aa.elapsed_ms
-            FROM ai_analysis aa
-            JOIN files f ON aa.file_id = f.id
-            WHERE f.camera_id = ? AND f.timestamp >= ? AND f.timestamp <= ?
-              AND aa.provider = ? AND f.file_type = 'photo'
-            ORDER BY f.timestamp
-        """, (camera_id, date_from, date_to, provider)).fetchall()
+        if provider == "openvino":
+            rows = conn.execute("""
+                SELECT od.file_id, f.timestamp, od.objects, od.model,
+                       0 AS input_tokens, 0 AS output_tokens, 0.0 AS cost_usd, od.elapsed_ms
+                FROM object_detection od
+                JOIN files f ON od.file_id = f.id
+                WHERE f.camera_id = ? AND f.timestamp >= ? AND f.timestamp <= ?
+                  AND f.file_type = 'photo'
+                ORDER BY f.timestamp
+            """, (camera_id, date_from, date_to)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT aa.file_id, f.timestamp, aa.objects, aa.model,
+                       aa.input_tokens, aa.output_tokens, aa.cost_usd, aa.elapsed_ms
+                FROM ai_analysis aa
+                JOIN files f ON aa.file_id = f.id
+                WHERE f.camera_id = ? AND f.timestamp >= ? AND f.timestamp <= ?
+                  AND aa.provider = ? AND f.file_type = 'photo'
+                ORDER BY f.timestamp
+            """, (camera_id, date_from, date_to, provider)).fetchall()
     results = [
         {"file_id": r["file_id"], "timestamp": r["timestamp"],
          "objects": r["objects"], "model": r["model"]}
@@ -146,26 +145,31 @@ def ai_objects_summary(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
 ):
-    q = """
-        SELECT aa.objects
-        FROM ai_analysis aa
-        JOIN files f ON aa.file_id = f.id
-        WHERE aa.objects IS NOT NULL AND aa.objects != ''
-    """
+    conds = ["objects IS NOT NULL", "objects != ''"]
     params: list = []
     if camera_id is not None:
-        q += " AND f.camera_id = ?"
+        conds.append("f.camera_id = ?")
         params.append(camera_id)
     if date_from:
-        q += " AND f.timestamp >= ?"
+        conds.append("f.timestamp >= ?")
         params.append(date_from)
     if date_to:
-        q += " AND f.timestamp <= ?"
+        conds.append("f.timestamp <= ?")
         params.append(date_to)
+    where = "WHERE " + " AND ".join(conds)
+
     with get_connection() as conn:
-        rows = conn.execute(q, params).fetchall()
+        rows_ai = conn.execute(
+            f"SELECT aa.objects FROM ai_analysis aa JOIN files f ON aa.file_id=f.id {where}",
+            params,
+        ).fetchall()
+        rows_det = conn.execute(
+            f"SELECT od.objects FROM object_detection od JOIN files f ON od.file_id=f.id {where}",
+            params,
+        ).fetchall()
+
     counts: dict = {}
-    for row in rows:
+    for row in rows_ai + rows_det:
         for obj in (row[0] or "").split():
             low = obj.lower()
             if low not in counts:

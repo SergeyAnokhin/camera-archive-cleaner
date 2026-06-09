@@ -3,6 +3,7 @@ import { COCO_CLASSES, DETECTION_CLASSES_DEFAULT } from '../../cocoClasses.js'
 import SliderSetting from './SliderSetting.jsx'
 import {
   OV_CONFIDENCE_KEY, OV_CONFIDENCE_DEFAULT, DETECTION_CLASSES_KEY,
+  OV_MODEL_KEY, OV_MODEL_DEFAULT, OV_MODELS,
 } from './settingsConfig.js'
 
 function loadOvConfidence() {
@@ -21,6 +22,7 @@ function loadDetectionClasses() {
 
 export default function DetectionTab() {
   const [ovConfidence, setOvConfidence] = useState(loadOvConfidence)
+  const [ovModel, setOvModel]           = useState(() => localStorage.getItem(OV_MODEL_KEY) || OV_MODEL_DEFAULT)
   const [classes, setClasses]           = useState(loadDetectionClasses)
 
   function saveClasses(next) {
@@ -41,10 +43,27 @@ export default function DetectionTab() {
     localStorage.setItem(OV_CONFIDENCE_KEY, JSON.stringify({ ...existing, confidence: v }))
   }
 
+  function handleOvModelChange(e) {
+    const v = e.target.value
+    setOvModel(v)
+    localStorage.setItem(OV_MODEL_KEY, v)
+  }
+
   return (
     <>
+      <div className="modal-section">
+        <div className="modal-section-title">OpenVINO — модель YOLO</div>
+        <div className="modal-setting-hint" style={{ marginBottom: 6 }}>
+          Модель для детекции объектов. Применяется при следующем запуске OpenVINO-задачи.
+        </div>
+        <select className="modal-select" value={ovModel} onChange={handleOvModelChange}
+          style={{ width: '100%' }}>
+          {OV_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+      </div>
+
       <SliderSetting
-        title="OpenVINO — default confidence threshold"
+        title="OpenVINO — порог уверенности"
         min={10} max={80} step={5}
         value={ovConfidence} onChange={handleOvConfidenceChange}
         minLabel="10%" maxLabel="80%"

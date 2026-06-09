@@ -11,19 +11,19 @@
 /* label stays on row 1, doesn't grow */
 .hv-ai-panel > .hv-mode-settings-label { flex-shrink: 0; }
 
-/* model select fills available width on row 1 */
-.hv-ai-model-select {
-  background: var(--bg-surface);
-  border: var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
+/* model label (read-only, replaces the old model select) */
+.hv-ai-model-label {
   font-size: calc(var(--font-base) * 0.82);
-  padding: 3px 6px;
-  cursor: pointer;
+  color: var(--text-muted);
   flex: 1 1 80px;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  cursor: default;
 }
-.hv-ai-model-select:focus { outline: none; border-color: var(--accent); }
 
 /* run button stays compact, does not grow */
 .hv-ai-run-btn {

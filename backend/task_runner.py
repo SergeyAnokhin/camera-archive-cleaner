@@ -18,7 +18,7 @@ import base64
 import compute_client
 from compute_cache import ov_cache_path, video_cache_path, OV_THUMB_DIR, VID_THUMB_DIR
 from database import (
-    get_connection, save_ai_analysis,
+    get_connection, save_object_detection, save_video_preview,
     update_task_progress, update_task_status,
 )
 
@@ -155,7 +155,7 @@ def _detect_and_save(file_id: int, file_path: str, model_name: str, confidence: 
                      classes=None, classes_tuple=None) -> None:
     result = compute_client.detect(file_path, model_name, confidence, draw=True, classes=classes)
     with get_connection() as conn:
-        save_ai_analysis(conn, file_id, "openvino", model_name, "", "", " ".join(result.objects))
+        save_object_detection(conn, file_id, model_name, " ".join(result.objects))
     if result.annotated_jpeg_b64:
         cache_path = ov_cache_path(file_id, model_name, confidence, classes_tuple)
         OV_THUMB_DIR.mkdir(exist_ok=True)
@@ -233,6 +233,10 @@ async def _run_video_thumbnails(task_id: str, params: dict, resume_from: int) ->
                         f"Слишком много ошибок ({error_count}), задача остановлена. "
                         f"Последний файл: {file_path}"
                     )
+
+        if cache_path.exists():
+            with get_connection() as conn:
+                save_video_preview(conn, file_id, mode, str(cache_path))
 
         processed += 1
         current = resume_from + processed

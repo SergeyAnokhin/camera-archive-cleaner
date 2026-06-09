@@ -1,8 +1,4 @@
 cameras:
-  - id: "foscam_for_testing"
-    name: "Foscam for testing"
-    path_snapshots: "C:\\REPOS\\camera-snapshots-cleaner-claude\\CameraArchive\\Foscam\\FI9805W_C4D6553DECE1\\snap"
-    path_videos: "C:\\REPOS\\camera-snapshots-cleaner-claude\\CameraArchive\\Foscam\\FI9805W_C4D6553DECE1\\record"
   - id: "foscam_fi9805w"
     name: "Foscam FI9805W"
     path_snapshots: "\\\\192.168.1.91\\Camera\\Foscam\\FI9805W_C4D6553DECE1\\snap"
@@ -11,3 +7,7 @@ cameras:
     name: "Foscam Hut"
     path_snapshots: "\\\\192.168.1.91\\Camera\\FoscamHut\\FI9800P_00626E870C7B\\snap"
     path_videos: "\\\\192.168.1.91\\Camera\\FoscamHut\\FI9800P_00626E870C7B\\record"
+  - id: "ReolinkFront"
+    name: "ReolinkFront"
+    path_snapshots: "\\\\192.168.1.91\\Camera\\ReolinkFront"
+    path_videos: "\\\\192.168.1.91\\Camera\\ReolinkFront"

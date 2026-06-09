@@ -17,9 +17,19 @@ router = APIRouter()
 logger = logging.getLogger("api")
 
 
-def _camera_file_ids(camera_id: str) -> list[int]:
+def _filter_file_ids(camera_id: Optional[str] = None,
+                     date_from: Optional[str] = None,
+                     date_to: Optional[str] = None) -> list[int]:
+    conds, params = [], []
+    if camera_id:
+        conds.append("camera_id=?"); params.append(camera_id)
+    if date_from:
+        conds.append("timestamp>=?"); params.append(date_from)
+    if date_to:
+        conds.append("timestamp<=?"); params.append(date_to)
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
     with get_connection() as conn:
-        rows = conn.execute("SELECT id FROM files WHERE camera_id=?", (camera_id,)).fetchall()
+        rows = conn.execute(f"SELECT id FROM files {where}", params).fetchall()
     return [r["id"] for r in rows]
 
 
@@ -60,18 +70,21 @@ def _clear_dir_by_ids_suffix(d: Path, file_ids: list[int]) -> int:
     return count
 
 
-@router.delete("/database", summary="Delete scanned file records (optionally for one camera)")
-def clear_database(camera_id: Optional[str] = Query(default=None)):
+@router.delete("/database", summary="Delete scanned file records (optionally by camera / date range)")
+def clear_database(camera_id: Optional[str] = Query(default=None),
+                   date_from: Optional[str] = Query(default=None),
+                   date_to: Optional[str] = Query(default=None)):
+    conds, params = [], []
     if camera_id:
-        logger.info("🧹 Очистка базы данных для камеры: %s", camera_id)
-        with get_connection() as conn:
-            conn.execute("DELETE FROM files WHERE camera_id=?", (camera_id,))
-        logger.info("   └─ база данных очищена для камеры %s", camera_id)
-    else:
-        logger.info("🧹 Очистка базы данных (все записи файлов)")
-        with get_connection() as conn:
-            conn.execute("DELETE FROM files")
-        logger.info("   └─ база данных очищена")
+        conds.append("camera_id=?"); params.append(camera_id)
+    if date_from:
+        conds.append("timestamp>=?"); params.append(date_from)
+    if date_to:
+        conds.append("timestamp<=?"); params.append(date_to)
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
+    logger.info("🧹 Очистка базы данных%s", f" (камера: {camera_id})" if camera_id else "")
+    with get_connection() as conn:
+        conn.execute(f"DELETE FROM files {where}", params)
     return {"deleted": True}
 
 
@@ -85,11 +98,13 @@ def vacuum_database():
 
 
 @router.delete("/thumbnails", summary="Delete cached basic thumbnail files")
-def clear_thumbnails(camera_id: Optional[str] = Query(default=None)):
+def clear_thumbnails(camera_id: Optional[str] = Query(default=None),
+                     date_from: Optional[str] = Query(default=None),
+                     date_to: Optional[str] = Query(default=None)):
     logger.info("🧹 Очистка кэша миниатюр%s", f" (камера: {camera_id})" if camera_id else "")
     deleted_files = 0
-    if camera_id:
-        file_ids = _camera_file_ids(camera_id)
+    if camera_id or date_from or date_to:
+        file_ids = _filter_file_ids(camera_id, date_from, date_to)
         for fid in file_ids:
             p = THUMB_DIR / f"{fid}.jpg"
             if p.is_file():
@@ -116,10 +131,12 @@ def clear_thumbnails(camera_id: Optional[str] = Query(default=None)):
 
 
 @router.delete("/diff_thumbnails", summary="Delete cached diff thumbnail files")
-def clear_diff_thumbnails(camera_id: Optional[str] = Query(default=None)):
+def clear_diff_thumbnails(camera_id: Optional[str] = Query(default=None),
+                          date_from: Optional[str] = Query(default=None),
+                          date_to: Optional[str] = Query(default=None)):
     logger.info("🧹 Очистка кэша diff-миниатюр%s", f" (камера: {camera_id})" if camera_id else "")
-    if camera_id:
-        file_ids = _camera_file_ids(camera_id)
+    if camera_id or date_from or date_to:
+        file_ids = _filter_file_ids(camera_id, date_from, date_to)
         deleted_files = _clear_dir_by_ids_suffix(DIFF_THUMB_DIR, file_ids)
     else:
         deleted_files, _ = _clear_dir_all(DIFF_THUMB_DIR)
@@ -128,10 +145,12 @@ def clear_diff_thumbnails(camera_id: Optional[str] = Query(default=None)):
 
 
 @router.delete("/erosion_thumbnails", summary="Delete cached erosion thumbnail files")
-def clear_erosion_thumbnails(camera_id: Optional[str] = Query(default=None)):
+def clear_erosion_thumbnails(camera_id: Optional[str] = Query(default=None),
+                             date_from: Optional[str] = Query(default=None),
+                             date_to: Optional[str] = Query(default=None)):
     logger.info("🧹 Очистка кэша erosion-миниатюр%s", f" (камера: {camera_id})" if camera_id else "")
-    if camera_id:
-        file_ids = _camera_file_ids(camera_id)
+    if camera_id or date_from or date_to:
+        file_ids = _filter_file_ids(camera_id, date_from, date_to)
         deleted_files = _clear_dir_by_ids_suffix(EROSION_THUMB_DIR, file_ids)
     else:
         deleted_files, _ = _clear_dir_all(EROSION_THUMB_DIR)
@@ -140,10 +159,12 @@ def clear_erosion_thumbnails(camera_id: Optional[str] = Query(default=None)):
 
 
 @router.delete("/diff_zoom_thumbnails", summary="Delete cached diff zoom thumbnail files")
-def clear_diff_zoom_thumbnails(camera_id: Optional[str] = Query(default=None)):
+def clear_diff_zoom_thumbnails(camera_id: Optional[str] = Query(default=None),
+                               date_from: Optional[str] = Query(default=None),
+                               date_to: Optional[str] = Query(default=None)):
     logger.info("🧹 Очистка кэша diff-zoom-миниатюр%s", f" (камера: {camera_id})" if camera_id else "")
-    if camera_id:
-        file_ids = _camera_file_ids(camera_id)
+    if camera_id or date_from or date_to:
+        file_ids = _filter_file_ids(camera_id, date_from, date_to)
         deleted_files = _clear_dir_by_ids_suffix(DIFF_ZOOM_THUMB_DIR, file_ids)
     else:
         deleted_files, _ = _clear_dir_all(DIFF_ZOOM_THUMB_DIR)
@@ -152,10 +173,12 @@ def clear_diff_zoom_thumbnails(camera_id: Optional[str] = Query(default=None)):
 
 
 @router.delete("/motion_thumbnails", summary="Delete cached motion thumbnail files")
-def clear_motion_thumbnails(camera_id: Optional[str] = Query(default=None)):
+def clear_motion_thumbnails(camera_id: Optional[str] = Query(default=None),
+                            date_from: Optional[str] = Query(default=None),
+                            date_to: Optional[str] = Query(default=None)):
     logger.info("🧹 Очистка кэша motion-миниатюр%s", f" (камера: {camera_id})" if camera_id else "")
-    if camera_id:
-        file_ids = _camera_file_ids(camera_id)
+    if camera_id or date_from or date_to:
+        file_ids = _filter_file_ids(camera_id, date_from, date_to)
         deleted_files = _clear_dir_by_ids_suffix(MOTION_THUMB_DIR, file_ids)
     else:
         deleted_files, _ = _clear_dir_all(MOTION_THUMB_DIR)
@@ -164,52 +187,61 @@ def clear_motion_thumbnails(camera_id: Optional[str] = Query(default=None)):
 
 
 @router.delete("/video_thumbnails", summary="Delete cached video thumbnail files")
-def clear_video_thumbnails(camera_id: Optional[str] = Query(default=None)):
+def clear_video_thumbnails(camera_id: Optional[str] = Query(default=None),
+                           date_from: Optional[str] = Query(default=None),
+                           date_to: Optional[str] = Query(default=None)):
     logger.info("🧹 Очистка кэша видео-превью%s", f" (камера: {camera_id})" if camera_id else "")
-    if camera_id:
-        file_ids = _camera_file_ids(camera_id)
+    if camera_id or date_from or date_to:
+        file_ids = _filter_file_ids(camera_id, date_from, date_to)
         deleted_files = _clear_dir_by_ids_prefix(VID_THUMB_DIR, file_ids)
+        if file_ids:
+            with get_connection() as conn:
+                ph = ",".join("?" * len(file_ids))
+                conn.execute(f"DELETE FROM video_previews WHERE file_id IN ({ph})", file_ids)
     else:
         deleted_files, _ = _clear_dir_all(VID_THUMB_DIR)
+        with get_connection() as conn:
+            conn.execute("DELETE FROM video_previews")
     logger.info("   └─ видео-превью очищены → %d файлов", deleted_files)
     return {"deleted_files": deleted_files}
 
 
-@router.delete("/openvino_thumbnails", summary="Delete OpenVINO detection thumbnails and analysis results")
-def clear_openvino_thumbnails(camera_id: Optional[str] = Query(default=None)):
+@router.delete("/openvino_thumbnails", summary="Delete OpenVINO detection results and bbox thumbnails")
+def clear_openvino_thumbnails(camera_id: Optional[str] = Query(default=None),
+                              date_from: Optional[str] = Query(default=None),
+                              date_to: Optional[str] = Query(default=None)):
     """
-    Clears OpenVINO detection results from ai_analysis table.
-    When camera_id is given: clears ai_analysis for that camera only; disk cache is unchanged
-    (OV thumbnails use content-addressed hashes that can't be filtered by camera).
-    When camera_id is omitted: clears all ai_analysis rows + all OV disk cache files.
+    Clears object_detection records (and disk cache for global run).
+    With date range: clears by file_ids matching the range; disk cache (content-addressed) only on global run.
     """
     logger.info("🧹 Очистка OpenVINO данных%s", f" (камера: {camera_id})" if camera_id else "")
-    if camera_id:
-        file_ids = _camera_file_ids(camera_id)
+    deleted_files = 0
+    if camera_id or date_from or date_to:
+        file_ids = _filter_file_ids(camera_id, date_from, date_to)
         deleted_rows = 0
         if file_ids:
             with get_connection() as conn:
-                placeholders = ",".join("?" * len(file_ids))
+                ph = ",".join("?" * len(file_ids))
                 deleted_rows = conn.execute(
-                    f"DELETE FROM ai_analysis WHERE file_id IN ({placeholders}) AND provider='openvino'",
-                    file_ids,
+                    f"DELETE FROM object_detection WHERE file_id IN ({ph})", file_ids
                 ).rowcount
-        deleted_files = 0
-        logger.info("   └─ OpenVINO данные очищены для камеры %s → %d записей", camera_id, deleted_rows)
+        logger.info("   └─ OpenVINO данные очищены → %d записей", deleted_rows)
     else:
         with get_connection() as conn:
-            deleted_rows = conn.execute("DELETE FROM ai_analysis WHERE provider='openvino'").rowcount
+            deleted_rows = conn.execute("DELETE FROM object_detection").rowcount
         deleted_files, _ = _clear_dir_all(OV_THUMB_DIR)
         logger.info("   └─ OpenVINO данные очищены → %d файлов, %d записей", deleted_files, deleted_rows)
     return {"deleted_files": deleted_files, "deleted_rows": deleted_rows}
 
 
 @router.delete("/all_thumbnails", summary="Delete all cached thumbnail files (all types)")
-def clear_all_thumbnails(camera_id: Optional[str] = Query(default=None)):
+def clear_all_thumbnails(camera_id: Optional[str] = Query(default=None),
+                         date_from: Optional[str] = Query(default=None),
+                         date_to: Optional[str] = Query(default=None)):
     logger.info("🧹 Очистка всех кэшей миниатюр%s", f" (камера: {camera_id})" if camera_id else "")
 
-    if camera_id:
-        file_ids = _camera_file_ids(camera_id)
+    if camera_id or date_from or date_to:
+        file_ids = _filter_file_ids(camera_id, date_from, date_to)
         basic_files = 0
         for fid in file_ids:
             p = THUMB_DIR / f"{fid}.jpg"
@@ -218,24 +250,17 @@ def clear_all_thumbnails(camera_id: Optional[str] = Query(default=None)):
                 basic_files += 1
         if file_ids:
             with get_connection() as conn:
-                placeholders = ",".join("?" * len(file_ids))
-                conn.execute(f"DELETE FROM thumbnails WHERE file_id IN ({placeholders})", file_ids)
+                ph = ",".join("?" * len(file_ids))
+                conn.execute(f"DELETE FROM thumbnails WHERE file_id IN ({ph})", file_ids)
+                conn.execute(f"DELETE FROM object_detection WHERE file_id IN ({ph})", file_ids)
+                conn.execute(f"DELETE FROM video_previews WHERE file_id IN ({ph})", file_ids)
 
         diff_files    = _clear_dir_by_ids_suffix(DIFF_THUMB_DIR,      file_ids)
         dzoom_files   = _clear_dir_by_ids_suffix(DIFF_ZOOM_THUMB_DIR,  file_ids)
         erosion_files = _clear_dir_by_ids_suffix(EROSION_THUMB_DIR,    file_ids)
         motion_files  = _clear_dir_by_ids_suffix(MOTION_THUMB_DIR,     file_ids)
         vid_files     = _clear_dir_by_ids_prefix(VID_THUMB_DIR,        file_ids)
-        ov_files      = 0  # hash-based, can't filter by camera; cleared on global run
-
-        # Clear ai_analysis for this camera
-        if file_ids:
-            with get_connection() as conn:
-                placeholders = ",".join("?" * len(file_ids))
-                conn.execute(
-                    f"DELETE FROM ai_analysis WHERE file_id IN ({placeholders}) AND provider='openvino'",
-                    file_ids,
-                )
+        ov_files      = 0
     else:
         basic_files, _    = _clear_dir_all(THUMB_DIR)
         diff_files, _     = _clear_dir_all(DIFF_THUMB_DIR)
@@ -247,6 +272,8 @@ def clear_all_thumbnails(camera_id: Optional[str] = Query(default=None)):
 
         with get_connection() as conn:
             delete_all_thumbnails(conn)
+            conn.execute("DELETE FROM object_detection")
+            conn.execute("DELETE FROM video_previews")
 
     total_files = basic_files + diff_files + dzoom_files + erosion_files + motion_files + ov_files + vid_files
     logger.info("   └─ все миниатюры очищены → %d файлов", total_files)

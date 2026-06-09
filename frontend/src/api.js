@@ -93,60 +93,60 @@ export function getDistribution(cameraId, dateFrom, dateTo) {
   }))
 }
 
-export function clearDatabase(cameraId = null) {
-  return del('/database' + buildQuery({ camera_id: cameraId }))
+export function clearDatabase(cameraId = null, dateFrom = null, dateTo = null) {
+  return del('/database' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
 export function vacuumDatabase() {
   return post('/database/vacuum')
 }
 
-export function clearThumbnails(cameraId = null) {
-  return del('/thumbnails' + buildQuery({ camera_id: cameraId }))
+export function clearThumbnails(cameraId = null, dateFrom = null, dateTo = null) {
+  return del('/thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
 export function getDiffThumbnailUrl(fileId, pageIds, threshold) {
   return `${BASE}/diff_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
 }
 
-export function clearDiffThumbnails(cameraId = null) {
-  return del('/diff_thumbnails' + buildQuery({ camera_id: cameraId }))
+export function clearDiffThumbnails(cameraId = null, dateFrom = null, dateTo = null) {
+  return del('/diff_thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
 export function getDiffZoomThumbnailUrl(fileId, pageIds, threshold) {
   return `${BASE}/diff_zoom_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
 }
 
-export function clearDiffZoomThumbnails(cameraId = null) {
-  return del('/diff_zoom_thumbnails' + buildQuery({ camera_id: cameraId }))
+export function clearDiffZoomThumbnails(cameraId = null, dateFrom = null, dateTo = null) {
+  return del('/diff_zoom_thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
 export function getErosionThumbnailUrl(fileId, pageIds, threshold) {
   return `${BASE}/erosion_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
 }
 
-export function clearErosionThumbnails(cameraId = null) {
-  return del('/erosion_thumbnails' + buildQuery({ camera_id: cameraId }))
+export function clearErosionThumbnails(cameraId = null, dateFrom = null, dateTo = null) {
+  return del('/erosion_thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
 export function getMotionThumbnailUrl(fileId, pageIds, threshold, mode) {
   return `${BASE}/motion_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}&mode=${mode}`
 }
 
-export function clearMotionThumbnails(cameraId = null) {
-  return del('/motion_thumbnails' + buildQuery({ camera_id: cameraId }))
+export function clearMotionThumbnails(cameraId = null, dateFrom = null, dateTo = null) {
+  return del('/motion_thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
-export function clearVideoThumbnails(cameraId = null) {
-  return del('/video_thumbnails' + buildQuery({ camera_id: cameraId }))
+export function clearVideoThumbnails(cameraId = null, dateFrom = null, dateTo = null) {
+  return del('/video_thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
-export function clearOpenVinoThumbnails(cameraId = null) {
-  return del('/openvino_thumbnails' + buildQuery({ camera_id: cameraId }))
+export function clearOpenVinoThumbnails(cameraId = null, dateFrom = null, dateTo = null) {
+  return del('/openvino_thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
-export function clearAllThumbnails(cameraId = null) {
-  return del('/all_thumbnails' + buildQuery({ camera_id: cameraId }))
+export function clearAllThumbnails(cameraId = null, dateFrom = null, dateTo = null) {
+  return del('/all_thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
 export function getStorageInfo() {

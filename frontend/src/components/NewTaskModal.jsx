@@ -2,32 +2,6 @@ import { useState, useEffect } from 'react'
 import { getStatsTotal, getCameraDateRange } from '../api.js'
 import './NewTaskModal.css'
 
-const VIDEO_MODES = [
-  { value: 'four_frames',      label: '2×2 grid (4 frames)' },
-  { value: 'first_frame',      label: 'First frame' },
-  { value: 'last_frame',       label: 'Last frame' },
-  { value: 'max_change_gif',   label: 'GIF — max-change (2 frames)' },
-  { value: 'four_frames_gif',  label: 'GIF — 4 frames evenly spaced' },
-  { value: 'max_change_4_gif', label: 'GIF — 4 frames max-change' },
-]
-
-const OPENVINO_MODELS = [
-  { value: 'yolov8n', label: 'YOLOv8n — nano (fast)' },
-  { value: 'yolov8s', label: 'YOLOv8s — small' },
-  { value: 'yolov8m', label: 'YOLOv8m — medium (accurate)' },
-]
-
-const GEMINI_MODELS = [
-  { value: 'gemini-3.1-flash-lite',    label: 'gemini-3.1-flash-lite ($0.25/$1.50)' },
-  { value: 'gemini-2.5-flash-lite',    label: 'gemini-2.5-flash-lite ($0.10/$0.40)' },
-  { value: 'gemini-2.5-flash',         label: 'gemini-2.5-flash ($0.30/$2.50)' },
-]
-
-const CLAUDE_MODELS = [
-  { value: 'claude-haiku-4-5-20251001', label: 'claude-haiku-4-5 ($0.80/$4.00)' },
-  { value: 'claude-sonnet-4-6',         label: 'claude-sonnet-4-6 ($3.00/$15.00)' },
-]
-
 function toLocalInput(isoStr) {
   return isoStr ? isoStr.slice(0, 16) : ''
 }
@@ -48,29 +22,46 @@ function isAiType(type) {
   return type === 'gemini' || type === 'claude'
 }
 
+function readGlobalSettings() {
+  const videoMode = localStorage.getItem('video_preview_mode') || 'four_frames'
+  const ovModel   = localStorage.getItem('openvino_model') || 'yolov8n'
+  const ovConf    = (() => {
+    try { return JSON.parse(localStorage.getItem('mode_params_openvino_detection') || '{}').confidence ?? 25 }
+    catch { return 25 }
+  })()
+  const geminiModel = localStorage.getItem('gemini_model') || 'gemini-3.1-flash-lite'
+  const claudeModel = localStorage.getItem('claude_model') || 'claude-haiku-4-5-20251001'
+  return { videoMode, ovModel, ovConf, geminiModel, claudeModel }
+}
+
+const VIDEO_MODE_LABELS = {
+  'none':           'Нет (иконка камеры)',
+  'first_frame':    'Первый кадр',
+  'last_frame':     'Последний кадр',
+  'four_frames':    '4 кадра (2×2)',
+  'max_change_gif': 'GIF — 2 кадра (макс. изменение)',
+  'four_frames_gif':'GIF — 4 кадра равномерно',
+  'max_change_4_gif':'GIF — 4 кадра (макс. изменение)',
+}
+
 export default function NewTaskModal({ cameras, onAdd, onClose }) {
-  const [type, setType]               = useState('video_thumbnails')
-  const [cameraId, setCameraId]       = useState(cameras[0]?.id ?? '')
-  const [dateFrom, setDateFrom]       = useState(monthStartInput())
-  const [dateTo, setDateTo]           = useState(nowLocalInput())
-  const [thumbMode, setThumbMode]     = useState('four_frames')
-  const [model, setModel]             = useState('yolov8n')
-  const [confidence, setConfidence]   = useState(0.25)
-  const [geminiModel, setGeminiModel] = useState(() => localStorage.getItem('gemini_model') || 'gemini-3.1-flash-lite')
-  const [claudeModel, setClaudeModel] = useState(() => localStorage.getItem('claude_model') || 'claude-haiku-4-5-20251001')
-  const [delayMin, setDelayMin]       = useState(0)
-  const [delayMax, setDelayMax]       = useState(0)
-  const [useTimeWindow, setUseTimeWindow] = useState(false)
-  const [activeFromHour, setActiveFromHour] = useState(0)
-  const [activeToHour, setActiveToHour]     = useState(8)
-  const [estimate, setEstimate]       = useState(null)
-  const [loading, setLoading]         = useState(false)
+  const [type, setType]         = useState('video_thumbnails')
+  const [cameraId, setCameraId] = useState(cameras[0]?.id ?? '')
+  const [dateFrom, setDateFrom] = useState(monthStartInput())
+  const [dateTo, setDateTo]     = useState(nowLocalInput())
+  const [delayMin, setDelayMin] = useState(0)
+  const [delayMax, setDelayMax] = useState(0)
+  const [useTimeWindow, setUseTimeWindow]     = useState(false)
+  const [activeFromHour, setActiveFromHour]   = useState(0)
+  const [activeToHour, setActiveToHour]       = useState(8)
+  const [estimate, setEstimate]               = useState(null)
+  const [loading, setLoading]                 = useState(false)
   const [datesFromCamera, setDatesFromCamera] = useState(false)
 
+  const settings = readGlobalSettings()
   const geminiApiKey = localStorage.getItem('gemini_api_key') || ''
   const claudeApiKey = localStorage.getItem('claude_api_key') || ''
 
-  // When camera changes, auto-set date range from camera's actual data
   useEffect(() => {
     if (!cameraId) return
     getCameraDateRange(cameraId)
@@ -86,7 +77,6 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
       .catch(() => setDatesFromCamera(false))
   }, [cameraId])
 
-  // Fetch file count estimate when camera/dates change
   useEffect(() => {
     if (!cameraId || !dateFrom || !dateTo) { setEstimate(null); return }
     const from = dateFrom + ':00'
@@ -109,17 +99,17 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
       const to   = dateTo   + ':00'
       const params = { camera_id: cameraId, date_from: from, date_to: to }
       if (type === 'video_thumbnails') {
-        params.thumb_mode = thumbMode
+        params.thumb_mode = settings.videoMode
       } else if (type === 'openvino') {
-        params.model_name = model
-        params.confidence = confidence
+        params.model_name = settings.ovModel
+        params.confidence = settings.ovConf / 100
       } else if (type === 'gemini') {
-        params.model = geminiModel
+        params.model = settings.geminiModel
         params.api_key = geminiApiKey
         if (delayMax > 0) { params.delay_min_sec = delayMin; params.delay_max_sec = delayMax }
         if (useTimeWindow) { params.active_from_hour = activeFromHour; params.active_to_hour = activeToHour }
       } else if (type === 'claude') {
-        params.model = claudeModel
+        params.model = settings.claudeModel
         params.api_key = claudeApiKey
         if (delayMax > 0) { params.delay_min_sec = delayMin; params.delay_max_sec = delayMax }
         if (useTimeWindow) { params.active_from_hour = activeFromHour; params.active_to_hour = activeToHour }
@@ -157,7 +147,7 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
               >
                 <i className="mdi mdi-video-outline ntm__type-icon" />
                 <span className="ntm__type-name">Video Thumbnails</span>
-                <span className="ntm__type-desc">Generate preview images for videos in a date range</span>
+                <span className="ntm__type-desc">Превью для видео в диапазоне дат</span>
               </button>
               <button
                 className={`ntm__type-card${type === 'openvino' ? ' ntm__type-card--active' : ''}`}
@@ -165,7 +155,7 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
               >
                 <i className="mdi mdi-magnify-scan ntm__type-icon" />
                 <span className="ntm__type-name">OpenVINO Detection</span>
-                <span className="ntm__type-desc">Run YOLO object detection on photos in a date range</span>
+                <span className="ntm__type-desc">YOLO детекция объектов на фото</span>
               </button>
               <button
                 className={`ntm__type-card${type === 'gemini' ? ' ntm__type-card--active' : ''}`}
@@ -173,7 +163,7 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
               >
                 <i className="mdi mdi-google ntm__type-icon" />
                 <span className="ntm__type-name">Gemini AI Analysis</span>
-                <span className="ntm__type-desc">Analyze photos with Google Gemini (per photo, with API key)</span>
+                <span className="ntm__type-desc">Анализ фото с Google Gemini</span>
               </button>
               <button
                 className={`ntm__type-card${type === 'claude' ? ' ntm__type-card--active' : ''}`}
@@ -181,9 +171,38 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
               >
                 <i className="mdi mdi-robot ntm__type-icon" />
                 <span className="ntm__type-name">Claude AI Analysis</span>
-                <span className="ntm__type-desc">Analyze photos with Anthropic Claude (per photo, with API key)</span>
+                <span className="ntm__type-desc">Анализ фото с Anthropic Claude</span>
               </button>
             </div>
+          </div>
+
+          {/* ── Active settings summary (read-only) ──────────── */}
+          <div className="ntm__section ntm__settings-summary">
+            <div className="ntm__label">Настройки (из Tools)</div>
+            {type === 'video_thumbnails' && (
+              <div className="ntm__summary-row">
+                <i className="mdi mdi-cog-outline" />
+                <span>Режим превью: <strong>{VIDEO_MODE_LABELS[settings.videoMode] || settings.videoMode}</strong></span>
+              </div>
+            )}
+            {type === 'openvino' && (
+              <div className="ntm__summary-row">
+                <i className="mdi mdi-cog-outline" />
+                <span>Модель: <strong>{settings.ovModel}</strong> · Порог: <strong>{settings.ovConf}%</strong></span>
+              </div>
+            )}
+            {type === 'gemini' && (
+              <div className="ntm__summary-row">
+                <i className="mdi mdi-cog-outline" />
+                <span>Модель: <strong>{settings.geminiModel}</strong></span>
+              </div>
+            )}
+            {type === 'claude' && (
+              <div className="ntm__summary-row">
+                <i className="mdi mdi-cog-outline" />
+                <span>Модель: <strong>{settings.claudeModel}</strong></span>
+              </div>
+            )}
           </div>
 
           {/* ── Camera ────────────────────────────────────────── */}
@@ -215,77 +234,17 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
             </div>
           </div>
 
-          {/* ── Type-specific params ──────────────────────────── */}
-          {type === 'video_thumbnails' && (
-            <div className="ntm__section ntm__row">
-              <label className="ntm__label">Preview mode</label>
-              <select className="modal-select ntm__select" value={thumbMode}
-                onChange={e => setThumbMode(e.target.value)}>
-                {VIDEO_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
+          {/* ── API key warning ───────────────────────────────── */}
+          {noApiKey && (
+            <div className="ntm__warn">
+              <i className="mdi mdi-alert-outline" />
+              {type === 'gemini' ? 'Gemini' : 'Claude'} API key не задан. Откройте Tools → {type === 'gemini' ? 'Google AI' : 'Claude AI'}.
             </div>
-          )}
-          {type === 'openvino' && (
-            <>
-              <div className="ntm__section ntm__row">
-                <label className="ntm__label">Model</label>
-                <select className="modal-select ntm__select" value={model}
-                  onChange={e => setModel(e.target.value)}>
-                  {OPENVINO_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                </select>
-              </div>
-              <div className="ntm__section ntm__row">
-                <label className="ntm__label">Confidence</label>
-                <div className="ntm__slider-row">
-                  <input type="range" min="0.1" max="0.9" step="0.05"
-                    value={confidence} onChange={e => setConfidence(parseFloat(e.target.value))}
-                    className="ntm__slider" />
-                  <span className="ntm__slider-val">{confidence.toFixed(2)}</span>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── AI params (Gemini / Claude) ───────────────────── */}
-          {type === 'gemini' && (
-            <>
-              <div className="ntm__section ntm__row">
-                <label className="ntm__label">Model</label>
-                <select className="modal-select ntm__select" value={geminiModel}
-                  onChange={e => setGeminiModel(e.target.value)}>
-                  {GEMINI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                </select>
-              </div>
-              {noApiKey && (
-                <div className="ntm__warn">
-                  <i className="mdi mdi-alert-outline" />
-                  Gemini API key not set. Open Tools → Google AI to add it.
-                </div>
-              )}
-            </>
-          )}
-          {type === 'claude' && (
-            <>
-              <div className="ntm__section ntm__row">
-                <label className="ntm__label">Model</label>
-                <select className="modal-select ntm__select" value={claudeModel}
-                  onChange={e => setClaudeModel(e.target.value)}>
-                  {CLAUDE_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                </select>
-              </div>
-              {noApiKey && (
-                <div className="ntm__warn">
-                  <i className="mdi mdi-alert-outline" />
-                  Claude API key not set. Open Tools → Claude AI to add it.
-                </div>
-              )}
-            </>
           )}
 
           {/* ── AI scheduling options (Gemini / Claude only) ─── */}
           {isAiType(type) && (
             <>
-              {/* Delay between requests */}
               <div className="ntm__section">
                 <div className="ntm__label">Пауза между запросами к AI</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -306,7 +265,6 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
                 )}
               </div>
 
-              {/* Time window */}
               <div className="ntm__section">
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
                   <input type="checkbox" checked={useTimeWindow}

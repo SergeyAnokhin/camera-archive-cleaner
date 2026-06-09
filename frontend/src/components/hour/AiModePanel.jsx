@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import { getAiRequestStats } from './hourUtils.js'
 import { resolveAiIcons } from '../../aiHelpers.js'
 import './AiModePanel.css'
@@ -7,37 +7,18 @@ export const AI_PROVIDER_CONFIG = {
   gemini: {
     modelKey: 'gemini_model',
     defaultModel: 'gemini-3.1-flash-lite',
-    models: [
-      { value: 'gemini-3.1-flash-lite',    label: '🟢 gemini-3.1-flash-lite ($0.25/$1.50)' },
-      { value: 'gemini-2.5-flash-lite',    label: '🟢 gemini-2.5-flash-lite ($0.10/$0.40)' },
-      { value: 'gemini-2.5-flash',         label: '🟡 gemini-2.5-flash ($0.30/$2.50)' },
-      { value: 'gemini-3.1-flash-preview', label: '🟡 gemini-3.1-flash-preview ($0.50/$3.00)' },
-      { value: 'gemini-3.5-flash',         label: '🔴 gemini-3.5-flash ($1.50/$9.00)' },
-      { value: 'gemini-2.5-pro',           label: '🔴 gemini-2.5-pro ($1.25/$10.00)' },
-      { value: 'gemini-3.1-pro-preview',   label: '🔴 gemini-3.1-pro-preview ($2.00/$12.00)' },
-    ],
     icon: 'mdi-google',
     label: 'Gemini Analysis',
   },
   claude: {
     modelKey: 'claude_model',
     defaultModel: 'claude-haiku-4-5-20251001',
-    models: [
-      { value: 'claude-haiku-4-5-20251001', label: '🟢 claude-haiku-4-5 ($0.80/$4.00)' },
-      { value: 'claude-sonnet-4-6',         label: '🟡 claude-sonnet-4-6 ($3.00/$15.00)' },
-      { value: 'claude-opus-4-7',           label: '🔴 claude-opus-4-7 ($15.00/$75.00)' },
-    ],
     icon: 'mdi-robot',
     label: 'Claude Analysis',
   },
   openvino: {
     modelKey: 'openvino_model',
     defaultModel: 'yolov8n',
-    models: [
-      { value: 'yolov8n', label: '🟢 YOLOv8n — Nano (быстро, ~1-3 с/фото)' },
-      { value: 'yolov8s', label: '🟡 YOLOv8s — Small (точнее, ~2-5 с/фото)' },
-      { value: 'yolov8m', label: '🔴 YOLOv8m — Medium (медленно, ~5-10 с/фото)' },
-    ],
     icon: 'mdi-chip',
     label: 'OpenVINO Detection',
   },
@@ -45,13 +26,7 @@ export const AI_PROVIDER_CONFIG = {
 
 export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun, statsKey, params, onParamChange }) {
   const cfg = AI_PROVIDER_CONFIG[provider] ?? AI_PROVIDER_CONFIG.gemini
-  const [model, setModel] = useState(() =>
-    localStorage.getItem(cfg.modelKey) || cfg.defaultModel
-  )
-
-  useEffect(() => {
-    setModel(localStorage.getItem(cfg.modelKey) || cfg.defaultModel)
-  }, [provider])
+  const model = localStorage.getItem(cfg.modelKey) || cfg.defaultModel
 
   const stats = getAiRequestStats(provider)
 
@@ -59,22 +34,23 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
   const targetCount = selectedIds.size > 0
     ? photoFiles.filter(f => selectedIds.has(f.id)).length
     : photoFiles.length
-  const analyzedCount = photoFiles.filter(f => aiAnalysisMap.has(f.id)).length
-  const sceneEntry = [...aiAnalysisMap.values()][0]
+
+  const analyzedCount = provider === 'openvino'
+    ? photoFiles.filter(f => aiAnalysisMap.get(f.id)?.detection != null).length
+    : photoFiles.filter(f => aiAnalysisMap.get(f.id)?.ai != null).length
+
+  const sceneEntry = provider !== 'openvino'
+    ? [...aiAnalysisMap.values()].find(e => e.ai)?.ai
+    : null
 
   const pageIcons = useMemo(() => {
     const allWords = []
     for (const entry of aiAnalysisMap.values()) {
-      if (entry.objects) allWords.push(...entry.objects.split(/\s+/).filter(Boolean))
+      const objects = provider === 'openvino' ? entry.detection?.objects : entry.ai?.objects
+      if (objects) allWords.push(...objects.split(/\s+/).filter(Boolean))
     }
     return resolveAiIcons(allWords.join(' '))
-  }, [aiAnalysisMap])
-
-  function handleModelChange(e) {
-    setModel(e.target.value)
-    localStorage.setItem(cfg.modelKey, e.target.value)
-    onParamChange?.('_refresh', Date.now())
-  }
+  }, [aiAnalysisMap, provider])
 
   const confidence = params?.confidence ?? 25
 
@@ -82,15 +58,14 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
 
   return (
     <div className="hv-mode-settings hv-ai-panel">
-      {/* Row 1: label · model select · run button */}
+      {/* Row 1: label · model name (read-only) · run button */}
       <span className="hv-mode-settings-label">
         <i className={`mdi ${cfg.icon}`} /> {cfg.label}
       </span>
-      <select className="hv-ai-model-select" value={model} onChange={handleModelChange}>
-        {cfg.models.map(m => (
-          <option key={m.value} value={m.value}>{m.label}</option>
-        ))}
-      </select>
+      <span className="hv-ai-model-label" title="Изменить модель: Tools → настройки">
+        <i className="mdi mdi-cog-outline" style={{ marginRight: 4, opacity: 0.6 }} />
+        {model}
+      </span>
       <button className="hv-ai-run-btn" onClick={onRun}>
         <i className="mdi mdi-play" />
         {selectedIds.size > 0
@@ -99,20 +74,13 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
         }
       </button>
 
-      {/* Row 2: threshold (openvino) + stats/analyzed/emojis */}
+      {/* Row 2: confidence display (openvino) + stats/analyzed/emojis */}
       {(provider === 'openvino' || hasStats) && (
         <div className="hv-ai-row2">
           {provider === 'openvino' && (
             <span className="hv-ai-confidence-inline">
               <i className="mdi mdi-tune-variant" />
               <span className="hv-ai-confidence-pct">{confidence}%</span>
-              <input
-                type="range"
-                className="hv-ai-confidence-slider"
-                min={10} max={80} step={5}
-                value={confidence}
-                onChange={e => onParamChange?.('confidence', +e.target.value)}
-              />
             </span>
           )}
           {hasStats && (

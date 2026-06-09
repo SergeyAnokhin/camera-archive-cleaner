@@ -5,33 +5,9 @@ import { formatBytes } from './navUtils.js'
 // delete (hour level only) and AI analysis across the selected cells.
 
 const CELL_PROVIDERS = [
-  {
-    key: 'openvino', label: 'OpenVINO Detection', icon: 'mdi-chip',
-    modelKey: 'openvino_model', defaultModel: 'yolov8n',
-    models: [
-      { value: 'yolov8n', label: '🟢 YOLOv8n — Nano (быстро)' },
-      { value: 'yolov8s', label: '🟡 YOLOv8s — Small (точнее)' },
-      { value: 'yolov8m', label: '🔴 YOLOv8m — Medium (медленно)' },
-    ],
-  },
-  {
-    key: 'gemini', label: 'Gemini Analysis', icon: 'mdi-google',
-    modelKey: 'gemini_model', defaultModel: 'gemini-3.1-flash-lite',
-    models: [
-      { value: 'gemini-3.1-flash-lite',    label: '🟢 gemini-3.1-flash-lite' },
-      { value: 'gemini-2.5-flash',         label: '🟡 gemini-2.5-flash' },
-      { value: 'gemini-2.5-pro',           label: '🔴 gemini-2.5-pro' },
-    ],
-  },
-  {
-    key: 'claude', label: 'Claude Analysis', icon: 'mdi-robot',
-    modelKey: 'claude_model', defaultModel: 'claude-haiku-4-5-20251001',
-    models: [
-      { value: 'claude-haiku-4-5-20251001', label: '🟢 claude-haiku-4-5' },
-      { value: 'claude-sonnet-4-6',         label: '🟡 claude-sonnet-4-6' },
-      { value: 'claude-opus-4-7',           label: '🔴 claude-opus-4-7' },
-    ],
-  },
+  { key: 'openvino', label: 'OpenVINO Detection', icon: 'mdi-chip',     modelKey: 'openvino_model', defaultModel: 'yolov8n' },
+  { key: 'gemini',   label: 'Gemini Analysis',    icon: 'mdi-google',   modelKey: 'gemini_model',   defaultModel: 'gemini-3.1-flash-lite' },
+  { key: 'claude',   label: 'Claude Analysis',    icon: 'mdi-robot',    modelKey: 'claude_model',   defaultModel: 'claude-haiku-4-5-20251001' },
 ]
 
 export default function CellSelBar({ level, periods, selectedMap, onSelectAll, onSelectNone, onClose,
@@ -39,26 +15,13 @@ export default function CellSelBar({ level, periods, selectedMap, onSelectAll, o
                        onAnalyze, analyzing, analyzeProgress, analyzeError,
                        onSendToTask, taskSent, taskSendError }) {
   const [providerKey, setProviderKey] = useState('openvino')
-  const [modelMap, setModelMap] = useState(() => {
-    const m = {}
-    for (const p of CELL_PROVIDERS) m[p.key] = localStorage.getItem(p.modelKey) || p.defaultModel
-    return m
-  })
-  const [ovConf, setOvConf] = useState(() => {
-    try {
-      const raw = localStorage.getItem('mode_params_openvino_detection')
-      if (raw) return JSON.parse(raw).confidence ?? 25
-    } catch {}
-    return 25
-  })
 
-  const providerCfg = CELL_PROVIDERS.find(p => p.key === providerKey)
-  const currentModel = modelMap[providerKey]
-
-  function handleModelChange(val) {
-    setModelMap(prev => ({ ...prev, [providerKey]: val }))
-    localStorage.setItem(providerCfg.modelKey, val)
-  }
+  const providerCfg  = CELL_PROVIDERS.find(p => p.key === providerKey)
+  const currentModel = localStorage.getItem(providerCfg.modelKey) || providerCfg.defaultModel
+  const ovConf       = (() => {
+    try { return JSON.parse(localStorage.getItem('mode_params_openvino_detection') || '{}').confidence ?? 25 }
+    catch { return 25 }
+  })()
 
   const count = selectedMap.size
   const isHour = level === 'hour'
@@ -149,29 +112,12 @@ export default function CellSelBar({ level, periods, selectedMap, onSelectAll, o
           ))}
         </select>
 
-        {/* Model combobox */}
-        <select value={currentModel} onChange={e => handleModelChange(e.target.value)} style={selStyle}>
-          {providerCfg.models.map(m => (
-            <option key={m.value} value={m.value}>{m.label}</option>
-          ))}
-        </select>
-
-        {/* OpenVINO-only: confidence slider */}
-        {providerKey === 'openvino' && (
-          <>
-            <span style={dim}><i className="mdi mdi-tune-variant" /> Threshold: {ovConf}%</span>
-            <input type="range" min={10} max={80} step={5} value={ovConf}
-              onChange={e => {
-                const v = +e.target.value
-                setOvConf(v)
-                const key = 'mode_params_openvino_detection'
-                const existing = (() => { try { return JSON.parse(localStorage.getItem(key) || '{}') } catch { return {} } })()
-                localStorage.setItem(key, JSON.stringify({ ...existing, confidence: v }))
-              }}
-              style={{ width: 90, accentColor: '#0ea5e9', cursor: 'pointer' }}
-            />
-          </>
-        )}
+        {/* Model label (read-only — set in Tools settings) */}
+        <span style={{ ...dim, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <i className="mdi mdi-cog-outline" style={{ opacity: 0.6 }} />
+          {currentModel}
+          {providerKey === 'openvino' && <span style={{ marginLeft: 4 }}>· {ovConf}%</span>}
+        </span>
 
         {/* Analyze button */}
         <button className="modal-btn accent"
