@@ -116,8 +116,13 @@ export const U_METRICS = [
 export const U_DEFAULTS = { af: [40, 65], se: [55, 80], bc: [40, 65], combined: [50, 72] }
 
 export const MOTION_MODE_KEYS = [
-  'motion_diff', 'diff_zoom', 'erosion', 'neon_mask', 'mhi', 'bounding_boxes', 'motion_stacking'
+  'motion_diff', 'erosion',
 ]
+
+export const BURST_GAP_KEY     = 'burst_gap_seconds'
+export const BURST_GAP_DEFAULT = 30
+export const BURST_GAP_MIN     = 5
+export const BURST_GAP_MAX     = 300
 
 // Compute-service routing — local cache of the server-side config.
 // Source of truth is the backend (compute_config.json); these keys let the

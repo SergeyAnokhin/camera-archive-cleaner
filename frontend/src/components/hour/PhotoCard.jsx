@@ -3,7 +3,7 @@ import { resolveAiIcons } from '../../aiHelpers.js'
 import { formatTime } from './hourUtils.js'
 import './PhotoCard.css'
 
-export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused, aiData, onImageLoad, onOpenLightbox }) {
+export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params, selectionMode, selected, onToggle, index, isFocused, isBurstStart, aiData, onImageLoad, onOpenLightbox }) {
   const [loaded, setLoaded]         = useState(false)
   const [error, setError]           = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
@@ -40,7 +40,7 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
     <>
       <div
         ref={cardRef}
-        className={`hv-card hv-card-photo${selectionMode && selected ? ' hv-selected' : ''}${isFocused ? ' hv-card-focused' : ''}`}
+        className={`hv-card hv-card-photo${isBurstStart ? ' hv-burst-start' : ''}${selectionMode && selected ? ' hv-selected' : ''}${isFocused ? ' hv-card-focused' : ''}`}
         style={{ '--hv-zoom': selectionMode ? 1 : hoverZoom }}
         title={selectionMode ? formatTime(file.timestamp) : `${formatTime(file.timestamp)} — click to enlarge`}
         onClick={handleClick}

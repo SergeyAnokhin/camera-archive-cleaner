@@ -7,7 +7,7 @@ function readPreviewMode() {
   return localStorage.getItem('video_preview_mode') || 'none'
 }
 
-export default function VideoCard({ file, selectionMode, selected, onToggle, index, isFocused, onOpenLightbox }) {
+export default function VideoCard({ file, selectionMode, selected, onToggle, index, isFocused, isBurstStart, onOpenLightbox }) {
   const [previewMode, setPreviewMode] = useState(readPreviewMode)
   const [thumbError, setThumbError] = useState(false)
   const cardRef = useRef(null)
@@ -33,7 +33,7 @@ export default function VideoCard({ file, selectionMode, selected, onToggle, ind
     <>
       <div
         ref={cardRef}
-        className={`hv-card hv-card-video${selectionMode && selected ? ' hv-selected' : ''}${isFocused ? ' hv-card-focused' : ''}`}
+        className={`hv-card hv-card-video${isBurstStart ? ' hv-burst-start' : ''}${selectionMode && selected ? ' hv-selected' : ''}${isFocused ? ' hv-card-focused' : ''}`}
         onClick={handleClick}
         title={`${formatTime(file.timestamp)}${selectionMode ? '' : ' — click to play'}`}
       >

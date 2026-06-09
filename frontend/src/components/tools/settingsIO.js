@@ -11,6 +11,7 @@ import {
   GEMINI_MODEL_KEY, GEMINI_DEFAULT_MODEL, GEMINI_PROMPT_KEY, GEMINI_DEFAULT_PROMPT,
   CLAUDE_MODEL_KEY, CLAUDE_DEFAULT_MODEL,
   MOTION_MODE_KEYS,
+  BURST_GAP_KEY, BURST_GAP_DEFAULT, BURST_GAP_MIN, BURST_GAP_MAX,
 } from './settingsConfig.js'
 
 export function applyFontSize(px) {
@@ -44,6 +45,7 @@ function collectSettings() {
       thumb_width:     Number(localStorage.getItem(THUMB_WIDTH_KEY)) || THUMB_WIDTH_DEFAULT,
       hover_zoom:      Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT,
       diff_threshold:  Number(localStorage.getItem(DIFF_THRESHOLD_KEY) ?? DIFF_THRESHOLD_DEFAULT),
+      burst_gap:       Number(localStorage.getItem(BURST_GAP_KEY)) || BURST_GAP_DEFAULT,
       view_mode:       localStorage.getItem('hour_view_mode') || 'normal',
     },
     motion_modes: motionModes,
@@ -121,6 +123,11 @@ export function applyImportedSettings(data) {
   if (dt !== null) {
     localStorage.setItem(DIFF_THRESHOLD_KEY, dt)
     document.dispatchEvent(new CustomEvent('diff-threshold-change', { detail: dt })); applied++
+  }
+  const bg = safeNum(data?.hour_view?.burst_gap, BURST_GAP_MIN, BURST_GAP_MAX)
+  if (bg !== null) {
+    localStorage.setItem(BURST_GAP_KEY, bg)
+    document.dispatchEvent(new CustomEvent('burst-gap-change', { detail: bg })); applied++
   }
   const vm = safeStr(data?.hour_view?.view_mode)
   if (vm !== null) { localStorage.setItem('hour_view_mode', vm); applied++ }

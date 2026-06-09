@@ -9,9 +9,12 @@ from database import DB_PATH, delete_all_thumbnails, get_connection
 from thumbnails import THUMB_DIR
 from diff_thumbnails import DIFF_THUMB_DIR
 from erosion_thumbnails import EROSION_THUMB_DIR
-from motion_thumbnails import MOTION_THUMB_DIR
-from diff_zoom_thumbnails import DIFF_ZOOM_THUMB_DIR
 from compute_cache import OV_THUMB_DIR, VID_THUMB_DIR
+
+# Legacy cache dirs — modes removed but dirs may still exist from previous runs
+_BACKEND = Path(__file__).parent.parent
+MOTION_THUMB_DIR   = _BACKEND / "motion_thumbnails_cache"
+DIFF_ZOOM_THUMB_DIR = _BACKEND / "diff_zoom_thumbnails_cache"
 
 router = APIRouter()
 logger = logging.getLogger("api")
@@ -155,34 +158,6 @@ def clear_erosion_thumbnails(camera_id: Optional[str] = Query(default=None),
     else:
         deleted_files, _ = _clear_dir_all(EROSION_THUMB_DIR)
     logger.info("   └─ erosion-миниатюры очищены → %d файлов", deleted_files)
-    return {"deleted_files": deleted_files}
-
-
-@router.delete("/diff_zoom_thumbnails", summary="Delete cached diff zoom thumbnail files")
-def clear_diff_zoom_thumbnails(camera_id: Optional[str] = Query(default=None),
-                               date_from: Optional[str] = Query(default=None),
-                               date_to: Optional[str] = Query(default=None)):
-    logger.info("🧹 Очистка кэша diff-zoom-миниатюр%s", f" (камера: {camera_id})" if camera_id else "")
-    if camera_id or date_from or date_to:
-        file_ids = _filter_file_ids(camera_id, date_from, date_to)
-        deleted_files = _clear_dir_by_ids_suffix(DIFF_ZOOM_THUMB_DIR, file_ids)
-    else:
-        deleted_files, _ = _clear_dir_all(DIFF_ZOOM_THUMB_DIR)
-    logger.info("   └─ diff-zoom-миниатюры очищены → %d файлов", deleted_files)
-    return {"deleted_files": deleted_files}
-
-
-@router.delete("/motion_thumbnails", summary="Delete cached motion thumbnail files")
-def clear_motion_thumbnails(camera_id: Optional[str] = Query(default=None),
-                            date_from: Optional[str] = Query(default=None),
-                            date_to: Optional[str] = Query(default=None)):
-    logger.info("🧹 Очистка кэша motion-миниатюр%s", f" (камера: {camera_id})" if camera_id else "")
-    if camera_id or date_from or date_to:
-        file_ids = _filter_file_ids(camera_id, date_from, date_to)
-        deleted_files = _clear_dir_by_ids_suffix(MOTION_THUMB_DIR, file_ids)
-    else:
-        deleted_files, _ = _clear_dir_all(MOTION_THUMB_DIR)
-    logger.info("   └─ motion-миниатюры очищены → %d файлов", deleted_files)
     return {"deleted_files": deleted_files}
 
 

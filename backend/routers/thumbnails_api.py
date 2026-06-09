@@ -1,7 +1,7 @@
 """On-demand thumbnail generation.
 
-Endpoints: /thumbnail, /diff_thumbnail, /diff_zoom_thumbnail, /erosion_thumbnail,
-/motion_thumbnail, /openvino_thumbnail, /video_thumbnail.
+Endpoints: /thumbnail, /diff_thumbnail, /erosion_thumbnail,
+/openvino_thumbnail, /video_thumbnail.
 Serving original files lives in `routers/media.py`.
 """
 import base64
@@ -16,8 +16,6 @@ from shared.contract import VIDEO_THUMB_MODES
 from thumbnails import get_or_create_thumbnail
 from diff_thumbnails import get_or_create_diff_thumbnail
 from erosion_thumbnails import get_or_create_erosion_thumbnail
-from motion_thumbnails import get_or_create_motion_thumbnail, VALID_MODES as MOTION_VALID_MODES
-from diff_zoom_thumbnails import get_or_create_diff_zoom_thumbnail
 
 router = APIRouter()
 
@@ -83,19 +81,6 @@ def get_diff_thumbnail(
     )
 
 
-@router.get("/diff_zoom_thumbnail/{file_id}", summary="Motion-diff zoom thumbnail (crop to hottest 1/9 tile)")
-def get_diff_zoom_thumbnail(
-    file_id: int,
-    page_ids: str = Query(description="Comma-separated photo file IDs on the current page"),
-    threshold: int = Query(default=20, ge=0, le=255),
-):
-    ids = _parse_page_ids(page_ids)
-    return _page_thumbnail_response(
-        file_id, "Diff zoom",
-        lambda conn: get_or_create_diff_zoom_thumbnail(conn, file_id, ids, threshold),
-    )
-
-
 @router.get("/erosion_thumbnail/{file_id}", summary="Erosion/MOG2 thumbnail for a photo")
 def get_erosion_thumbnail(
     file_id: int,
@@ -106,22 +91,6 @@ def get_erosion_thumbnail(
     return _page_thumbnail_response(
         file_id, "Erosion",
         lambda conn: get_or_create_erosion_thumbnail(conn, file_id, ids, threshold),
-    )
-
-
-@router.get("/motion_thumbnail/{file_id}", summary="Motion visualization thumbnail (4 modes)")
-def get_motion_thumbnail(
-    file_id: int,
-    page_ids: str = Query(description="Comma-separated photo file IDs on the current page"),
-    threshold: int = Query(default=20, ge=0, le=255),
-    mode: str = Query(default="neon_mask", description=f"One of: {sorted(MOTION_VALID_MODES)}"),
-):
-    if mode not in MOTION_VALID_MODES:
-        raise HTTPException(status_code=400, detail=f"Invalid mode '{mode}'")
-    ids = _parse_page_ids(page_ids)
-    return _page_thumbnail_response(
-        file_id, "Motion",
-        lambda conn: get_or_create_motion_thumbnail(conn, file_id, ids, threshold, mode),
     )
 
 

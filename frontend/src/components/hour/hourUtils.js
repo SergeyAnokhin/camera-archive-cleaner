@@ -11,10 +11,13 @@ export const DIFF_THRESHOLD_KEY   = 'diff_threshold'
 export const DIFF_THRESHOLD_DEFAULT = 20
 export const VIEW_MODE_KEY        = 'hour_view_mode'
 export const MODE_PARAMS_PREFIX   = 'mode_params_'
+export const BURST_GAP_KEY        = 'burst_gap_seconds'
+export const BURST_GAP_DEFAULT    = 30
 
 export function getPageSize()   { return Number(localStorage.getItem(PAGE_SIZE_KEY)) || PAGE_SIZE_DEFAULT }
 export function getHoverZoom()  { return Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT }
 export function getThumbWidth() { return Number(localStorage.getItem(THUMB_WIDTH_KEY)) || THUMB_WIDTH_DEFAULT }
+export function getBurstGap()   { return Number(localStorage.getItem(BURST_GAP_KEY)) || BURST_GAP_DEFAULT }
 
 export function loadModeParams(modeKey, defaults) {
   try {

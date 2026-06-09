@@ -19,6 +19,7 @@ import { markHourViewed } from '../viewedStatus.js'
 import {
   getPageSize, getHoverZoom, getThumbWidth, buildInitialModeParams,
   saveModeParams, recordAiRequest, VIEW_MODE_KEY,
+  getBurstGap, BURST_GAP_KEY,
 } from './hour/hourUtils.js'
 
 export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, onBack, onFilesDeleted }) {
@@ -29,6 +30,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [pageSize, setPageSize]         = useState(getPageSize)
   const [hoverZoom, setHoverZoom]       = useState(getHoverZoom)
   const [thumbWidth, setThumbWidth]     = useState(getThumbWidth)
+  const [burstGap, setBurstGap]         = useState(getBurstGap)
   const [viewMode, setViewMode]         = useState(() => localStorage.getItem(VIEW_MODE_KEY) || DEFAULT_VIEW_MODE_KEY)
   const [modeParams, setModeParams]     = useState(buildInitialModeParams)
   const [peekOriginal, setPeekOriginal] = useState(false)
@@ -79,13 +81,16 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     function onPageSize()   { setPageSize(getPageSize()); setPage(1) }
     function onZoom()       { setHoverZoom(getHoverZoom()) }
     function onThumbWidth() { setThumbWidth(getThumbWidth()) }
+    function onBurstGap(e)  { setBurstGap(e.detail) }
     document.addEventListener('hour-page-size-change', onPageSize)
     document.addEventListener('hover-zoom-change', onZoom)
     document.addEventListener('thumb-width-change', onThumbWidth)
+    document.addEventListener('burst-gap-change', onBurstGap)
     return () => {
       document.removeEventListener('hour-page-size-change', onPageSize)
       document.removeEventListener('hover-zoom-change', onZoom)
       document.removeEventListener('thumb-width-change', onThumbWidth)
+      document.removeEventListener('burst-gap-change', onBurstGap)
     }
   }, [])
 
@@ -119,6 +124,17 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     () => files.filter(f => f.file_type === 'photo').map(f => f.id),
     [files]
   )
+
+  const burstStartSet = useMemo(() => {
+    const set = new Set()
+    const gapMs = burstGap * 1000
+    for (let i = 1; i < files.length; i++) {
+      const tPrev = new Date(files[i - 1].timestamp).getTime()
+      const tCurr = new Date(files[i].timestamp).getTime()
+      if (tCurr - tPrev >= gapMs) set.add(i)
+    }
+    return set
+  }, [files, burstGap])
 
   function toggleSelectionMode() {
     setSelectionMode(v => !v)
@@ -350,6 +366,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
                   selected={selectedIds.has(file.id)}
                   onToggle={toggleSelect}
                   isFocused={index === focusedFileIndex}
+                  isBurstStart={burstStartSet.has(index)}
                   onOpenLightbox={setLightboxIndex}
                 />
               : <PhotoCard
@@ -364,6 +381,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
                   selected={selectedIds.has(file.id)}
                   onToggle={toggleSelect}
                   isFocused={index === focusedFileIndex}
+                  isBurstStart={burstStartSet.has(index)}
                   aiData={aiAnalysisMap.get(file.id) ?? null}
                   onImageLoad={activeMode.aiProvider === 'openvino' ? handleOpenVinoImageLoad : undefined}
                   onOpenLightbox={setLightboxIndex}

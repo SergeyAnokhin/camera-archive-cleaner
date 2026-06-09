@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import {
   clearDatabase, clearAllThumbnails, clearThumbnails,
-  clearDiffThumbnails, clearDiffZoomThumbnails, clearErosionThumbnails,
-  clearMotionThumbnails, clearVideoThumbnails, clearOpenVinoThumbnails,
+  clearDiffThumbnails, clearErosionThumbnails,
+  clearVideoThumbnails, clearOpenVinoThumbnails,
   vacuumDatabase, getStorageInfo, getCameraDateRange,
 } from '../../api.js'
 
@@ -139,9 +139,7 @@ export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras })
     await motionThumb.run(async () => {
       const results = await Promise.all([
         clearDiffThumbnails(cameraId, df, dt),
-        clearDiffZoomThumbnails(cameraId, df, dt),
         clearErosionThumbnails(cameraId, df, dt),
-        clearMotionThumbnails(cameraId, df, dt),
       ])
       const total = results.reduce((s, r) => s + (r.deleted_files || 0), 0)
       return { total }

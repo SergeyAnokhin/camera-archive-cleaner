@@ -265,6 +265,11 @@
 }
 .hv-card-checkbox.checked { color: var(--accent); }
 
+.hv-card.hv-burst-start {
+  border-left-color: var(--accent);
+  border-left-width: 3px;
+}
+
 .hv-card.hv-selected {
   box-shadow: 0 0 0 2px var(--accent);
 }

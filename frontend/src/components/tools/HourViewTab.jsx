@@ -7,6 +7,7 @@ import {
   DIFF_THRESHOLD_KEY, DIFF_THRESHOLD_MIN, DIFF_THRESHOLD_MAX, DIFF_THRESHOLD_DEFAULT,
   VIDEO_PREVIEW_KEY, VIDEO_PREVIEW_DEFAULT, VIDEO_PREVIEW_OPTIONS,
   UNIFORMITY_METHOD_KEY, UNIFORMITY_METHOD_DEFAULT, U_METRICS, U_DEFAULTS,
+  BURST_GAP_KEY, BURST_GAP_DEFAULT, BURST_GAP_MIN, BURST_GAP_MAX,
 } from './settingsConfig.js'
 
 export default function HourViewTab() {
@@ -33,6 +34,9 @@ export default function HourViewTab() {
   })
   const [uniformityMethod, setUniformityMethod] = useState(
     () => localStorage.getItem(UNIFORMITY_METHOD_KEY) || UNIFORMITY_METHOD_DEFAULT
+  )
+  const [burstGap, setBurstGap] = useState(
+    () => Number(localStorage.getItem(BURST_GAP_KEY)) || BURST_GAP_DEFAULT
   )
 
   function handlePageSizeChange(e) {
@@ -74,6 +78,14 @@ export default function HourViewTab() {
   function handleUniformityThreshold(metric, type, v) {
     setUniformityThresholds(prev => ({ ...prev, [metric]: { ...prev[metric], [type]: v } }))
     localStorage.setItem(`uniformity_${metric}_${type}`, v)
+  }
+
+  function handleBurstGapChange(e) {
+    const raw = Number(e.target.value)
+    const v = Math.max(BURST_GAP_MIN, Math.min(BURST_GAP_MAX, raw || BURST_GAP_DEFAULT))
+    setBurstGap(v)
+    localStorage.setItem(BURST_GAP_KEY, v)
+    document.dispatchEvent(new CustomEvent('burst-gap-change', { detail: v }))
   }
 
   function handleUniformityMethodChange(e) {
@@ -120,6 +132,19 @@ export default function HourViewTab() {
         valueLabel={diffThreshold}
         hint="Pixels with a channel delta below this value are darkened in Motion diff mode. Higher = only significant changes shown."
       />
+
+      {/* Burst gap */}
+      <div className="modal-section">
+        <div className="modal-section-title">Burst separator gap</div>
+        <div className="font-slider-row">
+          <input type="number" min={BURST_GAP_MIN} max={BURST_GAP_MAX} step="5"
+            value={burstGap} onChange={handleBurstGapChange} className="modal-number-input" />
+          <span className="font-size-value" style={{ marginLeft: 0 }}>seconds</span>
+        </div>
+        <div className="modal-setting-hint">
+          A blue left border marks frames where the gap to the previous frame exceeds this threshold — indicating a new camera burst ({BURST_GAP_MIN}–{BURST_GAP_MAX} s).
+        </div>
+      </div>
 
       {/* Video preview mode */}
       <div className="modal-section">
