@@ -13,6 +13,7 @@ PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov"}
 
 _LOG_EVERY = 1000
+_COMMIT_EVERY = 5000  # release the write lock periodically during large scans
 
 # Patterns that encode timestamp in filename.
 # Each pattern must have named groups: year, month, day, hour, minute, second.
@@ -74,6 +75,9 @@ def _scan_dir(conn: sqlite3.Connection, camera_id: str,
 
         upsert_file(conn, camera_id, file_type, str(file), file.stat().st_size, dt.isoformat())
         count += 1
+
+        if count % _COMMIT_EVERY == 0:
+            conn.commit()
 
         if count % _LOG_EVERY == 0:
             logger.info("[%s] %ss processed: %d", camera_id, file_type, count)
