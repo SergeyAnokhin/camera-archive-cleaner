@@ -5,6 +5,7 @@ import { exportSettingsYaml, applyImportedSettings, applyFontSize } from './sett
 import {
   FONT_KEY, FONT_MIN, FONT_MAX, FONT_DEFAULT,
   PREVIEWS_PER_CELL_KEY, PREVIEWS_PER_CELL_MIN, PREVIEWS_PER_CELL_MAX, PREVIEWS_PER_CELL_DEFAULT,
+  ETA_WINDOW_KEY, ETA_WINDOW_MIN, ETA_WINDOW_MAX, ETA_WINDOW_DEFAULT,
 } from './settingsConfig.js'
 
 export default function GeneralTab() {
@@ -13,6 +14,9 @@ export default function GeneralTab() {
     const v = localStorage.getItem(PREVIEWS_PER_CELL_KEY)
     return v !== null ? Number(v) : PREVIEWS_PER_CELL_DEFAULT
   })
+  const [etaWindow, setEtaWindow] = useState(() =>
+    Number(localStorage.getItem(ETA_WINDOW_KEY)) || ETA_WINDOW_DEFAULT
+  )
   const [importResult, setImportResult] = useState(null)
   const importRef = useRef(null)
 
@@ -31,6 +35,12 @@ export default function GeneralTab() {
     document.dispatchEvent(new CustomEvent('previews-per-cell-change', { detail: v }))
   }
 
+  function handleEtaWindowChange(e) {
+    const v = Number(e.target.value)
+    setEtaWindow(v)
+    localStorage.setItem(ETA_WINDOW_KEY, v)
+  }
+
   function handleImportFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -45,6 +55,7 @@ export default function GeneralTab() {
         setFontSize(Number(localStorage.getItem(FONT_KEY)) || FONT_DEFAULT)
         const ppc = localStorage.getItem(PREVIEWS_PER_CELL_KEY)
         setPreviewsPerCell(ppc !== null ? Number(ppc) : PREVIEWS_PER_CELL_DEFAULT)
+        setEtaWindow(Number(localStorage.getItem(ETA_WINDOW_KEY)) || ETA_WINDOW_DEFAULT)
       } catch (err) {
         setImportResult({ ok: false, text: `Parse error: ${err.message}` })
       }
@@ -69,6 +80,15 @@ export default function GeneralTab() {
         minLabel="0" maxLabel={String(PREVIEWS_PER_CELL_MAX)}
         valueLabel={previewsPerCell}
         hint="Thumbnails shown inside each heatmap cell (year/month/day). Set 0 to disable."
+      />
+
+      <SliderSetting
+        title="ETA window (минуты)"
+        min={ETA_WINDOW_MIN} max={ETA_WINDOW_MAX} step={1}
+        value={etaWindow} onChange={handleEtaWindowChange}
+        minLabel={String(ETA_WINDOW_MIN)} maxLabel={String(ETA_WINDOW_MAX)}
+        valueLabel={`${etaWindow} мин`}
+        hint="Скорость обработки и ETA рассчитываются по последним N минутам, а не с начала задачи."
       />
 
       {/* Export / Import */}

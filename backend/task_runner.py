@@ -11,6 +11,7 @@ import json
 import logging
 import random
 import time
+from collections import deque
 from datetime import datetime
 
 import base64
@@ -26,6 +27,28 @@ logger = logging.getLogger("api")
 
 _PROGRESS_INTERVAL = 5.0  # seconds between DB progress writes
 _global_paused = False
+
+
+class _SpeedTracker:
+    """Sliding window speed tracker (items/sec).
+    Keeps only events within the last `window_sec` seconds."""
+    def __init__(self, window_sec: float):
+        self._window = max(window_sec, 10.0)
+        self._events: deque = deque()  # (abs_time, cumulative_count)
+
+    def record(self, cumulative: int) -> None:
+        now = time.time()
+        self._events.append((now, cumulative))
+        cutoff = now - self._window
+        while len(self._events) > 1 and self._events[0][0] < cutoff:
+            self._events.popleft()
+
+    def speed(self) -> "float | None":
+        if len(self._events) < 2:
+            return None
+        dt = self._events[-1][0] - self._events[0][0]
+        dn = self._events[-1][1] - self._events[0][1]
+        return dn / dt if dt >= 1.0 else None
 
 
 def get_global_paused() -> bool:
@@ -181,6 +204,7 @@ async def _run_video_thumbnails(task_id: str, params: dict, resume_from: int) ->
     date_from = params["date_from"]
     date_to = params["date_to"]
     mode = params.get("thumb_mode", "four_frames")
+    reprocess_existing = params.get("reprocess_existing", False)
 
     with get_connection() as conn:
         total = conn.execute(
@@ -195,9 +219,22 @@ async def _run_video_thumbnails(task_id: str, params: dict, resume_from: int) ->
             (camera_id, date_from, date_to, resume_from),
         ).fetchall()
 
+    skip_set: set = set()
+    if not reprocess_existing:
+        with get_connection() as conn:
+            existing = conn.execute(
+                "SELECT vp.file_id FROM video_previews vp "
+                "JOIN files f ON f.id=vp.file_id "
+                "WHERE f.camera_id=? AND f.timestamp>=? AND f.timestamp<=? "
+                "AND f.file_type='video' AND vp.mode=?",
+                (camera_id, date_from, date_to, mode),
+            ).fetchall()
+        skip_set = {r["file_id"] for r in existing}
+
     await asyncio.to_thread(_write_progress, task_id, resume_from, total, None, None, None, None)
 
-    t_start = time.time()
+    window_sec = float(params.get("eta_window_minutes", 5)) * 60
+    tracker = _SpeedTracker(window_sec)
     processed = 0
     error_count = 0
     max_errors = params.get("max_errors", None)
@@ -215,6 +252,12 @@ async def _run_video_thumbnails(task_id: str, params: dict, resume_from: int) ->
 
         file_id = row["id"]
         file_path = row["file_path"]
+
+        if file_id in skip_set:
+            processed += 1
+            tracker.record(resume_from + processed)
+            continue
+
         cache_path = video_cache_path(file_id, mode)
 
         if not cache_path.exists():
@@ -240,8 +283,8 @@ async def _run_video_thumbnails(task_id: str, params: dict, resume_from: int) ->
 
         processed += 1
         current = resume_from + processed
-        elapsed = time.time() - t_start
-        speed = processed / elapsed if elapsed > 0.1 else None
+        tracker.record(current)
+        speed = tracker.speed()
         remaining = total - current
         eta = int(remaining / speed) if speed and speed > 0 else None
 
@@ -270,6 +313,7 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
     classes = params.get("classes", None)
     video_thumb_mode = params.get("video_thumb_mode")
     classes_tuple = tuple(sorted(classes)) if classes else None
+    reprocess_existing = params.get("reprocess_existing", False)
 
     with get_connection() as conn:
         total = conn.execute(
@@ -284,9 +328,21 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
             (camera_id, date_from, date_to, resume_from),
         ).fetchall()
 
+    skip_set: set = set()
+    if not reprocess_existing:
+        with get_connection() as conn:
+            existing = conn.execute(
+                "SELECT od.file_id FROM object_detection od "
+                "JOIN files f ON f.id=od.file_id "
+                "WHERE f.camera_id=? AND f.timestamp>=? AND f.timestamp<=? AND f.file_type='photo'",
+                (camera_id, date_from, date_to),
+            ).fetchall()
+        skip_set = {r["file_id"] for r in existing}
+
     await asyncio.to_thread(_write_progress, task_id, resume_from, total, None, None, None, None)
 
-    t_start = time.time()
+    window_sec = float(params.get("eta_window_minutes", 5)) * 60
+    tracker = _SpeedTracker(window_sec)
     processed = 0
     error_count = 0
     max_errors = params.get("max_errors", None)
@@ -304,6 +360,11 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
 
         file_id = row["id"]
         file_path = row["file_path"]
+
+        if file_id in skip_set:
+            processed += 1
+            tracker.record(resume_from + processed)
+            continue
 
         try:
             await asyncio.to_thread(_detect_and_save, file_id, file_path, model_name, confidence,
@@ -324,8 +385,8 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
 
         processed += 1
         current = resume_from + processed
-        elapsed = time.time() - t_start
-        speed = processed / elapsed if elapsed > 0.1 else None
+        tracker.record(current)
+        speed = tracker.speed()
         remaining = total - current
         eta = int(remaining / speed) if speed and speed > 0 else None
 
@@ -385,6 +446,7 @@ async def _run_ai(task_id: str, params: dict, resume_from: int, provider: str) -
     api_key = params["api_key"]
     delay_min = float(params.get("delay_min_sec", 0))
     delay_max = float(params.get("delay_max_sec", 0))
+    reprocess_existing = params.get("reprocess_existing", False)
 
     with get_connection() as conn:
         total = conn.execute(
@@ -399,9 +461,22 @@ async def _run_ai(task_id: str, params: dict, resume_from: int, provider: str) -
             (camera_id, date_from, date_to, resume_from),
         ).fetchall()
 
+    skip_set: set = set()
+    if not reprocess_existing:
+        with get_connection() as conn:
+            existing = conn.execute(
+                "SELECT aa.file_id FROM ai_analysis aa "
+                "JOIN files f ON f.id=aa.file_id "
+                "WHERE f.camera_id=? AND f.timestamp>=? AND f.timestamp<=? "
+                "AND f.file_type='photo' AND aa.provider=?",
+                (camera_id, date_from, date_to, provider),
+            ).fetchall()
+        skip_set = {r["file_id"] for r in existing}
+
     await asyncio.to_thread(_write_progress, task_id, resume_from, total, None, None, None, None)
 
-    t_start = time.time()
+    window_sec = float(params.get("eta_window_minutes", 5)) * 60
+    tracker = _SpeedTracker(window_sec)
     processed = 0
     error_count = 0
     max_errors = params.get("max_errors", None)
@@ -421,6 +496,11 @@ async def _run_ai(task_id: str, params: dict, resume_from: int, provider: str) -
         file_id = row["id"]
         file_path = row["file_path"]
 
+        if file_id in skip_set:
+            processed += 1
+            tracker.record(resume_from + processed)
+            continue
+
         try:
             await asyncio.to_thread(fn, file_id, model, api_key)
         except Exception as e:
@@ -437,8 +517,8 @@ async def _run_ai(task_id: str, params: dict, resume_from: int, provider: str) -
 
         processed += 1
         current = resume_from + processed
-        elapsed = time.time() - t_start
-        speed = processed / elapsed if elapsed > 0.1 else None
+        tracker.record(current)
+        speed = tracker.speed()
         remaining = total - current
         eta = int(remaining / speed) if speed and speed > 0 else None
 

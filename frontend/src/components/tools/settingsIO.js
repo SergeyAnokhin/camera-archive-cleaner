@@ -7,6 +7,7 @@ import {
   ZOOM_KEY, ZOOM_MIN, ZOOM_MAX, ZOOM_DEFAULT,
   THUMB_WIDTH_KEY, THUMB_WIDTH_MIN, THUMB_WIDTH_MAX, THUMB_WIDTH_DEFAULT,
   DIFF_THRESHOLD_KEY, DIFF_THRESHOLD_MIN, DIFF_THRESHOLD_MAX, DIFF_THRESHOLD_DEFAULT,
+  ETA_WINDOW_KEY, ETA_WINDOW_MIN, ETA_WINDOW_MAX, ETA_WINDOW_DEFAULT,
   GEMINI_MODEL_KEY, GEMINI_DEFAULT_MODEL, GEMINI_PROMPT_KEY, GEMINI_DEFAULT_PROMPT,
   CLAUDE_MODEL_KEY, CLAUDE_DEFAULT_MODEL,
   MOTION_MODE_KEYS,
@@ -34,6 +35,9 @@ function collectSettings() {
     ui: {
       font_size:          Number(localStorage.getItem(FONT_KEY)) || FONT_DEFAULT,
       previews_per_cell:  Number(localStorage.getItem(PREVIEWS_PER_CELL_KEY) ?? PREVIEWS_PER_CELL_DEFAULT),
+    },
+    tasks: {
+      eta_window_minutes: Number(localStorage.getItem(ETA_WINDOW_KEY)) || ETA_WINDOW_DEFAULT,
     },
     hour_view: {
       page_size:       Number(localStorage.getItem(PAGE_SIZE_KEY)) || PAGE_SIZE_DEFAULT,
@@ -96,6 +100,8 @@ export function applyImportedSettings(data) {
     localStorage.setItem(PREVIEWS_PER_CELL_KEY, ppc)
     document.dispatchEvent(new CustomEvent('previews-per-cell-change', { detail: ppc })); applied++
   }
+  const etaW = safeNum(data?.tasks?.eta_window_minutes, ETA_WINDOW_MIN, ETA_WINDOW_MAX)
+  if (etaW !== null) { localStorage.setItem(ETA_WINDOW_KEY, etaW); applied++ }
   const ps = safeNum(data?.hour_view?.page_size, PAGE_SIZE_MIN, PAGE_SIZE_MAX)
   if (ps !== null) {
     localStorage.setItem(PAGE_SIZE_KEY, ps)

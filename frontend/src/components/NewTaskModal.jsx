@@ -31,7 +31,8 @@ function readGlobalSettings() {
   })()
   const geminiModel = localStorage.getItem('gemini_model') || 'gemini-3.1-flash-lite'
   const claudeModel = localStorage.getItem('claude_model') || 'claude-haiku-4-5-20251001'
-  return { videoMode, ovModel, ovConf, geminiModel, claudeModel }
+  const etaWindowMinutes = Number(localStorage.getItem('eta_window_minutes')) || 5
+  return { videoMode, ovModel, ovConf, geminiModel, claudeModel, etaWindowMinutes }
 }
 
 const VIDEO_MODE_LABELS = {
@@ -54,6 +55,7 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
   const [useTimeWindow, setUseTimeWindow]     = useState(false)
   const [activeFromHour, setActiveFromHour]   = useState(0)
   const [activeToHour, setActiveToHour]       = useState(8)
+  const [reprocessExisting, setReprocessExisting] = useState(false)
   const [estimate, setEstimate]               = useState(null)
   const [loading, setLoading]                 = useState(false)
   const [datesFromCamera, setDatesFromCamera] = useState(false)
@@ -98,6 +100,8 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
       const from = dateFrom + ':00'
       const to   = dateTo   + ':00'
       const params = { camera_id: cameraId, date_from: from, date_to: to }
+      params.eta_window_minutes = settings.etaWindowMinutes
+      if (reprocessExisting) params.reprocess_existing = true
       if (type === 'video_thumbnails') {
         params.thumb_mode = settings.videoMode
       } else if (type === 'openvino') {
@@ -293,6 +297,21 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
               </div>
             </>
           )}
+
+          {/* ── Reprocess existing ───────────────────────────── */}
+          <div className="ntm__section">
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+              <input type="checkbox" checked={reprocessExisting}
+                onChange={e => setReprocessExisting(e.target.checked)}
+                style={{ accentColor: 'var(--accent)', width: 14, height: 14 }} />
+              <span className="ntm__label" style={{ margin: 0 }}>Перезаписать имеющийся анализ</span>
+            </label>
+            <div style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--text-dim)', marginTop: 4, paddingLeft: 22 }}>
+              {reprocessExisting
+                ? 'Все файлы будут обработаны заново, даже если анализ уже есть.'
+                : 'Файлы с готовым анализом будут пропущены (по умолчанию).'}
+            </div>
+          </div>
 
           {/* ── Estimate ─────────────────────────────────────── */}
           {fileCount != null && fileCount > 0 && (

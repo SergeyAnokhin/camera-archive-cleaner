@@ -33,6 +33,11 @@ export const DIFF_THRESHOLD_MIN     = 0
 export const DIFF_THRESHOLD_MAX     = 100
 export const DIFF_THRESHOLD_DEFAULT = 20
 
+export const ETA_WINDOW_KEY     = 'eta_window_minutes'
+export const ETA_WINDOW_MIN     = 1
+export const ETA_WINDOW_MAX     = 30
+export const ETA_WINDOW_DEFAULT = 5
+
 export const VIDEO_PREVIEW_KEY     = 'video_preview_mode'
 export const VIDEO_PREVIEW_DEFAULT = 'none'
 export const VIDEO_PREVIEW_OPTIONS = [
