@@ -13,12 +13,12 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`logging_setup.py`](../backend/logging_setup.py) | Logging config: ANSI colours, TRACE/DEBUG/INFO levels, custom formatter, uvicorn access filter. Configures the root logger on import |
 | [`api_helpers.py`](../backend/api_helpers.py) | Shared router helpers: `fmt_range()` (log date ranges), `row_to_dict()` (stats-row → dict) |
 | [`ai_pricing.py`](../backend/ai_pricing.py) | Per-million-token USD pricing tables for Gemini and Claude models |
-| [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `health`). Raises `ComputeDisabled` / `ComputeUnavailable` |
+| [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `convert_video`, `health`). Raises `ComputeDisabled` / `ComputeUnavailable`. Timeouts: detect 120 s, thumbnail 120 s, convert 7200 s |
 | [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` |
 | [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
-| [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks, processes files one by one, writes progress to DB every 5 s. Supports pause/resume by checking task status between files |
-| [`database.py`](../backend/database.py) | SQLite: table schema + migrations, all SQL queries. Tables: `files`, `thumbnails`, `ai_analysis` (Gemini/Claude), `object_detection` (OpenVINO), `video_previews`, `tasks`, `tuning_sessions`. The only file that touches the DB |
-| [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames (Foscam patterns + mtime fallback); writes to DB |
+| [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks, processes files one by one, writes progress to DB every 5 s. Supports pause/resume by checking task status between files. Task types: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert`, `file_organizer` |
+| [`database.py`](../backend/database.py) | SQLite: table schema + migrations, all SQL queries. Tables: `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks` (has `log_tail TEXT` for video_convert/file_organizer logs), `tuning_sessions`. `append_task_log()` stores last 300 log lines per task |
+| [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed (used by `file_organizer` task) |
 | [`config.py`](../backend/config.py) | Parses `cameras.yaml` → `Camera` dataclass (id, name, path_snapshots, path_videos) |
 | [`thumbnails.py`](../backend/thumbnails.py) | Basic 256×256 JPEG thumbnails (Pillow). Cache in `thumbnails_cache/`. Used by `/thumbnail/{id}` |
 | [`diff_thumbnails.py`](../backend/diff_thumbnails.py) | Motion Diff thumbnails: per-pixel delta from page mean (numpy). Cache in `diff_thumbnails_cache/` |
@@ -42,7 +42,7 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 | [`maintenance.py`](../backend/routers/maintenance.py) | `/database`, per-type `/*_thumbnails`, `/all_thumbnails`, `/storage_info` |
 | [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze`, `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`. Thin layer — request models + delegation; provider logic lives in `ai_providers/` |
 | [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status` — routing config for the compute-service |
-| [`tasks.py`](../backend/routers/tasks.py) | `/tasks` CRUD + `/tasks/metrics` — task queue REST endpoints |
+| [`tasks.py`](../backend/routers/tasks.py) | `/tasks` CRUD + `/tasks/metrics` + `GET /tasks/{id}/logs` — task queue REST endpoints. `log_tail` is excluded from the list response; fetch separately via `/logs` |
 | [`tuning.py`](../backend/routers/tuning.py) | `/tuning/sessions/*` — model tuning: image upload, autolabel, ground truth, background golden-section confidence search. See [`docs/tuning.md`](tuning.md) |
 
 ### AI providers (`backend/ai_providers/`)
@@ -81,9 +81,9 @@ Optional stateless service for heavy compute. Full architecture: [`compute-servi
 
 | File | Role |
 |---|---|
-| [`app.py`](../compute-service/app.py) | FastAPI app on :8001 — `/health`, `/detect`, `/video/thumbnail`. Logs elapsed seconds per request |
+| [`app.py`](../compute-service/app.py) | FastAPI app on :8001 — `/health`, `/detect`, `/video/thumbnail`, `/video/convert`. Logs elapsed seconds per request |
 | [`detection.py`](../compute-service/detection.py) | YOLO model loading (lazy) + object detection. Prefers `models/<name>_openvino_model/` over `.pt` |
-| [`video.py`](../compute-service/video.py) | Video thumbnail generation (first/last frame, 2×2 grid, max-change GIF) |
+| [`video.py`](../compute-service/video.py) | Video thumbnail generation (first/last frame, 2×2 grid, max-change GIF) + `convert_video()` — runs ffmpeg (H.265/H.264, up to 2 h timeout) |
 | [`config.py`](../compute-service/config.py) | Path-remap config (env vars `COMPUTE_PATH_REMAP_FROM` / `_TO`) |
 | [`export_models.py`](../compute-service/export_models.py) | **Build-time only** — exports yolov8n/s/m to OpenVINO IR; called by `Dockerfile RUN`, never at runtime |
 
@@ -93,7 +93,7 @@ Imported by both the main backend and the compute-service.
 
 | File | Role |
 |---|---|
-| [`contract.py`](../shared/contract.py) | Pydantic API models: `DetectRequest`, `DetectResponse`, `VideoThumbnailRequest`; `VIDEO_THUMB_MODES` |
+| [`contract.py`](../shared/contract.py) | Pydantic API models: `DetectRequest/Response`, `VideoThumbnailRequest`, `VideoConvertRequest/Response` (src_path, dst_path, codec, crf, preset); `VIDEO_THUMB_MODES` |
 | [`coco_names.py`](../shared/coco_names.py) | `COCO_TO_RUSSIAN` map (23 entries used by compute-service to translate YOLO outputs) |
 
 ---
@@ -134,8 +134,9 @@ Imported by both the main backend and the compute-service.
 | [`ToolsButton.jsx`](../frontend/src/components/ToolsButton.jsx) | Button that opens ToolsModal |
 | [`TasksScreen.jsx`](../frontend/src/components/TasksScreen.jsx) | Tasks screen — polls `/tasks` every 3 s, shows system metrics bar + task card list, hosts NewTaskModal |
 | [`TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx) | Model tuning screen (whole feature in one file): session sidebar + 3-step panel (upload, ground truth, golden-section benchmark, results charts). See [`docs/tuning.md`](tuning.md) |
-| [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card component: type icon, status badge, animated progress bar, speed/ETA, current-file thumbnail preview, pause/resume/cancel/delete/reorder buttons |
-| [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a new task: type selector cards (video\_thumbnails/openvino/gemini/claude), camera+date-range picker, read-only "НАСТРОЙКИ (ИЗ TOOLS)" summary showing active model/mode per task type |
+| [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card: type icon, status badge, progress bar, speed/ETA, thumbnail, pause/resume/cancel buttons. Logs button (console icon) for `video_convert`/`file_organizer` types; dry-run amber tag |
+| [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a task. Six types: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert` (input\_pattern, output\_suffix, output\_ext, codec, CRF, preset, date filter), `file_organizer` (source\_type, input\_pattern, output\_folder, date\_regex). Both new types have a dry-run toggle |
+| [`TaskLogsModal.jsx`](../frontend/src/components/TaskLogsModal.jsx) | Log viewer modal for `video_convert` and `file_organizer` tasks. Polls `GET /tasks/{id}/logs` every 2 s while task is active; colour-codes DRY/ERROR/Skip lines |
 
 ### Tools modal tabs (`frontend/src/components/tools/`)
 

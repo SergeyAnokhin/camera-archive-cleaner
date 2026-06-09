@@ -17,6 +17,7 @@ For a flat per-file listing see [`code-map.md`](code-map.md). This doc is the *g
 | **Thumbnail pipeline** | `thumbnails.py`, `diff_thumbnails.py`, `diff_zoom_thumbnails.py`, `erosion_thumbnails.py`, `motion_thumbnails.py` | Indexing/DB (cache paths) | Pillow, numpy, opencv |
 | **Compute delegation** | `compute_client.py`, `compute_config.py`, `compute_cache.py`, `ai_providers/openvino.py`, `routers/compute.py` | Indexing/DB, compute-service | httpx |
 | **Cloud AI** | `ai_providers/gemini.py`, `ai_providers/claude.py`, `ai_providers/common.py`, `ai_pricing.py` | Indexing/DB | google-genai, anthropic, Pillow |
+| **Task queue** | `task_runner.py`, `routers/tasks.py` | Indexing/DB, Compute delegation | asyncio (stdlib) |
 | **Compute-service** (separate process) | `compute-service/*` | `shared/` | ultralytics, openvino, opencv, Pillow |
 | **Shared block** | `shared/*` | — | pydantic |
 
@@ -34,13 +35,21 @@ been extracted** into a standalone stateless service. Full architecture:
 
 In short:
 
-- `compute-service/` runs YOLO inference and video decoding. It owns no DB and
-  no cache — it takes a file path + parameters and returns results.
+- `compute-service/` runs YOLO inference, video decoding, and **ffmpeg video
+  conversion** (`POST /video/convert`). It owns no DB and no cache — it takes
+  a file path + parameters and returns results.
 - The main backend keeps the DB read/write and disk caches; it delegates only
   the compute step via [`compute_client.py`](../backend/compute_client.py).
+  `video_convert` tasks are routed through `compute_client.convert_video()` with
+  a 2-hour timeout; `file_organizer` tasks run entirely on the backend (cheap
+  `shutil.move` calls — no compute delegation needed).
 - `shared/` holds the API contract and the `COCO_TO_RUSSIAN` map — imported by
-  both processes.
+  both processes. `VideoConvertRequest` / `VideoConvertResponse` live in
+  [`shared/contract.py`](../shared/contract.py).
 - Routing (`off` / `local` / `remote`) lives in `backend/compute_config.json`.
+- The scanner skips the `organized` folder (defined as `SCANNER_SKIP_DIRS` in
+  [`scanner.py`](../backend/scanner.py)) so file-organizer output is never
+  re-indexed as fresh snapshots.
 
 **Cross-boundary contract to preserve:** `COCO_TO_RUSSIAN` in
 [`shared/coco_names.py`](../shared/coco_names.py) must keep producing the same
