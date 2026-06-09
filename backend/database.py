@@ -321,16 +321,6 @@ def init_object_detection_table(conn: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_obj_det_file ON object_detection(file_id);
     """)
-    # Migration: move existing openvino rows from ai_analysis to object_detection
-    try:
-        conn.execute("""
-            INSERT OR IGNORE INTO object_detection (file_id, model, objects, elapsed_ms, analyzed_at)
-            SELECT file_id, model, objects, elapsed_ms, analyzed_at
-            FROM ai_analysis WHERE provider='openvino'
-        """)
-        conn.execute("DELETE FROM ai_analysis WHERE provider='openvino'")
-    except Exception:
-        pass
 
 
 def save_object_detection(conn: sqlite3.Connection, file_id: int, model: str,
