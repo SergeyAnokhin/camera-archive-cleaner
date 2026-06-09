@@ -199,6 +199,8 @@ async def _run_video_thumbnails(task_id: str, params: dict, resume_from: int) ->
 
     t_start = time.time()
     processed = 0
+    error_count = 0
+    max_errors = params.get("max_errors", None)
     last_save = time.time()
 
     for row in rows:
@@ -222,6 +224,15 @@ async def _run_video_thumbnails(task_id: str, params: dict, resume_from: int) ->
                 raise Exception(f"Compute service unavailable: {e}")
             except Exception as e:
                 logger.warning("Video thumb error %s: %s", file_path, e)
+                error_count += 1
+                if max_errors and error_count >= max_errors:
+                    current = resume_from + processed
+                    await asyncio.to_thread(_write_progress, task_id, current, total,
+                                            file_id, file_path, None, None)
+                    raise Exception(
+                        f"Слишком много ошибок ({error_count}), задача остановлена. "
+                        f"Последний файл: {file_path}"
+                    )
 
         processed += 1
         current = resume_from + processed
@@ -273,6 +284,8 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
 
     t_start = time.time()
     processed = 0
+    error_count = 0
+    max_errors = params.get("max_errors", None)
     last_save = time.time()
 
     for row in rows:
@@ -295,6 +308,15 @@ async def _run_openvino(task_id: str, params: dict, resume_from: int) -> None:
             raise Exception(f"Compute service unavailable: {e}")
         except Exception as e:
             logger.warning("OpenVINO error %s: %s", file_path, e)
+            error_count += 1
+            if max_errors and error_count >= max_errors:
+                current = resume_from + processed
+                await asyncio.to_thread(_write_progress, task_id, current, total,
+                                        file_id, file_path, None, None)
+                raise Exception(
+                    f"Слишком много ошибок ({error_count}), задача остановлена. "
+                    f"Последний файл: {file_path}"
+                )
 
         processed += 1
         current = resume_from + processed
@@ -377,6 +399,8 @@ async def _run_ai(task_id: str, params: dict, resume_from: int, provider: str) -
 
     t_start = time.time()
     processed = 0
+    error_count = 0
+    max_errors = params.get("max_errors", None)
     last_save = time.time()
     fn = _gemini_single if provider == "gemini" else _claude_single
 
@@ -397,6 +421,15 @@ async def _run_ai(task_id: str, params: dict, resume_from: int, provider: str) -
             await asyncio.to_thread(fn, file_id, model, api_key)
         except Exception as e:
             logger.warning("AI(%s) task %s error on %s: %s", provider, task_id[:8], file_path, e)
+            error_count += 1
+            if max_errors and error_count >= max_errors:
+                current = resume_from + processed
+                await asyncio.to_thread(_write_progress, task_id, current, total,
+                                        file_id, file_path, None, None)
+                raise Exception(
+                    f"Слишком много ошибок ({error_count}), задача остановлена. "
+                    f"Последний файл: {file_path}"
+                )
 
         processed += 1
         current = resume_from + processed

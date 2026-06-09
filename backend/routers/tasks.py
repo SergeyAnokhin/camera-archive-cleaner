@@ -153,6 +153,27 @@ def resume_task(task_id: str):
     return {"ok": True}
 
 
+@router.put("/{task_id}/skip")
+def skip_task_file(task_id: str):
+    """Skip the current failed file: increment progress_current by 1 and re-queue."""
+    with get_connection() as conn:
+        task = get_task(conn, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if task["status"] not in ("paused", "failed"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot skip task with status '{task['status']}'",
+            )
+        new_progress = (task["progress_current"] or 0) + 1
+        conn.execute(
+            "UPDATE tasks SET status='queued', error_message=NULL, "
+            "progress_current=? WHERE id=?",
+            (new_progress, task_id),
+        )
+    return {"ok": True}
+
+
 @router.put("/{task_id}/cancel")
 def cancel_task(task_id: str):
     with get_connection() as conn:

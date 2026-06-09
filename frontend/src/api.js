@@ -93,52 +93,69 @@ export function getDistribution(cameraId, dateFrom, dateTo) {
   }))
 }
 
-export function clearDatabase() {
-  return del('/database')
+export function clearDatabase(cameraId = null) {
+  return del('/database' + buildQuery({ camera_id: cameraId }))
 }
 
-export function clearThumbnails() {
-  return del('/thumbnails')
+export function vacuumDatabase() {
+  return post('/database/vacuum')
+}
+
+export function clearThumbnails(cameraId = null) {
+  return del('/thumbnails' + buildQuery({ camera_id: cameraId }))
 }
 
 export function getDiffThumbnailUrl(fileId, pageIds, threshold) {
   return `${BASE}/diff_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
 }
 
-export function clearDiffThumbnails() {
-  return del('/diff_thumbnails')
+export function clearDiffThumbnails(cameraId = null) {
+  return del('/diff_thumbnails' + buildQuery({ camera_id: cameraId }))
 }
 
 export function getDiffZoomThumbnailUrl(fileId, pageIds, threshold) {
   return `${BASE}/diff_zoom_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
 }
 
-export function clearDiffZoomThumbnails() {
-  return del('/diff_zoom_thumbnails')
+export function clearDiffZoomThumbnails(cameraId = null) {
+  return del('/diff_zoom_thumbnails' + buildQuery({ camera_id: cameraId }))
 }
 
 export function getErosionThumbnailUrl(fileId, pageIds, threshold) {
   return `${BASE}/erosion_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
 }
 
-export function clearErosionThumbnails() {
-  return del('/erosion_thumbnails')
+export function clearErosionThumbnails(cameraId = null) {
+  return del('/erosion_thumbnails' + buildQuery({ camera_id: cameraId }))
 }
 
 export function getMotionThumbnailUrl(fileId, pageIds, threshold, mode) {
   return `${BASE}/motion_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}&mode=${mode}`
 }
 
-export function clearMotionThumbnails() {
-  return del('/motion_thumbnails')
+export function clearMotionThumbnails(cameraId = null) {
+  return del('/motion_thumbnails' + buildQuery({ camera_id: cameraId }))
 }
 
-export function clearAllThumbnails() {
-  return del('/all_thumbnails')
+export function clearVideoThumbnails(cameraId = null) {
+  return del('/video_thumbnails' + buildQuery({ camera_id: cameraId }))
+}
+
+export function clearOpenVinoThumbnails(cameraId = null) {
+  return del('/openvino_thumbnails' + buildQuery({ camera_id: cameraId }))
+}
+
+export function clearAllThumbnails(cameraId = null) {
+  return del('/all_thumbnails' + buildQuery({ camera_id: cameraId }))
 }
 
 export function getStorageInfo() {
   return get('/storage_info')
+}
+
+export function getTaskMaxErrors() {
+  const val = parseInt(localStorage.getItem('task_max_errors') ?? '5', 10)
+  return isNaN(val) || val <= 0 ? null : val
 }
 
 async function sendJson(method, path, body) {
@@ -280,7 +297,9 @@ export function resumeAllTasks() {
 }
 
 export function createTask({ type, params, label }) {
-  return postJson('/tasks', { type, params, label })
+  const maxErrors = getTaskMaxErrors()
+  const fullParams = maxErrors != null ? { max_errors: maxErrors, ...params } : params
+  return postJson('/tasks', { type, params: fullParams, label })
 }
 
 export function deleteTask(taskId) {
@@ -293,6 +312,10 @@ export function pauseTask(taskId) {
 
 export function resumeTask(taskId) {
   return putJson(`/tasks/${taskId}/resume`, {})
+}
+
+export function skipTask(taskId) {
+  return putJson(`/tasks/${taskId}/skip`, {})
 }
 
 export function cancelTask(taskId) {

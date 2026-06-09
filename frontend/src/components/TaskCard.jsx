@@ -72,7 +72,7 @@ function pad2(n) { return String(n).padStart(2, '0') }
 
 export default function TaskCard({
   task,
-  onPause, onResume, onCancel, onDelete, onViewResults,
+  onPause, onResume, onSkip, onCancel, onDelete, onViewResults,
   onDragStart, onDragOver, onDrop, onDragEnd,
   isDragOver,
 }) {
@@ -150,8 +150,13 @@ export default function TaskCard({
             </button>
           )}
           {(task.status === 'paused' || task.status === 'failed') && (
-            <button className="tc__btn tc__btn--accent" title="Resume" onClick={onResume}>
+            <button className="tc__btn tc__btn--accent" title="Retry (resume from current file)" onClick={onResume}>
               <i className="mdi mdi-play" />
+            </button>
+          )}
+          {task.status === 'failed' && onSkip && (
+            <button className="tc__btn tc__btn--warn" title="Skip current file and continue" onClick={onSkip}>
+              <i className="mdi mdi-skip-next" />
             </button>
           )}
           {!['completed', 'cancelled'].includes(task.status) && (

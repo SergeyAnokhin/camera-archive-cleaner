@@ -363,6 +363,66 @@ export default function ComputeTab() {
         </button>
         {savedMsg && <span className="compute-saved">{savedMsg}</span>}
       </div>
+
+      {/* Task error threshold */}
+      <div className="modal-section">
+        <div className="modal-section-title">Обработка ошибок задач</div>
+        <MaxErrorsSetting />
+      </div>
+    </>
+  )
+}
+
+const MAX_ERRORS_KEY = 'task_max_errors'
+const MAX_ERRORS_DEFAULT = 5
+
+function MaxErrorsSetting() {
+  const [value, setValue] = useState(() => {
+    const v = parseInt(localStorage.getItem(MAX_ERRORS_KEY) ?? String(MAX_ERRORS_DEFAULT), 10)
+    return isNaN(v) ? MAX_ERRORS_DEFAULT : v
+  })
+  const [saved, setSaved] = useState(false)
+
+  function handleChange(e) {
+    const v = parseInt(e.target.value, 10)
+    if (!isNaN(v) && v >= 0) setValue(v)
+  }
+
+  function handleSave() {
+    localStorage.setItem(MAX_ERRORS_KEY, String(value))
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  return (
+    <>
+      <div className="modal-setting-hint">
+        Максимальное количество ошибок при обработке файлов в задаче, после которых задача
+        останавливается. Применяется к новым задачам. <strong>0</strong> — без ограничений
+        (пропускать ошибки бесконечно).
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+        <input
+          type="number"
+          min={0}
+          max={9999}
+          value={value}
+          onChange={handleChange}
+          style={{
+            width: 80,
+            background: '#1f2937',
+            border: '1px solid #374151',
+            borderRadius: 6,
+            color: 'var(--text)',
+            padding: '4px 8px',
+            fontSize: 'inherit',
+          }}
+        />
+        <button className="modal-btn" onClick={handleSave}>
+          <i className="mdi mdi-content-save" /> Сохранить
+        </button>
+        {saved && <span className="compute-saved">Сохранено</span>}
+      </div>
     </>
   )
 }

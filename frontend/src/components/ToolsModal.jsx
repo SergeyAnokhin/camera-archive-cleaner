@@ -18,7 +18,7 @@ const TABS = [
   { id: 'maintenance', label: 'Maintenance' },
 ]
 
-export default function ToolsModal({ onClose, onDatabaseCleared }) {
+export default function ToolsModal({ onClose, onDatabaseCleared, cameraId, cameras }) {
   const [activeTab, setActiveTab] = useState('general')
 
   function handleBackdropClick(e) {
@@ -58,7 +58,13 @@ export default function ToolsModal({ onClose, onDatabaseCleared }) {
           {activeTab === 'google_ai'   && <GoogleAiTab />}
           {activeTab === 'claude_ai'   && <ClaudeAiTab />}
           {activeTab === 'compute'     && <ComputeTab />}
-          {activeTab === 'maintenance' && <MaintenanceTab onDatabaseCleared={onDatabaseCleared} />}
+          {activeTab === 'maintenance' && (
+            <MaintenanceTab
+              onDatabaseCleared={onDatabaseCleared}
+              cameraId={cameraId}
+              cameras={cameras}
+            />
+          )}
         </div>
       </div>
     </div>

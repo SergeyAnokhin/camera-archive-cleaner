@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  getTasks, createTask, deleteTask, pauseTask, resumeTask, cancelTask,
+  getTasks, createTask, deleteTask, pauseTask, resumeTask, skipTask, cancelTask,
   reorderTasks, getTaskMetrics, pauseAllTasks, resumeAllTasks,
 } from '../api.js'
 import TaskCard from './TaskCard.jsx'
@@ -215,6 +215,7 @@ export default function TasksScreen({ cameras, onNavigate }) {
               onDragEnd={handleDragEnd}
               onPause={() => act(pauseTask, task.id)}
               onResume={() => act(resumeTask, task.id)}
+              onSkip={() => act(skipTask, task.id)}
               onCancel={() => act(cancelTask, task.id)}
               onDelete={() => act(deleteTask, task.id)}
               onViewResults={onNavigate ? (t) => onNavigate(t) : undefined}

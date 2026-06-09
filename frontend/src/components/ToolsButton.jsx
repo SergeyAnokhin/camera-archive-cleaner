@@ -2,7 +2,7 @@ import { useState } from 'react'
 import ToolsModal from './ToolsModal.jsx'
 import './ToolsButton.css'
 
-export default function ToolsButton({ onDatabaseCleared }) {
+export default function ToolsButton({ onDatabaseCleared, cameraId, cameras }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -15,6 +15,8 @@ export default function ToolsButton({ onDatabaseCleared }) {
         <ToolsModal
           onClose={() => setOpen(false)}
           onDatabaseCleared={() => { setOpen(false); onDatabaseCleared() }}
+          cameraId={cameraId}
+          cameras={cameras}
         />
       )}
     </>

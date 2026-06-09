@@ -468,7 +468,7 @@ export default function App() {
               <i className="mdi mdi-playlist-play" />
               Tasks
             </button>
-            <ToolsButton onDatabaseCleared={handleScanComplete} />
+            <ToolsButton onDatabaseCleared={handleScanComplete} cameraId={cameraId} cameras={cameras} />
             <ScanButton cameraId={cameraId} onScanComplete={handleScanComplete} />
           </div>
         </div>
