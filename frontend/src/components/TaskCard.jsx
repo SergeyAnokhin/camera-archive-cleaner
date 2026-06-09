@@ -2,10 +2,12 @@ import { getThumbnailUrl, getVideoThumbnailUrl } from '../api.js'
 import './TaskCard.css'
 
 const TYPE_CONFIG = {
-  video_thumbnails: { icon: 'mdi-video-outline',  label: 'Video Thumbnails' },
-  openvino:         { icon: 'mdi-magnify-scan',    label: 'OpenVINO Detection' },
-  gemini:           { icon: 'mdi-google',           label: 'Gemini AI Analysis' },
-  claude:           { icon: 'mdi-robot',            label: 'Claude AI Analysis' },
+  video_thumbnails: { icon: 'mdi-video-outline',      label: 'Video Thumbnails' },
+  openvino:         { icon: 'mdi-magnify-scan',        label: 'OpenVINO Detection' },
+  gemini:           { icon: 'mdi-google',              label: 'Gemini AI Analysis' },
+  claude:           { icon: 'mdi-robot',               label: 'Claude AI Analysis' },
+  video_convert:    { icon: 'mdi-video-check',          label: 'Video Convert' },
+  file_organizer:   { icon: 'mdi-folder-move-outline', label: 'File Organizer' },
 }
 
 const STATUS_CONFIG = {
@@ -72,7 +74,7 @@ function pad2(n) { return String(n).padStart(2, '0') }
 
 export default function TaskCard({
   task,
-  onPause, onResume, onSkip, onCancel, onDelete, onViewResults,
+  onPause, onResume, onSkip, onCancel, onDelete, onViewResults, onViewLogs,
   onDragStart, onDragOver, onDrop, onDragEnd,
   isDragOver,
 }) {
@@ -108,8 +110,10 @@ export default function TaskCard({
     : null
   const showThumb = thumbUrl && (isActive || task.status === 'paused')
 
-  const isAiTask = task.type === 'gemini' || task.type === 'claude' || task.type === 'openvino'
+  const isAiTask     = task.type === 'gemini' || task.type === 'claude' || task.type === 'openvino'
   const canViewResults = isAiTask && onViewResults
+  const canViewLogs  = (task.type === 'video_convert' || task.type === 'file_organizer') && onViewLogs
+  const isDryRun     = task.params?.dry_run
 
   const isFinished = ['completed', 'failed', 'cancelled'].includes(task.status)
   const durationSec = task.started_at && task.completed_at
@@ -139,6 +143,11 @@ export default function TaskCard({
         </span>
 
         <div className="tc__btns">
+          {canViewLogs && (
+            <button className="tc__btn tc__btn--accent" title="View logs" onClick={() => onViewLogs(task)}>
+              <i className="mdi mdi-console-line" />
+            </button>
+          )}
           {canViewResults && (
             <button className="tc__btn tc__btn--accent" title="View results in heatmap" onClick={() => onViewResults(task)}>
               <i className="mdi mdi-map-search-outline" />
@@ -191,10 +200,14 @@ export default function TaskCard({
       <div className="tc__sub">
         <span className="tc__label">{label || '—'}</span>
         <div className="tc__tags">
+          {isDryRun && <span className="tc__tag tc__tag--dry"><i className="mdi mdi-test-tube" /> dry run</span>}
           {params.model_name  && <span className="tc__tag">{params.model_name}</span>}
           {params.model       && <span className="tc__tag">{params.model}</span>}
           {params.thumb_mode  && <span className="tc__tag">{params.thumb_mode}</span>}
           {params.confidence != null && <span className="tc__tag">{params.confidence}</span>}
+          {params.input_pattern && <span className="tc__tag">{params.input_pattern}</span>}
+          {params.codec && <span className="tc__tag">{params.codec}</span>}
+          {params.output_folder && <span className="tc__tag"><i className="mdi mdi-folder-outline" /> {params.output_folder}</span>}
           {params.delay_max_sec > 0 && (
             <span className="tc__tag"><i className="mdi mdi-timer-pause-outline" /> {params.delay_min_sec}–{params.delay_max_sec}s</span>
           )}

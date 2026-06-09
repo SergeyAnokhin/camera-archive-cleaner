@@ -1,5 +1,5 @@
 .ntm {
-  width: 600px;
+  width: 660px;
 }
 
 .ntm__body {
@@ -183,6 +183,69 @@
   color: #fbbf24;
   display: flex;
   align-items: center;
+}
+
+/* ── Params grid (new task types) ────────────────────────── */
+.ntm__params-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.ntm__param {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ntm__param--wide {
+  grid-column: 1 / -1;
+}
+
+.ntm__param-hint {
+  font-size: calc(var(--font-base) * 0.75);
+  color: var(--text-dim);
+}
+
+.ntm__example-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(var(--font-base) * 0.82);
+  color: var(--text-muted);
+  background: rgba(14,165,233,.05);
+}
+
+.ntm__example-row code {
+  background: rgba(255,255,255,.08);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.95em;
+}
+
+/* Source type toggle */
+.ntm__toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--bg-input);
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: calc(var(--font-base) * 0.85);
+  color: var(--text-muted);
+  transition: border-color .15s, background .15s;
+}
+
+.ntm__toggle-btn:hover {
+  background: var(--bg-card-hover);
+}
+
+.ntm__toggle-btn--active {
+  border-color: var(--accent);
+  background: rgba(14,165,233,.08);
+  color: var(--text);
 }
 
 /* ── Footer ───────────────────────────────────────────────── */

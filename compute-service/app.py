@@ -21,7 +21,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from shared.contract import DetectRequest, DetectResponse, VideoThumbnailRequest
+from shared.contract import (DetectRequest, DetectResponse,
+                             VideoThumbnailRequest,
+                             VideoConvertRequest, VideoConvertResponse)
 
 import config
 import detection
@@ -146,3 +148,24 @@ def video_endpoint(req: VideoThumbnailRequest):
     logger.info("video   %-30s  mode=%-15s  %.2f s",
                 Path(path).name, req.mode, time.time() - t0)
     return Response(content=data, media_type=content_type)
+
+
+@app.post("/video/convert", response_model=VideoConvertResponse,
+          summary="Convert a video file with ffmpeg (H.265/H.264)")
+def video_convert_endpoint(req: VideoConvertRequest):
+    if not video.ffmpeg_available():
+        raise HTTPException(status_code=503, detail="ffmpeg not found on PATH")
+    src = config.remap_path(req.src_path)
+    dst = config.remap_path(req.dst_path)
+    if not Path(src).exists():
+        raise HTTPException(status_code=404, detail=f"Source not found: {src}")
+    try:
+        elapsed_ms = video.convert_video(src, dst, req.codec, req.crf, req.preset)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error("Video convert failed %s → %s: %s", src, dst, e)
+        raise HTTPException(status_code=500, detail=f"Conversion error: {e}")
+    logger.info("convert %-30s  codec=%-8s  crf=%d  preset=%-10s  %.2f s",
+                Path(src).name, req.codec, req.crf, req.preset, elapsed_ms / 1000)
+    return VideoConvertResponse(ok=True, elapsed_ms=elapsed_ms)

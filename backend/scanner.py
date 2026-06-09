@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov"}
 
+SCANNER_SKIP_DIRS = {"organized"}
+
 _LOG_EVERY = 1000
 _COMMIT_EVERY = 5000  # release the write lock periodically during large scans
 
@@ -53,6 +55,19 @@ def scan_camera(conn: sqlite3.Connection, camera: Camera) -> int:
     return count
 
 
+def _iter_files(root: Path):
+    """Yield all files under root, skipping SCANNER_SKIP_DIRS directories."""
+    try:
+        for entry in root.iterdir():
+            if entry.is_dir():
+                if entry.name not in SCANNER_SKIP_DIRS:
+                    yield from _iter_files(entry)
+            elif entry.is_file():
+                yield entry
+    except PermissionError:
+        pass
+
+
 def _scan_dir(conn: sqlite3.Connection, camera_id: str,
               directory: str, file_type: str) -> int:
     path = Path(directory)
@@ -63,9 +78,7 @@ def _scan_dir(conn: sqlite3.Connection, camera_id: str,
     extensions = PHOTO_EXTENSIONS if file_type == "photo" else VIDEO_EXTENSIONS
     count = 0
 
-    for file in path.rglob("*"):
-        if not file.is_file():
-            continue
+    for file in _iter_files(path):
         if file.suffix.lower() not in extensions:
             continue
 

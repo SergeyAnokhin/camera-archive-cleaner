@@ -7,20 +7,25 @@ items it re-reads the task status to support pause and cancel.
 On startup, tasks stuck in 'running'/'pausing' are reset to 'paused'.
 """
 import asyncio
+import fnmatch
 import json
 import logging
 import random
+import re
+import shutil
 import time
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 
 import base64
 
 import compute_client
 from compute_cache import ov_cache_path, video_cache_path, OV_THUMB_DIR, VID_THUMB_DIR
+from config import load_cameras
 from database import (
     get_connection, save_object_detection, save_video_preview,
-    update_task_progress, update_task_status,
+    update_task_progress, update_task_status, append_task_log,
 )
 
 logger = logging.getLogger("api")
@@ -138,6 +143,10 @@ async def _execute_task(task: dict) -> None:
             await _run_ai(task_id, params, resume_from, "gemini")
         elif task_type == "claude":
             await _run_ai(task_id, params, resume_from, "claude")
+        elif task_type == "video_convert":
+            await _run_video_convert(task_id, params, resume_from)
+        elif task_type == "file_organizer":
+            await _run_file_organizer(task_id, params, resume_from)
         else:
             raise ValueError(f"Unknown task type: {task_type}")
     except asyncio.CancelledError:
@@ -542,3 +551,240 @@ async def _run_ai(task_id: str, params: dict, resume_from: int, provider: str) -
             (final, total, task_id),
         )
     logger.info("✅ AI(%s) task %s done (%d photos)", provider, task_id[:8], final)
+
+
+# ---------------------------------------------------------------------------
+# Log helper (sync, for asyncio.to_thread)
+# ---------------------------------------------------------------------------
+
+def _append_log(task_id: str, msg: str) -> None:
+    ts = time.strftime("%H:%M:%S")
+    line = f"[{ts}] {msg}"
+    logger.info("Task %s: %s", task_id[:8], msg)
+    with get_connection() as conn:
+        append_task_log(conn, task_id, line)
+
+
+# ---------------------------------------------------------------------------
+# video_convert executor
+# ---------------------------------------------------------------------------
+
+async def _run_video_convert(task_id: str, params: dict, resume_from: int) -> None:
+    camera_id    = params["camera_id"]
+    input_pat    = params.get("input_pattern", "*.mp4")
+    out_suffix   = params.get("output_suffix", "_web")
+    out_ext      = params.get("output_extension", "mp4").lstrip(".")
+    codec        = params.get("codec", "libx265")
+    crf          = int(params.get("crf", 30))
+    preset       = params.get("preset", "medium")
+    dry_run      = bool(params.get("dry_run", False))
+    date_from_s  = params.get("date_from")
+    date_to_s    = params.get("date_to")
+
+    cameras_map = {c.id: c for c in load_cameras()}
+    camera = cameras_map.get(camera_id)
+    if not camera:
+        raise ValueError(f"Camera not found: {camera_id}")
+
+    root = Path(camera.path_videos)
+    if not root.exists():
+        raise ValueError(f"Videos directory not found: {root}")
+
+    if not dry_run:
+        try:
+            compute_client._base_url()  # fails fast if compute is disabled/unreachable
+        except compute_client.ComputeDisabled:
+            raise RuntimeError(
+                "Compute-service is disabled. Enable it in compute_config.json to use video_convert."
+            )
+
+    # Parse optional date filter
+    dt_from = datetime.fromisoformat(date_from_s.replace("Z", "+00:00")) if date_from_s else None
+    dt_to   = datetime.fromisoformat(date_to_s.replace("Z", "+00:00")) if date_to_s else None
+
+    # Collect matching source files (exclude already-converted outputs)
+    all_files: list[Path] = []
+    for f in root.rglob("*"):
+        if not f.is_file():
+            continue
+        if not fnmatch.fnmatch(f.name.lower(), input_pat.lower()):
+            continue
+        if out_suffix and f.stem.endswith(out_suffix):
+            continue
+        if dt_from or dt_to:
+            mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
+            if dt_from and mtime < dt_from:
+                continue
+            if dt_to and mtime > dt_to:
+                continue
+        all_files.append(f)
+
+    all_files.sort(key=lambda p: p.stat().st_mtime)
+    total = len(all_files)
+    to_process = all_files[resume_from:]
+
+    await asyncio.to_thread(_write_progress, task_id, resume_from, total, None, None, None, None)
+
+    tracker  = _SpeedTracker(300)
+    processed = 0
+    last_save = time.time()
+
+    prefix = "[DRY] " if dry_run else ""
+
+    for f in to_process:
+        status = await asyncio.to_thread(_read_status, task_id)
+        if status in ("pausing", "cancelled"):
+            current = resume_from + processed
+            await asyncio.to_thread(_write_progress, task_id, current, total, None, str(f), None, None)
+            with get_connection() as conn:
+                conn.execute("UPDATE tasks SET status='paused' WHERE id=?", (task_id,))
+            logger.info("⏸ Task %s paused at %d/%d", task_id[:8], current, total)
+            return
+
+        dst = f.parent / f"{f.stem}{out_suffix}.{out_ext}"
+        rel = str(f.relative_to(root))
+
+        if dst.exists():
+            await asyncio.to_thread(_append_log, task_id, f"Skip (exists): {rel} → {dst.name}")
+        elif dry_run:
+            await asyncio.to_thread(_append_log, task_id,
+                                    f"[DRY] Would convert: {rel} → {dst.name}")
+        else:
+            await asyncio.to_thread(_append_log, task_id, f"Converting: {rel} → {dst.name}")
+            try:
+                await asyncio.to_thread(
+                    compute_client.convert_video, str(f), str(dst), codec, crf, preset
+                )
+                await asyncio.to_thread(_append_log, task_id, f"Done: {dst.name}")
+            except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable) as e:
+                raise Exception(f"Compute service unavailable: {e}")
+            except Exception as e:
+                await asyncio.to_thread(_append_log, task_id, f"ERROR {rel}: {e}")
+
+        processed += 1
+        current = resume_from + processed
+        tracker.record(current)
+        speed = tracker.speed()
+        eta = int((total - current) / speed) if speed and speed > 0 else None
+
+        if time.time() - last_save >= _PROGRESS_INTERVAL:
+            await asyncio.to_thread(_write_progress, task_id, current, total, None, str(f), speed, eta)
+            last_save = time.time()
+
+    final = resume_from + processed
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE tasks SET status='completed', completed_at=datetime('now'), "
+            "progress_current=?, progress_total=?, speed_per_sec=NULL, eta_seconds=NULL, "
+            "current_file_id=NULL, current_file_path=NULL WHERE id=?",
+            (final, total, task_id),
+        )
+    logger.info("✅ Task %s (video_convert%s) done: %d files", task_id[:8],
+                " DRY" if dry_run else "", final)
+
+
+# ---------------------------------------------------------------------------
+# file_organizer executor
+# ---------------------------------------------------------------------------
+
+async def _run_file_organizer(task_id: str, params: dict, resume_from: int) -> None:
+    camera_id     = params["camera_id"]
+    source_type   = params.get("source_type", "snapshots")
+    input_pat     = params.get("input_pattern", "*.jpg")
+    output_folder = params.get("output_folder", "organized")
+    date_regex    = params.get("date_regex", r"(\d{4})(\d{2})(\d{2})")
+    dry_run       = bool(params.get("dry_run", False))
+
+    cameras_map = {c.id: c for c in load_cameras()}
+    camera = cameras_map.get(camera_id)
+    if not camera:
+        raise ValueError(f"Camera not found: {camera_id}")
+
+    root = Path(camera.path_snapshots if source_type == "snapshots" else camera.path_videos)
+    if not root.exists():
+        raise ValueError(f"Directory not found: {root}")
+
+    output_dir = root / output_folder
+
+    # Validate regex early
+    try:
+        compiled_re = re.compile(date_regex)
+    except re.error as e:
+        raise ValueError(f"Invalid date_regex: {e}")
+
+    # Scan only root-level files (output_folder subdir is excluded naturally)
+    all_files: list[Path] = []
+    for f in root.iterdir():
+        if not f.is_file():
+            continue
+        if not fnmatch.fnmatch(f.name.lower(), input_pat.lower()):
+            continue
+        all_files.append(f)
+
+    all_files.sort(key=lambda p: p.name)
+    total = len(all_files)
+    to_process = all_files[resume_from:]
+
+    await asyncio.to_thread(_write_progress, task_id, resume_from, total, None, None, None, None)
+
+    if not dry_run:
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    tracker  = _SpeedTracker(300)
+    processed = 0
+    last_save = time.time()
+
+    for f in to_process:
+        status = await asyncio.to_thread(_read_status, task_id)
+        if status in ("pausing", "cancelled"):
+            current = resume_from + processed
+            await asyncio.to_thread(_write_progress, task_id, current, total, None, str(f), None, None)
+            with get_connection() as conn:
+                conn.execute("UPDATE tasks SET status='paused' WHERE id=?", (task_id,))
+            logger.info("⏸ Task %s paused at %d/%d", task_id[:8], current, total)
+            return
+
+        m = compiled_re.search(f.name)
+        if not m or len(m.groups()) < 3:
+            await asyncio.to_thread(_append_log, task_id, f"Skip (no date match): {f.name}")
+        else:
+            year, month, day = m.group(1), m.group(2), m.group(3)
+            dest_dir = output_dir / year / month / day
+            dest     = dest_dir / f.name
+
+            if dest.exists():
+                await asyncio.to_thread(_append_log, task_id, f"Skip (exists): {f.name}")
+            elif dry_run:
+                await asyncio.to_thread(_append_log, task_id,
+                                        f"[DRY] Would move: {f.name} → "
+                                        f"{output_folder}/{year}/{month}/{day}/")
+            else:
+                try:
+                    dest_dir.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(f), str(dest))
+                    await asyncio.to_thread(_append_log, task_id,
+                                            f"Moved: {f.name} → "
+                                            f"{output_folder}/{year}/{month}/{day}/")
+                except Exception as e:
+                    await asyncio.to_thread(_append_log, task_id, f"ERROR {f.name}: {e}")
+
+        processed += 1
+        current = resume_from + processed
+        tracker.record(current)
+        speed = tracker.speed()
+        eta = int((total - current) / speed) if speed and speed > 0 else None
+
+        if time.time() - last_save >= _PROGRESS_INTERVAL:
+            await asyncio.to_thread(_write_progress, task_id, current, total, None, str(f), speed, eta)
+            last_save = time.time()
+
+    final = resume_from + processed
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE tasks SET status='completed', completed_at=datetime('now'), "
+            "progress_current=?, progress_total=?, speed_per_sec=NULL, eta_seconds=NULL, "
+            "current_file_id=NULL, current_file_path=NULL WHERE id=?",
+            (final, total, task_id),
+        )
+    logger.info("✅ Task %s (file_organizer%s) done: %d files", task_id[:8],
+                " DRY" if dry_run else "", final)

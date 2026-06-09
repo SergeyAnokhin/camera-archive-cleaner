@@ -35,6 +35,7 @@ def _row_to_dict(row) -> dict:
         d["params"] = json.loads(d.get("params") or "{}")
     except Exception:
         d["params"] = {}
+    d.pop("log_tail", None)  # fetched separately via /tasks/{id}/logs
     return d
 
 
@@ -51,9 +52,13 @@ class CreateTaskRequest(BaseModel):
     label: Optional[str] = None
 
 
+ALLOWED_TASK_TYPES = {"video_thumbnails", "openvino", "gemini", "claude",
+                      "video_convert", "file_organizer"}
+
+
 @router.post("")
 def create_new_task(req: CreateTaskRequest):
-    if req.type not in {"video_thumbnails", "openvino", "gemini", "claude"}:
+    if req.type not in ALLOWED_TASK_TYPES:
         raise HTTPException(status_code=400, detail=f"Unknown task type: {req.type}")
 
     params = dict(req.params)
@@ -112,6 +117,19 @@ def resume_all():
     task_runner.set_global_paused(False)
     logger.info("▶ Global queue pause cleared")
     return {"ok": True, "global_paused": False}
+
+
+@router.get("/{task_id}/logs")
+def get_task_logs(task_id: str):
+    with get_connection() as conn:
+        task = get_task(conn, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        try:
+            lines = json.loads(task["log_tail"] or "[]")
+        except Exception:
+            lines = []
+    return {"task_id": task_id, "status": task["status"], "lines": lines}
 
 
 @router.delete("/{task_id}")

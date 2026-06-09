@@ -30,3 +30,18 @@ class VideoThumbnailRequest(BaseModel):
     """Video-thumbnail request. Response is binary image/jpeg or image/gif."""
     path: str
     mode: str
+
+
+class VideoConvertRequest(BaseModel):
+    """Video-conversion request. Both paths use the same coordinate system as the
+    main backend; the compute-service remaps them via config.remap_path() if needed."""
+    src_path: str
+    dst_path: str
+    codec: str = "libx265"
+    crf: int = 30
+    preset: str = "medium"
+
+
+class VideoConvertResponse(BaseModel):
+    ok: bool
+    elapsed_ms: int = 0

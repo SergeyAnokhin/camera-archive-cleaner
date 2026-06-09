@@ -8,13 +8,16 @@ import logging
 import httpx
 
 from compute_config import effective_url
-from shared.contract import DetectRequest, DetectResponse, VideoThumbnailRequest
+from shared.contract import (DetectRequest, DetectResponse,
+                             VideoThumbnailRequest,
+                             VideoConvertRequest)
 
 logger = logging.getLogger("api")
 
-_DETECT_TIMEOUT = 120.0
-_VIDEO_TIMEOUT = 120.0
-_HEALTH_TIMEOUT = 5.0
+_DETECT_TIMEOUT   = 120.0
+_VIDEO_TIMEOUT    = 120.0
+_CONVERT_TIMEOUT  = 7200.0  # up to 2 h per file
+_HEALTH_TIMEOUT   = 5.0
 
 
 class ComputeDisabled(Exception):
@@ -56,6 +59,22 @@ def video_thumbnail(path: str, mode: str) -> tuple[bytes, str]:
     if resp.status_code != 200:
         raise ComputeUnavailable(f"Compute-service error {resp.status_code}: {resp.text}")
     return resp.content, resp.headers.get("content-type", "image/jpeg")
+
+
+def convert_video(src_path: str, dst_path: str, codec: str = "libx265",
+                  crf: int = 30, preset: str = "medium") -> None:
+    """Ask the compute-service to convert src_path → dst_path with ffmpeg.
+    Raises ComputeDisabled, ComputeUnavailable, or RuntimeError on failure."""
+    url = _base_url()
+    req = VideoConvertRequest(src_path=src_path, dst_path=dst_path,
+                              codec=codec, crf=crf, preset=preset)
+    try:
+        resp = httpx.post(f"{url}/video/convert", json=req.model_dump(),
+                          timeout=_CONVERT_TIMEOUT)
+    except httpx.HTTPError as e:
+        raise ComputeUnavailable(f"Compute-service unreachable at {url}: {e}")
+    if resp.status_code != 200:
+        raise ComputeUnavailable(f"Compute-service error {resp.status_code}: {resp.text[:300]}")
 
 
 def health() -> dict:

@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from pathlib import Path
 
@@ -439,9 +440,25 @@ def init_tasks_table(conn: sqlite3.Connection) -> None:
             created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
             started_at        TEXT,
             completed_at      TEXT,
-            error_message     TEXT
+            error_message     TEXT,
+            log_tail          TEXT
         );
     """)
+    try:
+        conn.execute("ALTER TABLE tasks ADD COLUMN log_tail TEXT")
+    except Exception:
+        pass
+
+
+def append_task_log(conn: sqlite3.Connection, task_id: str, line: str,
+                    max_lines: int = 300) -> None:
+    row = conn.execute("SELECT log_tail FROM tasks WHERE id=?", (task_id,)).fetchone()
+    existing = json.loads(row["log_tail"] or "[]") if row else []
+    existing.append(line)
+    if len(existing) > max_lines:
+        existing = existing[-max_lines:]
+    conn.execute("UPDATE tasks SET log_tail=? WHERE id=?",
+                 (json.dumps(existing), task_id))
 
 
 def get_all_tasks(conn: sqlite3.Connection) -> list:

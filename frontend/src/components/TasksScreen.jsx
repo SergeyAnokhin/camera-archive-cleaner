@@ -5,6 +5,7 @@ import {
 } from '../api.js'
 import TaskCard from './TaskCard.jsx'
 import NewTaskModal from './NewTaskModal.jsx'
+import TaskLogsModal from './TaskLogsModal.jsx'
 import './TasksScreen.css'
 
 function formatBytes(b) {
@@ -70,6 +71,7 @@ export default function TasksScreen({ cameras, onNavigate }) {
   const [globalPaused, setGlobalPaused] = useState(false)
   const [metrics, setMetrics]           = useState(null)
   const [showModal, setShowModal]       = useState(false)
+  const [logsTask, setLogsTask]         = useState(null)
   const [error, setError]               = useState(null)
   const [dragIdx, setDragIdx]           = useState(null)
   const [overIdx, setOverIdx]           = useState(null)
@@ -219,6 +221,7 @@ export default function TasksScreen({ cameras, onNavigate }) {
               onCancel={() => act(cancelTask, task.id)}
               onDelete={() => act(deleteTask, task.id)}
               onViewResults={onNavigate ? (t) => onNavigate(t) : undefined}
+              onViewLogs={t => setLogsTask(t)}
             />
           ))}
         </div>
@@ -230,6 +233,14 @@ export default function TasksScreen({ cameras, onNavigate }) {
           cameras={cameras}
           onAdd={handleAdd}
           onClose={() => setShowModal(false)}
+        />
+      )}
+
+      {/* ── Task logs modal ──────────────────────────────────── */}
+      {logsTask && (
+        <TaskLogsModal
+          task={logsTask}
+          onClose={() => setLogsTask(null)}
         />
       )}
     </div>

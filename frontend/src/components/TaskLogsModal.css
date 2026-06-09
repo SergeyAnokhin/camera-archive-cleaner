@@ -1,0 +1,129 @@
+.tlm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.tlm-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: min(760px, 96vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+}
+
+.tlm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.tlm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.tlm-icon {
+  color: var(--accent);
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.tlm-title {
+  font-size: calc(var(--font-base) * 0.95);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tlm-badge {
+  font-size: calc(var(--font-base) * 0.75);
+  padding: 2px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tlm-badge--dry {
+  background: rgba(245,158,11,.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245,158,11,.3);
+}
+
+.tlm-badge--live {
+  background: rgba(34,197,94,.12);
+  color: #22c55e;
+  border: 1px solid rgba(34,197,94,.3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tlm-close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.tlm-close:hover { color: var(--text); background: var(--border); }
+
+.tlm-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 14px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: calc(var(--font-base) * 0.82);
+  line-height: 1.55;
+}
+
+.tlm-empty {
+  color: var(--text-dim);
+  font-family: inherit;
+  padding: 20px 0;
+  text-align: center;
+}
+
+.tlm-line {
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 1px 0;
+}
+
+.tlm-line--dry   { color: #f59e0b; }
+.tlm-line--error { color: #ef4444; }
+.tlm-line--skip  { color: var(--text-dim); }
+
+.tlm-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.tlm-count {
+  font-size: calc(var(--font-base) * 0.8);
+  color: var(--text-dim);
+}

@@ -314,6 +314,10 @@ export function getTaskMetrics() {
   return get('/tasks/metrics')
 }
 
+export function getTaskLogs(taskId) {
+  return get(`/tasks/${encodeURIComponent(taskId)}/logs`)
+}
+
 // Tuning
 export function getTuningSessions() {
   return get('/tuning/sessions')

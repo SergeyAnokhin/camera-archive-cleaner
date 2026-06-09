@@ -1,9 +1,12 @@
-"""Video thumbnail generation — stateless. Returns image bytes, no disk cache.
+"""Video thumbnail generation and conversion — stateless.
 
-The main backend owns the cache; this service only computes.
+The main backend owns caches and file lists; this service only computes.
 """
 import io
 import logging
+import shutil
+import subprocess
+import time
 from pathlib import Path
 
 import cv2
@@ -189,3 +192,39 @@ def make_video_thumbnail(file_path: str, mode: str) -> tuple[bytes, str]:
 
     finally:
         cap.release()
+
+
+# ---------------------------------------------------------------------------
+# Video conversion (ffmpeg)
+# ---------------------------------------------------------------------------
+
+def ffmpeg_available() -> bool:
+    return shutil.which("ffmpeg") is not None
+
+
+def convert_video(src: str, dst: str, codec: str = "libx265",
+                  crf: int = 30, preset: str = "medium") -> int:
+    """Convert src to dst with ffmpeg. Returns elapsed_ms. Raises RuntimeError on failure."""
+    dst_path = Path(dst)
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        "ffmpeg", "-i", src,
+        "-c:v", codec,
+        "-crf", str(crf),
+        "-preset", preset,
+        "-an",
+        "-movflags", "+faststart",
+        dst,
+        "-y",
+        "-loglevel", "error",
+    ]
+    t0 = time.time()
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+    elapsed_ms = int((time.time() - t0) * 1000)
+
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        raise RuntimeError(f"ffmpeg: {stderr[:400]}")
+
+    return elapsed_ms
