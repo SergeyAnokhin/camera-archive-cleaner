@@ -108,45 +108,40 @@ def estimate_task_files(
     output_suffix: Optional[str] = None,
 ):
     """Count files that would be processed by video_convert or file_organizer."""
-    from config import load_cameras
-
-    cameras_map = {c.id: c for c in load_cameras()}
-    camera = cameras_map.get(camera_id)
-    if not camera:
-        raise HTTPException(status_code=404, detail=f"Camera not found: {camera_id}")
-
-    root = Path(camera.path)
-    if not root.exists():
-        return {"file_count": 0}
-
-    def _parse_dt(s):
-        if not s:
-            return None
-        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-
-    dt_from = _parse_dt(date_from)
-    dt_to   = _parse_dt(date_to)
-    count   = 0
-
     if task_type == "video_convert":
+        # Fast path: query the database (already indexed, no filesystem walk)
+        q = ("SELECT file_path FROM files WHERE camera_id=? AND file_type='video'"
+             + (" AND timestamp>=?" if date_from else "")
+             + (" AND timestamp<=?" if date_to else ""))
+        args = [camera_id] + ([date_from] if date_from else []) + ([date_to] if date_to else [])
+        with get_connection() as conn:
+            rows = conn.execute(q, args).fetchall()
         suffix = output_suffix or ""
-        for f in root.rglob("*"):
-            if not f.is_file():
-                continue
-            if not fnmatch.fnmatch(f.name.lower(), input_pattern.lower()):
-                continue
-            if suffix and f.stem.endswith(suffix):
-                continue
-            if dt_from or dt_to:
-                mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
-                if dt_from and mtime < dt_from:
-                    continue
-                if dt_to and mtime > dt_to:
-                    continue
-            count += 1
+        count = sum(
+            1 for r in rows
+            if fnmatch.fnmatch(Path(r["file_path"]).name.lower(), input_pattern.lower())
+            and not (suffix and Path(r["file_path"]).stem.endswith(suffix))
+        )
+        return {"file_count": count}
 
     elif task_type == "file_organizer":
+        # file_organizer only touches root-level files — iterdir is non-recursive and fast
+        from config import load_cameras
+        cameras_map = {c.id: c for c in load_cameras()}
+        camera = cameras_map.get(camera_id)
+        if not camera:
+            raise HTTPException(status_code=404, detail=f"Camera not found: {camera_id}")
+        root = Path(camera.path)
+        if not root.exists():
+            return {"file_count": 0}
+        def _parse_dt(s):
+            if not s:
+                return None
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        dt_from = _parse_dt(date_from)
+        dt_to   = _parse_dt(date_to)
+        count = 0
         for f in root.iterdir():
             if not f.is_file():
                 continue
@@ -159,11 +154,10 @@ def estimate_task_files(
                 if dt_to and mtime > dt_to:
                     continue
             count += 1
+        return {"file_count": count}
 
     else:
         raise HTTPException(status_code=400, detail=f"estimate_files not supported for: {task_type}")
-
-    return {"file_count": count}
 
 
 class ReorderRequest(BaseModel):
