@@ -598,7 +598,7 @@ async def _run_video_convert(task_id: str, params: dict, resume_from: int) -> No
     if not camera:
         raise ValueError(f"Camera not found: {camera_id}")
 
-    root = Path(camera.path_videos)
+    root = Path(camera.path)
     if not root.exists():
         raise ValueError(f"Videos directory not found: {root}")
 
@@ -714,7 +714,7 @@ async def _run_file_organizer(task_id: str, params: dict, resume_from: int) -> N
     if not camera:
         raise ValueError(f"Camera not found: {camera_id}")
 
-    root = Path(camera.path_snapshots if source_type == "snapshots" else camera.path_videos)
+    root = Path(camera.path)
     if not root.exists():
         raise ValueError(f"Directory not found: {root}")
 

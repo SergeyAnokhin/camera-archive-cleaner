@@ -100,17 +100,16 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 
 ```yaml
 cameras:
-  - id: "foscam_for_testing"
-    name: "Foscam for testing"
-    path_snapshots: "C:\\path\\to\\local\\snap"
-    path_videos:    "C:\\path\\to\\local\\record"
   - id: "foscam_fi9805w"
     name: "Foscam FI9805W"
-    path_snapshots: "\\\\192.168.1.99\\Camera\\Foscam\\snap"
-    path_videos:    "\\\\192.168.1.99\\Camera\\Foscam\\record"
+    path: "Foscam/FI9805W_C4D6553DECE1"  # relative to CAMERA_ROOT
+  - id: "reolink_front"
+    name: "Reolink Front"
+    path: "ReolinkFront"
 ```
 
-Paths can be local Windows paths or UNC shares (`\\server\share\...`).
+Set `CAMERA_ROOT` env var to the mount point (e.g. `\\192.168.1.99\Camera` locally,
+`/camera` in Kubernetes). The absolute path is `CAMERA_ROOT / path`.
 
 ---
 

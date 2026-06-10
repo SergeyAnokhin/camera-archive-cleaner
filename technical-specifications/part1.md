@@ -108,18 +108,17 @@ config ──► scanner ──► database (SQLite)
 #### 5. Конфигурация камер (YAML) ⚙️
 
 Источники задаются внешним `.yaml`-файлом — добавление камеры не требует изменения
-кода. Каждая камера имеет отдельные директории для снапшотов (фото) и видео.
+кода. Абсолютный путь формируется из `CAMERA_ROOT` (env var) и относительного
+поля `path`.
 
 ```yaml
 cameras:
-  - id: "foscam_for_testing"
-    name: "Foscam for testing"
-    path_snapshots: "C:\\path\\to\\local\\snap"
-    path_videos:    "C:\\path\\to\\local\\record"
   - id: "foscam_fi9805w"
     name: "Foscam FI9805W"
-    path_snapshots: "\\\\192.168.1.99\\Camera\\Foscam\\snap"
-    path_videos:    "\\\\192.168.1.99\\Camera\\Foscam\\record"
+    path: "Foscam/FI9805W_C4D6553DECE1"  # relative to CAMERA_ROOT
+  - id: "reolink_front"
+    name: "Reolink Front"
+    path: "ReolinkFront"
 ```
 
 Поля камеры:
@@ -128,11 +127,9 @@ cameras:
 |---|---|---|
 | `id` | string | Уникальный идентификатор, ключ связи во всей системе и в БД |
 | `name` | string | Человекочитаемое имя (отображается в UI) |
-| `path_snapshots` | string | Директория с фото (локальный путь или UNC) |
-| `path_videos` | string | Директория с видео |
+| `path` | string | Путь относительно `CAMERA_ROOT`; абсолютный = `CAMERA_ROOT / path` |
 
-Конфиг разбирается при старте бэкенда в структуру камеры (id, name,
-path_snapshots, path_videos).
+Конфиг разбирается при старте бэкенда в структуру `Camera(id, name, path)`.
 
 ---
 
