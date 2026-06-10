@@ -84,11 +84,27 @@ compute are separate pods. An initContainer writes
 **if absent**, so the backend reaches the compute Service and later UI edits
 (Tools → Compute) still persist. See [`backend/compute_config.py`](../backend/compute_config.py).
 
-### Camera files (SMB)
+### Camera files (SMB) and CAMERA_ROOT
 Both pods mount the same NAS share via the SMB CSI driver at the **same** path
-(`camera.smb.mountPath`, default `/camera`), so `COMPUTE_PATH_REMAP_*` stays empty
-(identity). `cameras.yaml` paths must match that mount. The backend mounts it
-read-write (it deletes files via `/delete`); compute mounts it read-only.
+(`camera.smb.mountPath`, default `/camera`). The Helm chart injects this value as
+`CAMERA_ROOT` into both the backend and compute containers automatically — you never
+need to configure it separately.
+
+`backend/cameras.yaml` stores **relative** paths (e.g. `FoscamHut`); `CAMERA_ROOT` is
+prepended at runtime to form absolute paths. When the backend calls the compute service
+it strips `CAMERA_ROOT` from the path; compute prepends its own `CAMERA_ROOT` to
+reconstruct the absolute path. Because both pods use the same mount point, paths are
+always consistent with no remapping.
+
+The backend mounts the share read-write (it deletes files via `/delete`); compute
+mounts it read-only.
+
+**Local Windows development** — set `CAMERA_ROOT` to the UNC path before starting
+either service:
+```powershell
+$env:CAMERA_ROOT = "\\192.168.1.91\Camera"
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
 ### Ingress / `/api` stripping
 The frontend calls relative `/api/...` ([`frontend/src/api.js`](../frontend/src/api.js)),
@@ -184,7 +200,7 @@ and commit — ArgoCD deploys from git, so changes must be pushed, not applied l
 | `image.registry` | `ghcr.io/<your-owner>/<your-repo>` (lowercase) |
 | `camera.smb.source` | your share, e.g. `//192.168.1.91/Camera` |
 | `camera.smb.mountPath` | mount point inside both pods (default `/camera`) |
-| `camerasConfig` | one entry per camera, **Linux** paths under `mountPath` (e.g. `/camera/Foscam/.../snap`) — these are what the DB stores |
+| `camerasConfig` | AUTO-MANAGED by CI from `backend/cameras.yaml` — contains **relative** paths (`Foscam/FI9805W_...`); `CAMERA_ROOT` is prepended at runtime |
 | `ingress.host` | the hostname you will open in the browser |
 | `imagePullSecrets` | `[{name: ghcr-creds}]` only if images are private |
 

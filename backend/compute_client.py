@@ -8,11 +8,13 @@ runtime, the last known-good URL is tried first; on failure the next URL in
 the list is tried. ComputeUnavailable is raised only when all URLs fail.
 """
 import logging
+from pathlib import Path
 from typing import Callable, TypeVar
 
 import httpx
 
 import compute_config
+from config import CAMERA_ROOT
 from shared.contract import (DetectRequest, DetectResponse,
                              VideoThumbnailRequest,
                              VideoConvertRequest)
@@ -20,6 +22,14 @@ from shared.contract import (DetectRequest, DetectResponse,
 logger = logging.getLogger("api")
 
 _DETECT_TIMEOUT   = 120.0
+
+
+def _to_relative(path: str) -> str:
+    """Strip CAMERA_ROOT prefix so compute can apply its own root."""
+    try:
+        return str(Path(path).relative_to(CAMERA_ROOT))
+    except ValueError:
+        return path  # not under CAMERA_ROOT — send as-is
 _VIDEO_TIMEOUT    = 120.0
 _CONVERT_TIMEOUT  = 7200.0  # up to 2 h per file
 _HEALTH_TIMEOUT   = 5.0
@@ -94,7 +104,7 @@ def _request_with_failover(fn: Callable[[str], T]) -> T:
 
 def detect(path: str, model: str, confidence: float,
            draw: bool = True, classes=None) -> DetectResponse:
-    req = DetectRequest(path=path, model=model, confidence=confidence,
+    req = DetectRequest(path=_to_relative(path), model=model, confidence=confidence,
                         classes=list(classes) if classes else None, draw=draw)
 
     def _do(url):
@@ -110,7 +120,7 @@ def detect(path: str, model: str, confidence: float,
 
 
 def video_thumbnail(path: str, mode: str) -> tuple[bytes, str]:
-    req = VideoThumbnailRequest(path=path, mode=mode)
+    req = VideoThumbnailRequest(path=_to_relative(path), mode=mode)
 
     def _do(url):
         try:
@@ -129,7 +139,7 @@ def convert_video(src_path: str, dst_path: str, codec: str = "libx265",
                   crf: int = 30, preset: str = "medium") -> None:
     """Ask the compute-service to convert src_path → dst_path with ffmpeg.
     Raises ComputeDisabled, ComputeUnavailable, or RuntimeError on failure."""
-    req = VideoConvertRequest(src_path=src_path, dst_path=dst_path,
+    req = VideoConvertRequest(src_path=_to_relative(src_path), dst_path=_to_relative(dst_path),
                               codec=codec, crf=crf, preset=preset)
 
     def _do(url):

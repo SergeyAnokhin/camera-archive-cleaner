@@ -1,10 +1,13 @@
+# Relative paths from CAMERA_ROOT (env var).
+# Kubernetes default: CAMERA_ROOT=/camera (SMB mount).
+# Windows local dev: set CAMERA_ROOT=\\192.168.1.91\Camera
 cameras:
   - id: "foscam_fi9805w"
     name: "Foscam FI9805W"
-    path: "\\\\192.168.1.91\\Camera\\Foscam\\FI9805W_C4D6553DECE1"
+    path: "Foscam/FI9805W_C4D6553DECE1"
   - id: "foscamHut"
     name: "Foscam Hut"
-    path: "\\\\192.168.1.91\\Camera\\FoscamHut"
+    path: "FoscamHut"
   - id: "ReolinkFront"
     name: "ReolinkFront"
-    path: "\\\\192.168.1.91\\Camera\\ReolinkFront"
+    path: "ReolinkFront"

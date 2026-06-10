@@ -55,11 +55,7 @@ compute:
       operator: Equal
       value: compute
       effect: NoSchedule
-  # Path remap: empty because the SMB share is mounted at the SAME path in both
-  # backend and compute pods (identity — no remap needed). See docs/compute-service.md.
-  pathRemap:
-    from: ""
-    to: ""
+  # CAMERA_ROOT is injected automatically from camera.smb.mountPath — no path remap needed.
 frontend:
   replicas: 1
   nodeSelector:
@@ -68,16 +64,20 @@ frontend:
     port: 80
 # cameras.yaml served to the backend as a ConfigMap. Paths are LINUX paths under
 # the SMB mountPath below — NOT the Windows/UNC paths used in local dev.
+# AUTO-MANAGED by CI — do not edit here.
+# Edit backend/cameras.yaml; CI injects it here on every push to main.
+# Paths are relative to CAMERA_ROOT (/camera in the pod = SMB mount).
 camerasConfig: |
   cameras:
     - id: "foscam_fi9805w"
       name: "Foscam FI9805W"
-      path_snapshots: "/camera/Foscam/FI9805W_C4D6553DECE1/snap"
-      path_videos: "/camera/Foscam/FI9805W_C4D6553DECE1/record"
+      path: "Foscam/FI9805W_C4D6553DECE1"
     - id: "foscamHut"
       name: "Foscam Hut"
-      path_snapshots: "/camera/FoscamHut/FI9800P_00626E870C7B/snap"
-      path_videos: "/camera/FoscamHut/FI9800P_00626E870C7B/record"
+      path: "FoscamHut"
+    - id: "ReolinkFront"
+      name: "ReolinkFront"
+      path: "ReolinkFront"
 # Camera NAS share, mounted (read-write — backend deletes files) into both pods
 # via the SMB CSI driver. Requires csi-driver-smb installed in the cluster.
 camera:

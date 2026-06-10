@@ -107,7 +107,7 @@ def detect_endpoint(req: DetectRequest):
                  req.classes if req.classes is not None else "all-80")
 
     t_remap = time.time()
-    path = config.remap_path(req.path)
+    path = config.to_absolute(req.path)
     logger.debug("path remap  %.1f ms  %s -> %s", (time.time() - t_remap) * 1000, req.path, path)
 
     t_stat = time.time()
@@ -134,7 +134,7 @@ def detect_endpoint(req: DetectRequest):
 
 @app.post("/video/thumbnail", summary="Video preview thumbnail (image/jpeg or image/gif)")
 def video_endpoint(req: VideoThumbnailRequest):
-    path = config.remap_path(req.path)
+    path = config.to_absolute(req.path)
     t0 = time.time()
     try:
         data, content_type = video.make_video_thumbnail(path, req.mode)
@@ -155,8 +155,8 @@ def video_endpoint(req: VideoThumbnailRequest):
 def video_convert_endpoint(req: VideoConvertRequest):
     if not video.ffmpeg_available():
         raise HTTPException(status_code=503, detail="ffmpeg not found on PATH")
-    src = config.remap_path(req.src_path)
-    dst = config.remap_path(req.dst_path)
+    src = config.to_absolute(req.src_path)
+    dst = config.to_absolute(req.dst_path)
     if not Path(src).exists():
         raise HTTPException(status_code=404, detail=f"Source not found: {src}")
     try:

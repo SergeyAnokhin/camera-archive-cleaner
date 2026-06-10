@@ -50,6 +50,9 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - containerPort: 8000
+          env:
+            - name: CAMERA_ROOT
+              value: {{ .Values.camera.smb.mountPath | quote }}
           readinessProbe:
             httpGet:
               path: /cameras
