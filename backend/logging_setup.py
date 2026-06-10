@@ -70,13 +70,18 @@ class _ColorFmt(logging.Formatter):
 
 
 class AccessFilter(logging.Filter):
-    """thumbnail → TRACE (скрыт при root=DEBUG); остальное → DEBUG."""
+    """thumbnail → TRACE (скрыт при root=DEBUG); остальное → DEBUG.
+
+    Также подавляет запись, если мутированный уровень ниже root-уровня —
+    иначе propagation обходит проверку уровня логгера и DEBUG-строки
+    просачиваются в INFO-режиме.
+    """
     def filter(self, record: logging.LogRecord) -> bool:
         if _THUMB_RE.search(record.getMessage()):
             record.levelno, record.levelname = TRACE, "TRACE"
         else:
             record.levelno, record.levelname = logging.DEBUG, "DEBUG"
-        return True
+        return record.levelno >= logging.root.level
 
 
 _handler = logging.StreamHandler()

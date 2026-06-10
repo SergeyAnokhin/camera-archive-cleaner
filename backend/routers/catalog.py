@@ -16,7 +16,7 @@ logger = logging.getLogger("api")
 def list_cameras():
     cameras = load_cameras()
     result = [{"id": c.id, "name": c.name, "path": c.path} for c in cameras]
-    logger.info("📷 Список камер → %d камер: %s", len(result), [c["id"] for c in result])
+    logger.debug("📷 Список камер → %d камер: %s", len(result), [c["id"] for c in result])
     return result
 
 
