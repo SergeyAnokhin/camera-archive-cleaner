@@ -25,14 +25,39 @@ def get_compute_config():
 class ComputeConfigUpdate(BaseModel):
     mode: str
     remote_url: str = ""
+    remote_urls: list[str] = []
 
 
 @router.put("/compute/config", summary="Update compute-service routing config")
 def update_compute_config(req: ComputeConfigUpdate):
     try:
-        return compute_config.save_config(req.mode, req.remote_url)
+        urls = req.remote_urls or ([req.remote_url] if req.remote_url else [])
+        return compute_config.save_config(req.mode, remote_urls=urls)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class ProbeUrlsRequest(BaseModel):
+    urls: list[str]
+
+
+@router.post("/compute/probe-urls", summary="Probe a list of compute-service URLs in parallel")
+def probe_urls(req: ProbeUrlsRequest):
+    """Pings each URL in the list and returns per-URL reachability.
+    Used by the frontend to validate/auto-select from a multi-URL config."""
+    results = []
+    for url in req.urls:
+        url = url.rstrip("/")
+        entry: dict = {"url": url, "reachable": False}
+        try:
+            resp = httpx.get(f"{url}/health", timeout=3.0)
+            resp.raise_for_status()
+            info = resp.json()
+            entry.update({"reachable": True, "capabilities": info.get("capabilities", [])})
+        except Exception as e:
+            entry["error"] = str(e)[:200]
+        results.append(entry)
+    return {"results": results}
 
 
 @router.get("/services/status", summary="Backend + compute-service status and metrics")
@@ -51,7 +76,7 @@ def services_status(request: Request):
 
     # Compute service metrics (may be remote — use short timeout)
     cfg = compute_config.load_config()
-    compute_url = compute_config.effective_url()
+    compute_url = compute_client.get_active_url()
     compute_data: dict = {
         "mode": cfg["mode"],
         "url": compute_url,
@@ -83,9 +108,11 @@ def services_status(request: Request):
 @router.get("/compute/status", summary="Compute-service reachability + capabilities")
 def compute_status():
     cfg = compute_config.load_config()
+    urls = compute_config.effective_urls()
     result = {
         "mode": cfg["mode"],
-        "url": compute_config.effective_url(),
+        "url": compute_client.get_active_url(),
+        "urls": urls,
         "reachable": False,
         "capabilities": [],
     }

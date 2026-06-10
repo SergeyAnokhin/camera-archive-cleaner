@@ -79,11 +79,17 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
   const [foOutputFolder, setFoOutputFolder] = useState('organized')
   const [foDateRegex,    setFoDateRegex]    = useState('(\\d{4})(\\d{2})(\\d{2})')
   const [foDryRun,       setFoDryRun]       = useState(false)
+  const [foDateFrom,     setFoDateFrom]     = useState('')
+  const [foDateTo,       setFoDateTo]       = useState('')
+
+  // shared: whether vc/fo date fields were auto-filled from camera range
+  const [vcFoDatesFromCamera, setVcFoDatesFromCamera] = useState(false)
 
   const settings = readGlobalSettings()
   const geminiApiKey = localStorage.getItem('gemini_api_key') || ''
   const claudeApiKey = localStorage.getItem('claude_api_key') || ''
 
+  // Auto-fill date range for DB task types
   useEffect(() => {
     if (!cameraId || !isDbType(type)) return
     getCameraDateRange(cameraId)
@@ -97,6 +103,26 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
         }
       })
       .catch(() => setDatesFromCamera(false))
+  }, [cameraId, type])
+
+  // Auto-fill date range for video_convert and file_organizer (from camera's indexed files)
+  useEffect(() => {
+    if (!cameraId || (type !== 'video_convert' && type !== 'file_organizer')) return
+    getCameraDateRange(cameraId)
+      .then(range => {
+        if (range.date_from && range.date_to) {
+          const from = toLocalInput(range.date_from)
+          const to   = toLocalInput(range.date_to)
+          setVcDateFrom(from)
+          setVcDateTo(to)
+          setFoDateFrom(from)
+          setFoDateTo(to)
+          setVcFoDatesFromCamera(true)
+        } else {
+          setVcFoDatesFromCamera(false)
+        }
+      })
+      .catch(() => setVcFoDatesFromCamera(false))
   }, [cameraId, type])
 
   useEffect(() => {
@@ -166,6 +192,8 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
         params.output_folder  = foOutputFolder
         params.date_regex     = foDateRegex
         params.dry_run        = foDryRun
+        if (foDateFrom) params.date_from = foDateFrom + ':00'
+        if (foDateTo)   params.date_to   = foDateTo   + ':00'
       }
 
       await onAdd({ type, params, label: buildLabel() })
@@ -430,16 +458,26 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
               </div>
 
               <div className="ntm__section">
-                <div className="ntm__label">Фильтр по дате файла (по mtime, необязательно)</div>
+                <div className="ntm__date-header">
+                  <label className="ntm__label" style={{margin:0}}>Фильтр по дате файла (mtime)</label>
+                  {vcFoDatesFromCamera && (
+                    <span className="ntm__date-hint">
+                      <i className="mdi mdi-check-circle" style={{fontSize:12,marginRight:3}} />
+                      авто-заполнено
+                    </span>
+                  )}
+                </div>
                 <div className="ntm__dates">
                   <input type="datetime-local" className="modal-text-input ntm__date-input"
-                    value={vcDateFrom} onChange={e => setVcDateFrom(e.target.value)} />
+                    value={vcDateFrom}
+                    onChange={e => { setVcDateFrom(e.target.value); setVcFoDatesFromCamera(false) }} />
                   <span className="ntm__date-sep">→</span>
                   <input type="datetime-local" className="modal-text-input ntm__date-input"
-                    value={vcDateTo} onChange={e => setVcDateTo(e.target.value)} />
+                    value={vcDateTo}
+                    onChange={e => { setVcDateTo(e.target.value); setVcFoDatesFromCamera(false) }} />
                 </div>
                 <div className="ntm__param-hint" style={{ marginTop: 4 }}>
-                  Пусто = обрабатывать все файлы без фильтрации
+                  Пусто = обрабатывать все файлы без фильтра по дате
                 </div>
               </div>
 
@@ -517,6 +555,30 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
                   Файлы из корня папки → <code>{foOutputFolder || 'organized'}/ГГГГ/ММ/ДД/</code>
                   &nbsp;· Уже перемещённые пропускаются
                 </span>
+              </div>
+
+              <div className="ntm__section">
+                <div className="ntm__date-header">
+                  <label className="ntm__label" style={{margin:0}}>Фильтр по дате файла (mtime)</label>
+                  {vcFoDatesFromCamera && (
+                    <span className="ntm__date-hint">
+                      <i className="mdi mdi-check-circle" style={{fontSize:12,marginRight:3}} />
+                      авто-заполнено
+                    </span>
+                  )}
+                </div>
+                <div className="ntm__dates">
+                  <input type="datetime-local" className="modal-text-input ntm__date-input"
+                    value={foDateFrom}
+                    onChange={e => { setFoDateFrom(e.target.value); setVcFoDatesFromCamera(false) }} />
+                  <span className="ntm__date-sep">→</span>
+                  <input type="datetime-local" className="modal-text-input ntm__date-input"
+                    value={foDateTo}
+                    onChange={e => { setFoDateTo(e.target.value); setVcFoDatesFromCamera(false) }} />
+                </div>
+                <div className="ntm__param-hint" style={{ marginTop: 4 }}>
+                  Пусто = обрабатывать все файлы без фильтра по дате
+                </div>
               </div>
 
               <div className="ntm__section">

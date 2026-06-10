@@ -554,6 +554,18 @@ async def _run_ai(task_id: str, params: dict, resume_from: int, provider: str) -
 
 
 # ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+def _parse_dt(s: str | None):
+    """Parse ISO datetime string to timezone-aware datetime (UTC if no tz given)."""
+    if not s:
+        return None
+    dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+# ---------------------------------------------------------------------------
 # Log helper (sync, for asyncio.to_thread)
 # ---------------------------------------------------------------------------
 
@@ -592,15 +604,15 @@ async def _run_video_convert(task_id: str, params: dict, resume_from: int) -> No
 
     if not dry_run:
         try:
-            compute_client._base_url()  # fails fast if compute is disabled/unreachable
+            compute_client._get_urls()  # fails fast if compute is disabled/not configured
         except compute_client.ComputeDisabled:
             raise RuntimeError(
                 "Compute-service is disabled. Enable it in compute_config.json to use video_convert."
             )
 
-    # Parse optional date filter
-    dt_from = datetime.fromisoformat(date_from_s.replace("Z", "+00:00")) if date_from_s else None
-    dt_to   = datetime.fromisoformat(date_to_s.replace("Z", "+00:00")) if date_to_s else None
+    # Parse optional date filter (ensure timezone-aware for comparison with mtime)
+    dt_from = _parse_dt(date_from_s)
+    dt_to   = _parse_dt(date_to_s)
 
     # Collect matching source files (exclude already-converted outputs)
     all_files: list[Path] = []
@@ -694,6 +706,8 @@ async def _run_file_organizer(task_id: str, params: dict, resume_from: int) -> N
     output_folder = params.get("output_folder", "organized")
     date_regex    = params.get("date_regex", r"(\d{4})(\d{2})(\d{2})")
     dry_run       = bool(params.get("dry_run", False))
+    dt_from       = _parse_dt(params.get("date_from"))
+    dt_to         = _parse_dt(params.get("date_to"))
 
     cameras_map = {c.id: c for c in load_cameras()}
     camera = cameras_map.get(camera_id)
@@ -719,6 +733,12 @@ async def _run_file_organizer(task_id: str, params: dict, resume_from: int) -> N
             continue
         if not fnmatch.fnmatch(f.name.lower(), input_pat.lower()):
             continue
+        if dt_from or dt_to:
+            mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
+            if dt_from and mtime < dt_from:
+                continue
+            if dt_to and mtime > dt_to:
+                continue
         all_files.append(f)
 
     all_files.sort(key=lambda p: p.name)

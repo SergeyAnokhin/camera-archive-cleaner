@@ -251,12 +251,16 @@ export function getComputeStatus() {
   return get('/compute/status')
 }
 
-export function saveComputeConfig(mode, remoteUrl) {
-  return putJson('/compute/config', { mode, remote_url: remoteUrl })
+export function saveComputeConfig(mode, remoteUrl, remoteUrls = []) {
+  return putJson('/compute/config', { mode, remote_url: remoteUrl, remote_urls: remoteUrls })
 }
 
 export function pingComputeConfig(mode, remoteUrl) {
   return postJson('/compute/ping', { mode, remote_url: remoteUrl })
+}
+
+export function probeComputeUrls(urls) {
+  return postJson('/compute/probe-urls', { urls })
 }
 
 export function getComputeClientIp() {
