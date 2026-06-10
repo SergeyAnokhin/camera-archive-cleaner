@@ -12,7 +12,7 @@ For a flat per-file listing see [`code-map.md`](code-map.md). This doc is the *g
 |---|---|---|---|
 | **HTTP layer** | `main.py`, `routers/*`, `api_helpers.py` | every other subsystem | fastapi, uvicorn |
 | **Logging** | `logging_setup.py` | — (configures root logger on import) | — |
-| **Config & scan** | `config.py`, `scanner.py`, `cameras.yaml` | Indexing/DB | pyyaml |
+| **Config & scan** | `config.py`, `scanner.py`, `cameras.yaml` | Indexing/DB | pyyaml, env `CAMERA_ROOT` |
 | **Indexing / DB** | `database.py`, `snapshots.db` | — (owns all SQL) | sqlite3 (stdlib) |
 | **Thumbnail pipeline** | `thumbnails.py`, `diff_thumbnails.py`, `diff_zoom_thumbnails.py`, `erosion_thumbnails.py`, `motion_thumbnails.py` | Indexing/DB (cache paths) | Pillow, numpy, opencv |
 | **Compute delegation** | `compute_client.py`, `compute_config.py`, `compute_cache.py`, `ai_providers/openvino.py`, `routers/compute.py` | Indexing/DB, compute-service | httpx |
@@ -24,6 +24,14 @@ For a flat per-file listing see [`code-map.md`](code-map.md). This doc is the *g
 Rule of thumb: **`database.py` owns the table schema and the shared SQL helpers.** `config & scan`, `stats`, the thumbnail pipeline and `ai_providers` reach the DB only through its functions — that makes `database.py` the main seam to mock or replace.
 
 The exception is [`routers/delete.py`](../backend/routers/delete.py), which runs its own inline SQL: the file-deletion `SELECT`/`DELETE` and the ±5 s video-matching `JOIN`. [`routers/ai.py`](../backend/routers/ai.py) (`/ai_objects_summary`), [`routers/maintenance.py`](../backend/routers/maintenance.py) (`DELETE FROM files`) and [`ai_providers/openvino.py`](../backend/ai_providers/openvino.py) each run one inline query as well. So when changing the DB schema, grep for raw SQL beyond `database.py` too.
+
+**When changing `Camera` dataclass fields** (`config.py`), update all consumers:
+- `backend/routers/catalog.py` — serialises Camera to JSON for `/cameras`
+- `backend/scanner.py` — reads `camera.path`
+- `backend/compute_client.py` — strips `CAMERA_ROOT` from `camera.path`
+- `frontend/src/components/DeleteConfirmModal.jsx` — displays `camera.path`
+
+**When changing `cameras.yaml` schema** — the file is the single source of truth. CI auto-injects it into `values.yaml` `camerasConfig`. Do **not** edit `camerasConfig` directly. `config.py` consumes the yaml; `CAMERA_ROOT` env var (set in Helm from `camera.smb.mountPath`) is prepended at runtime.
 
 ---
 

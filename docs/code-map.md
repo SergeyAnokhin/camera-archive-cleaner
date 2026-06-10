@@ -13,19 +13,19 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`logging_setup.py`](../backend/logging_setup.py) | Logging config: ANSI colours, TRACE/DEBUG/INFO levels, custom formatter, uvicorn access filter. Configures the root logger on import |
 | [`api_helpers.py`](../backend/api_helpers.py) | Shared router helpers: `fmt_range()` (log date ranges), `row_to_dict()` (stats-row → dict) |
 | [`ai_pricing.py`](../backend/ai_pricing.py) | Per-million-token USD pricing tables for Gemini and Claude models |
-| [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `convert_video`, `health`). Raises `ComputeDisabled` / `ComputeUnavailable`. Timeouts: detect 120 s, thumbnail 120 s, convert 7200 s |
+| [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `convert_video`, `health`). Strips `CAMERA_ROOT` prefix from all paths before sending (so compute can apply its own root). Raises `ComputeDisabled` / `ComputeUnavailable`. Timeouts: detect 120 s, thumbnail 120 s, convert 7200 s |
 | [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` |
 | [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
 | [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks, processes files one by one, writes progress to DB every 5 s. Supports pause/resume by checking task status between files. Task types: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert`, `file_organizer` |
 | [`database.py`](../backend/database.py) | SQLite: table schema + migrations, all SQL queries. Tables: `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks` (has `log_tail TEXT` for video_convert/file_organizer logs), `tuning_sessions`. `append_task_log()` stores last 300 log lines per task |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed (used by `file_organizer` task) |
-| [`config.py`](../backend/config.py) | Parses `cameras.yaml` → `Camera` dataclass (id, name, path_snapshots, path_videos) |
+| [`config.py`](../backend/config.py) | Parses `cameras.yaml` → `Camera(id, name, path)`. `path` = `CAMERA_ROOT` env var + relative path from yaml. **When changing `Camera` fields, also update:** `routers/catalog.py` (serialises to JSON), `scanner.py` (reads `camera.path`), `compute_client.py` (strips root), `DeleteConfirmModal.jsx` (displays `camera.path`). |
 | [`thumbnails.py`](../backend/thumbnails.py) | Basic 256×256 JPEG thumbnails (Pillow). Cache in `thumbnails_cache/`. Used by `/thumbnail/{id}` |
 | [`diff_thumbnails.py`](../backend/diff_thumbnails.py) | Motion Diff thumbnails: per-pixel delta from page mean (numpy). Cache in `diff_thumbnails_cache/` |
 | [`erosion_thumbnails.py`](../backend/erosion_thumbnails.py) | Erosion thumbnails: MOG2 + morphological erosion. Cache in `erosion_thumbnails_cache/` |
 | [`motion_thumbnails.py`](../backend/motion_thumbnails.py) | Thumbnails for 4 motion modes: neon_mask, mhi, bounding_boxes, motion_stacking. Cache in `motion_thumbnails_cache/` |
 | [`diff_zoom_thumbnails.py`](../backend/diff_zoom_thumbnails.py) | Diff Zoom thumbnails: crop to most active 1/9 tile. Cache in `diff_zoom_thumbnails_cache/` |
-| `cameras.yaml` | Camera config. Edit manually before running |
+| `cameras.yaml` | **Single source of truth** for camera config. Stores relative paths (e.g. `FoscamHut`); `CAMERA_ROOT` is prepended at runtime. CI auto-injects this file into `deploy/helm/.../values.yaml` `camerasConfig` on every push — **do not edit `camerasConfig` directly**. |
 | `snapshots.db` | SQLite database (auto-created on startup) |
 
 ### Backend routers (`backend/routers/`)
@@ -84,7 +84,7 @@ Optional stateless service for heavy compute. Full architecture: [`compute-servi
 | [`app.py`](../compute-service/app.py) | FastAPI app on :8001 — `/health`, `/detect`, `/video/thumbnail`, `/video/convert`. Logs elapsed seconds per request |
 | [`detection.py`](../compute-service/detection.py) | YOLO model loading (lazy) + object detection. Prefers `models/<name>_openvino_model/` over `.pt` |
 | [`video.py`](../compute-service/video.py) | Video thumbnail generation (first/last frame, 2×2 grid, max-change GIF) + `convert_video()` — runs ffmpeg (H.265/H.264, up to 2 h timeout) |
-| [`config.py`](../compute-service/config.py) | Path-remap config (env vars `COMPUTE_PATH_REMAP_FROM` / `_TO`) |
+| [`config.py`](../compute-service/config.py) | `CAMERA_ROOT` env var (default `/camera`); `to_absolute(relative_path)` converts relative paths received from the backend to absolute. Set `CAMERA_ROOT=\\192.168.1.91\Camera` for local Windows dev. |
 | [`export_models.py`](../compute-service/export_models.py) | **Build-time only** — exports yolov8n/s/m to OpenVINO IR; called by `Dockerfile RUN`, never at runtime |
 
 ## Shared block (`shared/`)
@@ -121,7 +121,7 @@ Imported by both the main backend and the compute-service.
 | [`GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) | Gemini AI analysis modal: scene description, objects, token/cost/time stats |
 | [`ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) | Claude AI analysis modal (same structure as Gemini) |
 | [`OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) | OpenVINO "Run" modal: confidence slider, per-photo object tags with emoji, ms/photo timing |
-| [`DeleteConfirmModal.jsx`](../frontend/src/components/DeleteConfirmModal.jsx) | Delete confirmation modal: file list with relative paths, paired video preview |
+| [`DeleteConfirmModal.jsx`](../frontend/src/components/DeleteConfirmModal.jsx) | Delete confirmation modal: file list with relative paths (strips `camera.path` prefix), paired video preview |
 | [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal — thin shell: backdrop, tab bar, renders the active tab. The 6 tabs live in `tools/` (see table below) |
 | [`CellSelBar.jsx`](../frontend/src/components/CellSelBar.jsx) | Heatmap cell-selection toolbar: bulk select, delete (hour level), and AI analysis across selected day/hour cells. Rendered by `App.jsx` in selection mode |
 | [`navUtils.js`](../frontend/src/components/navUtils.js) | Heatmap navigation helpers: `LEVELS`, `GRID_COLS`, `dateRangeForPeriod`, `computeIntensity`, `formatBytes`, nav-state persistence |
@@ -136,7 +136,7 @@ Imported by both the main backend and the compute-service.
 | [`TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx) | Model tuning screen (whole feature in one file): session sidebar + 3-step panel (upload, ground truth, golden-section benchmark, results charts). See [`docs/tuning.md`](tuning.md) |
 | [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card: type icon, status badge, progress bar, speed/ETA, thumbnail, pause/resume/cancel buttons. Logs button (console icon) for `video_convert`/`file_organizer` types; dry-run amber tag |
 | [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a task. Six types: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert` (input\_pattern, output\_suffix, output\_ext, codec, CRF, preset, date filter), `file_organizer` (source\_type, input\_pattern, output\_folder, date\_regex). Both new types have a dry-run toggle |
-| [`TaskLogsModal.jsx`](../frontend/src/components/TaskLogsModal.jsx) | Log viewer modal for `video_convert` and `file_organizer` tasks. Polls `GET /tasks/{id}/logs` every 2 s while task is active; colour-codes DRY/ERROR/Skip lines |
+| [`TaskLogsModal.jsx`](../frontend/src/components/TaskLogsModal.jsx) | Log viewer modal for `video_convert` and `file_organizer` tasks. Polls `GET /tasks/{id}/logs` every 2 s while task is active; colour-codes DRY/ERROR/Skip lines. Header has a fullscreen toggle (⛶/⊡) that expands the modal to 98 vw × 96 vh |
 
 ### Tools modal tabs (`frontend/src/components/tools/`)
 
