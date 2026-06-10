@@ -47,11 +47,42 @@ def scan_camera(conn: sqlite3.Connection, camera: Camera) -> int:
     if deleted:
         logger.info("[%s] Cleared %d old records before scan", camera.id, deleted)
 
-    logger.info("[%s] Starting scan: %s", camera.id, camera.name)
+    logger.info("[%s] Starting scan: %s at %s", camera.id, camera.name, camera.path)
+
+    root = Path(camera.path)
+    if not root.exists():
+        logger.warning("[%s] Directory not found, skipping: %s", camera.id, camera.path)
+        return 0
+
     count = 0
-    count += _scan_dir(conn, camera.id, camera.path_snapshots, "photo")
-    count += _scan_dir(conn, camera.id, camera.path_videos, "video")
-    logger.info("[%s] Scan complete: %d files total", camera.id, count)
+    photos = 0
+    videos = 0
+
+    for file in _iter_files(root):
+        ext = file.suffix.lower()
+        if ext in PHOTO_EXTENSIONS:
+            file_type = "photo"
+            photos += 1
+        elif ext in VIDEO_EXTENSIONS:
+            file_type = "video"
+            videos += 1
+        else:
+            continue
+
+        dt = _timestamp_from_filename(file.name)
+        if dt is None:
+            dt = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
+
+        upsert_file(conn, camera.id, file_type, str(file), file.stat().st_size, dt.isoformat())
+        count += 1
+
+        if count % _COMMIT_EVERY == 0:
+            conn.commit()
+
+        if count % _LOG_EVERY == 0:
+            logger.info("[%s] processed: %d (photos: %d, videos: %d)", camera.id, count, photos, videos)
+
+    logger.info("[%s] Scan complete: %d files total (photos: %d, videos: %d)", camera.id, count, photos, videos)
     return count
 
 
@@ -66,34 +97,3 @@ def _iter_files(root: Path):
                 yield entry
     except PermissionError:
         pass
-
-
-def _scan_dir(conn: sqlite3.Connection, camera_id: str,
-              directory: str, file_type: str) -> int:
-    path = Path(directory)
-    if not path.exists():
-        logger.warning("[%s] Directory not found, skipping: %s", camera_id, directory)
-        return 0
-
-    extensions = PHOTO_EXTENSIONS if file_type == "photo" else VIDEO_EXTENSIONS
-    count = 0
-
-    for file in _iter_files(path):
-        if file.suffix.lower() not in extensions:
-            continue
-
-        dt = _timestamp_from_filename(file.name)
-        if dt is None:
-            dt = datetime.fromtimestamp(file.stat().st_mtime, tz=timezone.utc)
-
-        upsert_file(conn, camera_id, file_type, str(file), file.stat().st_size, dt.isoformat())
-        count += 1
-
-        if count % _COMMIT_EVERY == 0:
-            conn.commit()
-
-        if count % _LOG_EVERY == 0:
-            logger.info("[%s] %ss processed: %d", camera_id, file_type, count)
-
-    logger.info("[%s] %s scan done: %d files", camera_id, file_type, count)
-    return count

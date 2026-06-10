@@ -9,8 +9,7 @@ CONFIG_PATH = Path(__file__).parent / "cameras.yaml"
 class Camera:
     id: str
     name: str
-    path_snapshots: str
-    path_videos: str
+    path: str
 
 
 def load_cameras(path: Path = CONFIG_PATH) -> list[Camera]:
@@ -20,8 +19,7 @@ def load_cameras(path: Path = CONFIG_PATH) -> list[Camera]:
         Camera(
             id=cam["id"],
             name=cam["name"],
-            path_snapshots=cam["path_snapshots"],
-            path_videos=cam["path_videos"],
+            path=cam["path"],
         )
         for cam in data["cameras"]
     ]

@@ -5,8 +5,9 @@ import './TaskLogsModal.css'
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'pausing'])
 
 export default function TaskLogsModal({ task, onClose }) {
-  const [lines, setLines]   = useState([])
-  const [status, setStatus] = useState(task.status)
+  const [lines, setLines]       = useState([])
+  const [status, setStatus]     = useState(task.status)
+  const [maximized, setMaximized] = useState(false)
   const bottomRef = useRef(null)
   const pollRef   = useRef(null)
 
@@ -43,8 +44,8 @@ export default function TaskLogsModal({ task, onClose }) {
   const label = params.label || task.type
 
   return (
-    <div className="tlm-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="tlm-card">
+    <div className={`tlm-backdrop${maximized ? ' tlm-backdrop--max' : ''}`} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className={`tlm-card${maximized ? ' tlm-card--max' : ''}`}>
 
         <div className="tlm-header">
           <div className="tlm-header-left">
@@ -57,9 +58,14 @@ export default function TaskLogsModal({ task, onClose }) {
               </span>
             )}
           </div>
-          <button className="tlm-close" onClick={onClose}>
-            <i className="mdi mdi-close" />
-          </button>
+          <div className="tlm-header-actions">
+            <button className="tlm-close" onClick={() => setMaximized(m => !m)} title={maximized ? 'Восстановить' : 'Развернуть'}>
+              <i className={`mdi ${maximized ? 'mdi-fullscreen-exit' : 'mdi-fullscreen'}`} />
+            </button>
+            <button className="tlm-close" onClick={onClose}>
+              <i className="mdi mdi-close" />
+            </button>
+          </div>
         </div>
 
         <div className="tlm-log">

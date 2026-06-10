@@ -74,6 +74,13 @@
   gap: 4px;
 }
 
+.tlm-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .tlm-close {
   background: none;
   border: none;
@@ -86,6 +93,13 @@
   line-height: 1;
 }
 .tlm-close:hover { color: var(--text); background: var(--border); }
+
+.tlm-card--max {
+  width: 98vw !important;
+  max-width: 98vw !important;
+  height: 96vh;
+  max-height: 96vh !important;
+}
 
 .tlm-log {
   flex: 1;
