@@ -9,13 +9,13 @@ image:
   pullPolicy: IfNotPresent
   backend:
     repository: backend
-    tag: "34dff0b5d801" # CI overwrites with the git SHA
+    tag: "4db41281948c" # CI overwrites with the git SHA
   compute:
     repository: compute
-    tag: "34dff0b5d801" # CI overwrites with the git SHA
+    tag: "4db41281948c" # CI overwrites with the git SHA
   frontend:
     repository: frontend
-    tag: "34dff0b5d801" # CI overwrites with the git SHA
+    tag: "4db41281948c" # CI overwrites with the git SHA
 # Pull secret name(s) for the GHCR images (only needed if the packages are private).
 imagePullSecrets: []
 # - name: ghcr-creds
