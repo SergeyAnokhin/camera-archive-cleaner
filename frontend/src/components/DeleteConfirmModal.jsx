@@ -2,15 +2,8 @@ import { useEffect } from 'react'
 import './DeleteConfirmModal.css'
 
 function cameraRoot(camera) {
-  const a = (camera?.path_snapshots || '').replace(/\\/g, '/').replace(/\/$/, '')
-  const b = (camera?.path_videos   || '').replace(/\\/g, '/').replace(/\/$/, '')
-  if (!a && !b) return ''
-  const pa = a.split('/'), pb = b.split('/')
-  const common = []
-  for (let i = 0; i < Math.min(pa.length, pb.length); i++) {
-    if (pa[i] === pb[i]) common.push(pa[i]); else break
-  }
-  return common.length ? common.join('/') + '/' : ''
+  const p = (camera?.path || '').replace(/\\/g, '/')
+  return p ? p.replace(/\/?$/, '/') : ''
 }
 
 function FileRow({ item, root }) {

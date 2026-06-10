@@ -15,7 +15,7 @@ logger = logging.getLogger("api")
 @router.get("/cameras", summary="List all configured cameras")
 def list_cameras():
     cameras = load_cameras()
-    result = [{"id": c.id, "name": c.name, "path_snapshots": c.path_snapshots, "path_videos": c.path_videos} for c in cameras]
+    result = [{"id": c.id, "name": c.name, "path": c.path} for c in cameras]
     logger.info("📷 Список камер → %d камер: %s", len(result), [c["id"] for c in result])
     return result
 
