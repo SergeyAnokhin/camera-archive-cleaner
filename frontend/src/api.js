@@ -271,6 +271,17 @@ export function discoverCompute() {
   return get('/compute/discover')
 }
 
+export function getFileEstimate({ cameraId, taskType, inputPattern, dateFrom, dateTo, outputSuffix }) {
+  return get('/tasks/estimate_files' + buildQuery({
+    camera_id:     cameraId,
+    task_type:     taskType,
+    input_pattern: inputPattern,
+    date_from:     dateFrom  || undefined,
+    date_to:       dateTo    || undefined,
+    output_suffix: outputSuffix || undefined,
+  }))
+}
+
 // Tasks
 export function getTasks() {
   return get('/tasks')

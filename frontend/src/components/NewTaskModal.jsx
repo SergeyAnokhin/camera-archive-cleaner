@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getStatsTotal, getCameraDateRange } from '../api.js'
+import { getStatsTotal, getCameraDateRange, getFileEstimate } from '../api.js'
 import './NewTaskModal.css'
 
 function toLocalInput(isoStr) {
@@ -85,6 +85,10 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
   // shared: whether vc/fo date fields were auto-filled from camera range
   const [vcFoDatesFromCamera, setVcFoDatesFromCamera] = useState(false)
 
+  // dynamic file count estimate for video_convert / file_organizer
+  const [vcFoFileCount,        setVcFoFileCount]        = useState(null)
+  const [vcFoFileCountLoading, setVcFoFileCountLoading] = useState(false)
+
   const settings = readGlobalSettings()
   const geminiApiKey = localStorage.getItem('gemini_api_key') || ''
   const claudeApiKey = localStorage.getItem('claude_api_key') || ''
@@ -133,6 +137,37 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
       .then(d => setEstimate({ photos: d.photo_count ?? 0, videos: d.video_count ?? 0 }))
       .catch(() => setEstimate(null))
   }, [cameraId, dateFrom, dateTo, type])
+
+  // Dynamic file count for video_convert / file_organizer (filesystem scan, debounced)
+  useEffect(() => {
+    if (type !== 'video_convert' && type !== 'file_organizer') {
+      setVcFoFileCount(null)
+      setVcFoFileCountLoading(false)
+      return
+    }
+    if (!cameraId) { setVcFoFileCount(null); return }
+
+    const inputPat    = type === 'video_convert' ? vcInputPattern    : foInputPattern
+    const dateFrom_   = type === 'video_convert' ? vcDateFrom        : foDateFrom
+    const dateTo_     = type === 'video_convert' ? vcDateTo          : foDateTo
+    const outputSuffix = type === 'video_convert' ? vcOutputSuffix   : null
+
+    setVcFoFileCountLoading(true)
+    const timer = setTimeout(() => {
+      getFileEstimate({
+        cameraId,
+        taskType:     type,
+        inputPattern: inputPat,
+        dateFrom:     dateFrom_ ? dateFrom_ + ':00' : null,
+        dateTo:       dateTo_   ? dateTo_   + ':00' : null,
+        outputSuffix,
+      })
+        .then(d => { setVcFoFileCount(d.file_count); setVcFoFileCountLoading(false) })
+        .catch(() => { setVcFoFileCount(null);        setVcFoFileCountLoading(false) })
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [cameraId, type, vcInputPattern, vcDateFrom, vcDateTo, vcOutputSuffix,
+      foInputPattern, foDateFrom, foDateTo])
 
   function buildLabel() {
     const cam = cameras.find(c => c.id === cameraId)
@@ -479,6 +514,22 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
                 <div className="ntm__param-hint" style={{ marginTop: 4 }}>
                   Пусто = обрабатывать все файлы без фильтра по дате
                 </div>
+                {vcFoFileCountLoading ? (
+                  <div style={{ marginTop: 6, color: 'var(--text-dim)', fontSize: 'calc(var(--font-base)*0.85)' }}>
+                    <i className="mdi mdi-loading mdi-spin" style={{ marginRight: 4 }} />Подсчёт файлов…
+                  </div>
+                ) : vcFoFileCount != null ? (
+                  vcFoFileCount > 0 ? (
+                    <div className="ntm__estimate" style={{ marginTop: 6 }}>
+                      <i className="mdi mdi-information-outline" />
+                      <strong>{vcFoFileCount.toLocaleString()}</strong>&nbsp;видео подходит под фильтр
+                    </div>
+                  ) : (
+                    <div className="ntm__warn" style={{ marginTop: 6 }}>
+                      <i className="mdi mdi-alert-outline" /> Видео по фильтру не найдено
+                    </div>
+                  )
+                ) : null}
               </div>
 
               <div className="ntm__section ntm__example-row">
@@ -579,6 +630,22 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
                 <div className="ntm__param-hint" style={{ marginTop: 4 }}>
                   Пусто = обрабатывать все файлы без фильтра по дате
                 </div>
+                {vcFoFileCountLoading ? (
+                  <div style={{ marginTop: 6, color: 'var(--text-dim)', fontSize: 'calc(var(--font-base)*0.85)' }}>
+                    <i className="mdi mdi-loading mdi-spin" style={{ marginRight: 4 }} />Подсчёт файлов…
+                  </div>
+                ) : vcFoFileCount != null ? (
+                  vcFoFileCount > 0 ? (
+                    <div className="ntm__estimate" style={{ marginTop: 6 }}>
+                      <i className="mdi mdi-information-outline" />
+                      <strong>{vcFoFileCount.toLocaleString()}</strong>&nbsp;файл(ов) подходит под фильтр
+                    </div>
+                  ) : (
+                    <div className="ntm__warn" style={{ marginTop: 6 }}>
+                      <i className="mdi mdi-alert-outline" /> Файлов по фильтру не найдено
+                    </div>
+                  )
+                ) : null}
               </div>
 
               <div className="ntm__section">

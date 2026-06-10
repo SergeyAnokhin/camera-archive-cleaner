@@ -110,7 +110,7 @@ logging.root.handlers = [_handler]
 # Пример: чтобы видеть только WARNING и выше:
 #   logging.root.setLevel(logging.WARNING)
 # ══════════════════════════════════════════════════════════════════════════════
-logging.root.setLevel(logging.INFO)
+logging.root.setLevel(logging.DEBUG)
 
 # httpx/httpcore генерируют очень много DEBUG-мусора при каждом запросе к compute
 logging.getLogger("httpx").setLevel(logging.WARNING)

@@ -1,17 +1,21 @@
 """Task queue endpoints.
 
-GET  /tasks            — list all tasks
-POST /tasks            — create a task
-GET  /tasks/metrics    — CPU/RAM from compute service
-PUT  /tasks/reorder    — reorder tasks [{id, order_index}]
-DELETE /tasks/{id}     — delete a task (must not be running)
-PUT  /tasks/{id}/pause   — request pause (running → pausing)
-PUT  /tasks/{id}/resume  — resume (paused/failed → queued)
-PUT  /tasks/{id}/cancel  — cancel any non-finished task
+GET  /tasks                  — list all tasks
+POST /tasks                  — create a task
+GET  /tasks/metrics          — CPU/RAM from compute service
+GET  /tasks/estimate_files   — count files matching video_convert/file_organizer filter
+PUT  /tasks/reorder          — reorder tasks [{id, order_index}]
+DELETE /tasks/{id}           — delete a task (must not be running)
+PUT  /tasks/{id}/pause       — request pause (running → pausing)
+PUT  /tasks/{id}/resume      — resume (paused/failed → queued)
+PUT  /tasks/{id}/cancel      — cancel any non-finished task
 """
+import fnmatch
 import json
 import logging
 import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -92,6 +96,74 @@ def get_metrics():
             "memory_used": None,
             "memory_percent": None,
         }
+
+
+@router.get("/estimate_files")
+def estimate_task_files(
+    camera_id: str,
+    task_type: str,
+    input_pattern: str = "*",
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    output_suffix: Optional[str] = None,
+):
+    """Count files that would be processed by video_convert or file_organizer."""
+    from config import load_cameras
+
+    cameras_map = {c.id: c for c in load_cameras()}
+    camera = cameras_map.get(camera_id)
+    if not camera:
+        raise HTTPException(status_code=404, detail=f"Camera not found: {camera_id}")
+
+    root = Path(camera.path)
+    if not root.exists():
+        return {"file_count": 0}
+
+    def _parse_dt(s):
+        if not s:
+            return None
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+    dt_from = _parse_dt(date_from)
+    dt_to   = _parse_dt(date_to)
+    count   = 0
+
+    if task_type == "video_convert":
+        suffix = output_suffix or ""
+        for f in root.rglob("*"):
+            if not f.is_file():
+                continue
+            if not fnmatch.fnmatch(f.name.lower(), input_pattern.lower()):
+                continue
+            if suffix and f.stem.endswith(suffix):
+                continue
+            if dt_from or dt_to:
+                mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
+                if dt_from and mtime < dt_from:
+                    continue
+                if dt_to and mtime > dt_to:
+                    continue
+            count += 1
+
+    elif task_type == "file_organizer":
+        for f in root.iterdir():
+            if not f.is_file():
+                continue
+            if not fnmatch.fnmatch(f.name.lower(), input_pattern.lower()):
+                continue
+            if dt_from or dt_to:
+                mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
+                if dt_from and mtime < dt_from:
+                    continue
+                if dt_to and mtime > dt_to:
+                    continue
+            count += 1
+
+    else:
+        raise HTTPException(status_code=400, detail=f"estimate_files not supported for: {task_type}")
+
+    return {"file_count": count}
 
 
 class ReorderRequest(BaseModel):

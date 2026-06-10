@@ -581,6 +581,35 @@ def _append_log(task_id: str, msg: str) -> None:
 # video_convert executor
 # ---------------------------------------------------------------------------
 
+def _scan_video_convert_files(root: Path, input_pat: str, out_suffix: str,
+                               dt_from, dt_to, task_id: str) -> list[Path]:
+    """Scan filesystem for video files matching the filter. Runs in a thread."""
+    all_files: list[Path] = []
+    seen_dirs: set[Path] = set()
+    for f in root.rglob("*"):
+        if not f.is_file():
+            continue
+        if f.parent not in seen_dirs:
+            seen_dirs.add(f.parent)
+            logger.debug("VC %s: scanning dir %s (%d matches so far)",
+                         task_id[:8], f.parent, len(all_files))
+        if not fnmatch.fnmatch(f.name.lower(), input_pat.lower()):
+            continue
+        if out_suffix and f.stem.endswith(out_suffix):
+            continue
+        if dt_from or dt_to:
+            mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
+            if dt_from and mtime < dt_from:
+                continue
+            if dt_to and mtime > dt_to:
+                continue
+        all_files.append(f)
+    all_files.sort(key=lambda p: p.stat().st_mtime)
+    logger.debug("VC %s: scan complete — %d files in %d dir(s)",
+                 task_id[:8], len(all_files), len(seen_dirs))
+    return all_files
+
+
 async def _run_video_convert(task_id: str, params: dict, resume_from: int) -> None:
     camera_id    = params["camera_id"]
     input_pat    = params.get("input_pattern", "*.mp4")
@@ -610,28 +639,28 @@ async def _run_video_convert(task_id: str, params: dict, resume_from: int) -> No
                 "Compute-service is disabled. Enable it in compute_config.json to use video_convert."
             )
 
-    # Parse optional date filter (ensure timezone-aware for comparison with mtime)
     dt_from = _parse_dt(date_from_s)
     dt_to   = _parse_dt(date_to_s)
 
-    # Collect matching source files (exclude already-converted outputs)
-    all_files: list[Path] = []
-    for f in root.rglob("*"):
-        if not f.is_file():
-            continue
-        if not fnmatch.fnmatch(f.name.lower(), input_pat.lower()):
-            continue
-        if out_suffix and f.stem.endswith(out_suffix):
-            continue
-        if dt_from or dt_to:
-            mtime = datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc)
-            if dt_from and mtime < dt_from:
-                continue
-            if dt_to and mtime > dt_to:
-                continue
-        all_files.append(f)
+    # ── Scan filesystem in a background thread ───────────────────────────────
+    date_info = ""
+    if dt_from or dt_to:
+        date_info = f" [{date_from_s or ''}–{date_to_s or ''}]"
+    await asyncio.to_thread(
+        _append_log, task_id,
+        f"Scanning {root} for {input_pat!r}{date_info}…"
+    )
 
-    all_files.sort(key=lambda p: p.stat().st_mtime)
+    all_files = await asyncio.to_thread(
+        _scan_video_convert_files, root, input_pat, out_suffix, dt_from, dt_to, task_id
+    )
+
+    resume_msg = f", resuming from #{resume_from}" if resume_from else ""
+    await asyncio.to_thread(
+        _append_log, task_id,
+        f"Found {len(all_files)} file(s){resume_msg}"
+    )
+
     total = len(all_files)
     to_process = all_files[resume_from:]
 
