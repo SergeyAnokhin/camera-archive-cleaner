@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import SliderSetting from './SliderSetting.jsx'
 
 const LEVELS = [
-  { value: 'TRACE',   label: 'TRACE',   hint: 'Thumbnail + polling запросы' },
-  { value: 'DEBUG',   label: 'DEBUG',   hint: 'Все HTTP-запросы' },
-  { value: 'INFO',    label: 'INFO',    hint: 'Рабочие логи (рекомендуется)' },
-  { value: 'WARNING', label: 'WARNING', hint: 'Только предупреждения' },
-  { value: 'ERROR',   label: 'ERROR',   hint: 'Только ошибки' },
+  { value: 'TRACE',   label: 'TRACE',   hint: 'Thumbnail + polling requests' },
+  { value: 'DEBUG',   label: 'DEBUG',   hint: 'All HTTP requests' },
+  { value: 'INFO',    label: 'INFO',    hint: 'Operational logs (recommended)' },
+  { value: 'WARNING', label: 'WARNING', hint: 'Warnings only' },
+  { value: 'ERROR',   label: 'ERROR',   hint: 'Errors only' },
 ]
 
 function LevelPicker({ value, onChange, disabled }) {
@@ -146,25 +146,25 @@ export default function LoggingTab() {
     <>
       {/* ── Backend log level ── */}
       <div className="modal-section">
-        <div className="modal-section-title">Backend — уровень лога</div>
+        <div className="modal-section-title">Backend — log level</div>
         <LevelPicker value={backendLevel} onChange={handleBackendLevel} />
         {levelHint && <div className="modal-setting-hint">{levelHint}</div>}
       </div>
 
       {/* ── Backend buffer size ── */}
       <SliderSetting
-        title="Backend — строк в файле лога"
+        title="Backend — log file lines"
         min={100} max={2000} step={100}
         value={backendMaxLines} onChange={handleBackendMaxLines}
         minLabel="100" maxLabel="2000"
-        valueLabel={`${backendMaxLines} строк`}
-        hint="Буфер в памяти и файл backend.log. Файл обновляется каждые 10 секунд."
+        valueLabel={`${backendMaxLines} lines`}
+        hint="In-memory buffer and the backend.log file. The file is refreshed every 10 seconds."
       />
 
       {/* ── Compute log level ── */}
       <div className="modal-section">
         <div className="modal-section-title">
-          Compute — уровень лога
+          Compute — log level
           {computeLevel === null && <span className="log-offline-badge">offline</span>}
         </div>
         <LevelPicker
@@ -173,26 +173,26 @@ export default function LoggingTab() {
           disabled={computeLevel === null}
         />
         {computeLevel === null && (
-          <div className="modal-setting-hint">Compute-сервис недоступен.</div>
+          <div className="modal-setting-hint">Compute service is unreachable.</div>
         )}
       </div>
 
       {/* ── Compute buffer size ── */}
       {computeLevel !== null && (
         <SliderSetting
-          title="Compute — строк в файле лога"
+          title="Compute — log file lines"
           min={50} max={1000} step={50}
           value={computeMaxLines} onChange={handleComputeMaxLines}
           minLabel="50" maxLabel="1000"
-          valueLabel={`${computeMaxLines} строк`}
-          hint="Буфер compute-сервиса и файл compute.log."
+          valueLabel={`${computeMaxLines} lines`}
+          hint="Compute-service buffer and the compute.log file."
         />
       )}
 
       {/* ── Log viewer ── */}
       <div className="modal-section">
         <div className="modal-section-title log-viewer-title">
-          <span>Просмотр логов</span>
+          <span>Log viewer</span>
           <div className="log-viewer-controls">
             <div className="log-source-toggle">
               <button
@@ -222,7 +222,7 @@ export default function LoggingTab() {
               onChange={e => setLogN(Number(e.target.value))}
             >
               {[50, 100, 200, 500].map(v => (
-                <option key={v} value={v}>{v} строк</option>
+                <option key={v} value={v}>{v} lines</option>
               ))}
             </select>
           </div>
@@ -236,7 +236,7 @@ export default function LoggingTab() {
           onScroll={handleLogViewerScroll}
         >
           {logLines.length === 0
-            ? <span className="log-viewer-empty">Нажмите ↻ для загрузки логов</span>
+            ? <span className="log-viewer-empty">Press ↻ to load the logs</span>
             : logLines.map((line, i) => (
                 <div key={i} className={`log-line ${getLineClass(line)}`}>{line}</div>
               ))

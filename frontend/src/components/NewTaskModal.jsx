@@ -226,29 +226,29 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
           {/* ── Active settings summary (read-only, DB tasks only) ── */}
           {!isNewType && (
             <div className="ntm__section ntm__settings-summary">
-              <div className="ntm__label">Настройки (из Tools)</div>
+              <div className="ntm__label">Settings (from Tools)</div>
               {type === 'video_thumbnails' && (
                 <div className="ntm__summary-row">
                   <i className="mdi mdi-cog-outline" />
-                  <span>Режим превью: <strong>{VIDEO_MODE_LABELS[settings.videoMode] || settings.videoMode}</strong></span>
+                  <span>Preview mode: <strong>{VIDEO_MODE_LABELS[settings.videoMode] || settings.videoMode}</strong></span>
                 </div>
               )}
               {type === 'openvino' && (
                 <div className="ntm__summary-row">
                   <i className="mdi mdi-cog-outline" />
-                  <span>Модель: <strong>{settings.ovModel}</strong> · Порог: <strong>{settings.ovConf}%</strong></span>
+                  <span>Model: <strong>{settings.ovModel}</strong> · Confidence: <strong>{settings.ovConf}%</strong></span>
                 </div>
               )}
               {type === 'gemini' && (
                 <div className="ntm__summary-row">
                   <i className="mdi mdi-cog-outline" />
-                  <span>Модель: <strong>{settings.geminiModel}</strong></span>
+                  <span>Model: <strong>{settings.geminiModel}</strong></span>
                 </div>
               )}
               {type === 'claude' && (
                 <div className="ntm__summary-row">
                   <i className="mdi mdi-cog-outline" />
-                  <span>Модель: <strong>{settings.claudeModel}</strong></span>
+                  <span>Model: <strong>{settings.claudeModel}</strong></span>
                 </div>
               )}
             </div>
@@ -289,7 +289,7 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
           {noApiKey && (
             <div className="ntm__warn">
               <i className="mdi mdi-alert-outline" />
-              {type === 'gemini' ? 'Gemini' : 'Claude'} API key не задан. Откройте Tools → {type === 'gemini' ? 'Google AI' : 'Claude AI'}.
+              No {type === 'gemini' ? 'Gemini' : 'Claude'} API key set. Open Tools → AI.
             </div>
           )}
 
@@ -297,17 +297,17 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
           {isAiType(type) && (
             <>
               <div className="ntm__section">
-                <div className="ntm__label">Пауза между запросами к AI</div>
+                <div className="ntm__label">Pause between AI requests</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: 'var(--text-dim)' }}>мин:</span>
+                  <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: 'var(--text-dim)' }}>min:</span>
                   <input type="number" min="0" max="60" step="1" value={delayMin}
                     onChange={e => { const v = +e.target.value; setDelayMin(v); if (delayMax < v) setDelayMax(v) }}
                     className="modal-text-input" style={{ width: 70 }} />
-                  <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: 'var(--text-dim)' }}>макс:</span>
+                  <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: 'var(--text-dim)' }}>max:</span>
                   <input type="number" min="0" max="60" step="1" value={delayMax}
                     onChange={e => { const v = +e.target.value; setDelayMax(v); if (delayMin > v) setDelayMin(v) }}
                     className="modal-text-input" style={{ width: 70 }} />
-                  <span style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--text-dim)' }}>сек (0 = без паузы)</span>
+                  <span style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--text-dim)' }}>sec (0 = no pause)</span>
                 </div>
               </div>
 
@@ -316,19 +316,19 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
                   <input type="checkbox" checked={useTimeWindow}
                     onChange={e => setUseTimeWindow(e.target.checked)}
                     style={{ accentColor: 'var(--accent)', width: 14, height: 14 }} />
-                  <span className="ntm__label" style={{ margin: 0 }}>Ограничить время выполнения</span>
+                  <span className="ntm__label" style={{ margin: 0 }}>Limit run hours</span>
                 </label>
                 {useTimeWindow && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: 'var(--text-dim)' }}>с</span>
+                    <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: 'var(--text-dim)' }}>from</span>
                     <input type="number" min="0" max="23" step="1" value={activeFromHour}
                       onChange={e => setActiveFromHour(+e.target.value)}
                       className="modal-text-input" style={{ width: 60 }} />
-                    <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: 'var(--text-dim)' }}>до</span>
+                    <span style={{ fontSize: 'calc(var(--font-base) * 0.85)', color: 'var(--text-dim)' }}>to</span>
                     <input type="number" min="0" max="23" step="1" value={activeToHour}
                       onChange={e => setActiveToHour(+e.target.value)}
                       className="modal-text-input" style={{ width: 60 }} />
-                    <span style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--text-dim)' }}>часов</span>
+                    <span style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--text-dim)' }}>hours</span>
                   </div>
                 )}
               </div>
@@ -342,12 +342,12 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
                 <input type="checkbox" checked={reprocessExisting}
                   onChange={e => setReprocessExisting(e.target.checked)}
                   style={{ accentColor: 'var(--accent)', width: 14, height: 14 }} />
-                <span className="ntm__label" style={{ margin: 0 }}>Перезаписать имеющийся анализ</span>
+                <span className="ntm__label" style={{ margin: 0 }}>Overwrite existing analysis</span>
               </label>
               <div style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--text-dim)', marginTop: 4, paddingLeft: 22 }}>
                 {reprocessExisting
-                  ? 'Все файлы будут обработаны заново, даже если анализ уже есть.'
-                  : 'Файлы с готовым анализом будут пропущены (по умолчанию).'}
+                  ? 'All files will be processed again, even if they already have analysis.'
+                  : 'Files that already have analysis will be skipped (default).'}
               </div>
             </div>
           )}

@@ -24,7 +24,7 @@ export default function ClaudeAnalysisModal({ fileIds, onClose, onComplete, task
 
   async function handleRun() {
     if (!apiKey) {
-      setError('API key не задан. Откройте Tools → Claude AI.')
+      setError('No API key set. Open Tools → AI.')
       return
     }
     setRunning(true)
@@ -44,12 +44,12 @@ export default function ClaudeAnalysisModal({ fileIds, onClose, onComplete, task
   return (
     <BaseAiModal
       icon="mdi-robot"
-      title="Структурный анализ Claude"
+      title="Structured analysis (Claude)"
       onClose={onClose}
       fileCount={fileIds.length} model={model} showNoKey={!apiKey}
       beforeRunRow={
         <div className="gai-section">
-          <div className="gai-label">Промпт</div>
+          <div className="gai-label">Prompt</div>
           <textarea
             className="gai-prompt-area"
             value={prompt}
@@ -71,7 +71,7 @@ export default function ClaudeAnalysisModal({ fileIds, onClose, onComplete, task
         },
         label: `Claude · ${taskContext.dateFrom?.slice(0, 16) ?? ''}`,
         disabled: running || !apiKey,
-        title: 'Отправить в очередь задач (обработает весь период, по одному фото)',
+        title: 'Send to the task queue (processes the whole period, one photo at a time)',
       } : null}
       onTaskCreated={onTaskCreated}
     >

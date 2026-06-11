@@ -41,13 +41,13 @@ export const ETA_WINDOW_DEFAULT = 5
 export const VIDEO_PREVIEW_KEY     = 'video_preview_mode'
 export const VIDEO_PREVIEW_DEFAULT = 'none'
 export const VIDEO_PREVIEW_OPTIONS = [
-  { value: 'none',           label: 'Нет (иконка камеры)' },
-  { value: 'first_frame',    label: 'Первый кадр' },
-  { value: 'last_frame',     label: 'Последний кадр' },
-  { value: 'four_frames',      label: '4 кадра (2×2 сетка)' },
-  { value: 'max_change_gif',   label: 'GIF — максимальное изменение (2 кадра)' },
-  { value: 'four_frames_gif',  label: 'GIF — 4 кадра равномерно' },
-  { value: 'max_change_4_gif', label: 'GIF — 4 кадра с максимальным изменением' },
+  { value: 'none',           label: 'None (camera icon)' },
+  { value: 'first_frame',    label: 'First frame' },
+  { value: 'last_frame',     label: 'Last frame' },
+  { value: 'four_frames',      label: '4 frames (2×2 grid)' },
+  { value: 'max_change_gif',   label: 'GIF — max change (2 frames)' },
+  { value: 'four_frames_gif',  label: 'GIF — 4 frames evenly spaced' },
+  { value: 'max_change_4_gif', label: 'GIF — 4 frames with most change' },
 ]
 
 export const GEMINI_API_KEY_KEY = 'gemini_api_key'
@@ -99,19 +99,19 @@ export const DETECTION_CLASSES_KEY = 'detection_classes'
 export const OV_MODEL_KEY     = 'openvino_model'
 export const OV_MODEL_DEFAULT = 'yolov8n'
 export const OV_MODELS = [
-  { value: 'yolov8n', label: 'YOLOv8n — nano (быстро)' },
+  { value: 'yolov8n', label: 'YOLOv8n — nano (fastest)' },
   { value: 'yolov8s', label: 'YOLOv8s — small' },
-  { value: 'yolov8m', label: 'YOLOv8m — medium (точнее)' },
+  { value: 'yolov8m', label: 'YOLOv8m — medium (more accurate)' },
 ]
 
 export const UNIFORMITY_METHOD_KEY     = 'uniformity_method'
 export const UNIFORMITY_METHOD_DEFAULT = 'combined'
 
 export const U_METRICS = [
-  { key: 'af',       label: 'AF', desc: 'Active Fraction — доля активных минут' },
-  { key: 'se',       label: 'SE', desc: 'Shannon Entropy — равномерность нагрузки' },
-  { key: 'bc',       label: 'BC', desc: 'Block Coverage — активные блоки 5 мин' },
-  { key: 'combined', label: '∑',  desc: 'Комбинированный (40AF+35SE+25BC)' },
+  { key: 'af',       label: 'AF', desc: 'Active Fraction — share of active minutes' },
+  { key: 'se',       label: 'SE', desc: 'Shannon Entropy — load distribution' },
+  { key: 'bc',       label: 'BC', desc: 'Block Coverage — active 5-min blocks' },
+  { key: 'combined', label: '∑',  desc: 'Combined score (40AF+35SE+25BC)' },
 ]
 export const U_DEFAULTS = { af: [40, 65], se: [55, 80], bc: [40, 65], combined: [50, 72] }
 

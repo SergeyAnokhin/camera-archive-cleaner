@@ -138,19 +138,19 @@ export default function TuningScreen() {
     <div style={S.outer}>
       {/* Sidebar */}
       <div style={S.sidebar}>
-        <div style={S.sidebarHeader}>Сессии тюнинга</div>
+        <div style={S.sidebarHeader}>Tuning sessions</div>
         <div style={{ padding: '10px 12px 8px' }}>
           <button
             className="modal-btn primary"
             style={{ width: '100%', fontSize: 'calc(var(--font-base) * 0.85)' }}
             onClick={() => { setShowingNewForm(true); setActiveSession(null); setStepError(null) }}
           >
-            <i className="mdi mdi-plus" /> Новая сессия
+            <i className="mdi mdi-plus" /> New session
           </button>
         </div>
 
         {sessions.length === 0 && (
-          <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>Нет сессий</div>
+          <div style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-dim)', fontStyle: 'italic' }}>No sessions</div>
         )}
 
         {sessions.map(s => (
@@ -161,12 +161,12 @@ export default function TuningScreen() {
                 className="modal-btn neutral"
                 style={{ padding: '1px 5px', fontSize: 10, flexShrink: 0, lineHeight: '14px' }}
                 onClick={e => handleDeleteSession(s.id, e)}
-                title="Удалить"
+                title="Delete"
               >×</button>
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}>
               <span style={{ fontSize: 10, color: STATUS_COLOR[s.status] || '#6b7280', fontWeight: 600 }}>{STATUS_LABEL[s.status] || s.status}</span>
-              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>· {s.image_count} фото</span>
+              <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>· {s.image_count} photos</span>
             </div>
             {s.status === 'running' && s.progress_total > 0 && (
               <div style={{ marginTop: 6 }}>
@@ -190,7 +190,7 @@ export default function TuningScreen() {
                 <span style={{ fontWeight: 700, fontSize: 'calc(var(--font-base) * 1.05)' }}>{activeSession.name}</span>
                 <span style={{ marginLeft: 12, fontSize: 12, color: STATUS_COLOR[activeSession.status] }}>{STATUS_LABEL[activeSession.status]}</span>
               </div>
-              <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{imageCount} изображений</span>
+              <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{imageCount} images</span>
             </div>
 
             <div style={S.stepper}>
@@ -227,9 +227,9 @@ export default function TuningScreen() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, color: 'var(--text-dim)' }}>
             <i className="mdi mdi-tune-variant" style={{ fontSize: 48, marginBottom: 16, opacity: 0.4 }} />
-            <div style={{ marginBottom: 12 }}>Создайте сессию или выберите существующую</div>
+            <div style={{ marginBottom: 12 }}>Create a session or select an existing one</div>
             <button className="modal-btn primary" style={{ fontSize: 'calc(var(--font-base) * 0.9)' }} onClick={() => setShowingNewForm(true)}>
-              <i className="mdi mdi-plus" /> Новая сессия
+              <i className="mdi mdi-plus" /> New session
             </button>
           </div>
         )}

@@ -33,23 +33,23 @@ export function readGlobalSettings() {
 }
 
 export const VIDEO_MODE_LABELS = {
-  'none':           'Нет (иконка камеры)',
-  'first_frame':    'Первый кадр',
-  'last_frame':     'Последний кадр',
-  'four_frames':    '4 кадра (2×2)',
-  'max_change_gif': 'GIF — 2 кадра (макс. изменение)',
-  'four_frames_gif':'GIF — 4 кадра равномерно',
-  'max_change_4_gif':'GIF — 4 кадра (макс. изменение)',
+  'none':           'None (camera icon)',
+  'first_frame':    'First frame',
+  'last_frame':     'Last frame',
+  'four_frames':    '4 frames (2×2)',
+  'max_change_gif': 'GIF — 2 frames (max change)',
+  'four_frames_gif':'GIF — 4 frames evenly spaced',
+  'max_change_4_gif':'GIF — 4 frames (max change)',
 }
 
 export const VC_CODECS  = ['libx265', 'libx264', 'libvpx-vp9', 'copy']
 export const VC_PRESETS = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'veryslow']
 
 export const TASK_TYPES = [
-  { type: 'video_thumbnails', icon: 'mdi-video-outline',         name: 'Video Thumbnails',   desc: 'Превью для видео в диапазоне дат' },
-  { type: 'openvino',         icon: 'mdi-magnify-scan',          name: 'OpenVINO Detection', desc: 'YOLO детекция объектов на фото' },
-  { type: 'gemini',           icon: 'mdi-google',                name: 'Gemini AI Analysis', desc: 'Анализ фото с Google Gemini' },
-  { type: 'claude',           icon: 'mdi-robot',                 name: 'Claude AI Analysis', desc: 'Анализ фото с Anthropic Claude' },
-  { type: 'video_convert',    icon: 'mdi-video-check',           name: 'Video Convert',      desc: 'Конвертация видео через ffmpeg (H.265)' },
-  { type: 'file_organizer',   icon: 'mdi-folder-move-outline',   name: 'File Organizer',     desc: 'Раскладывание файлов по ГГГГ/ММ/ДД' },
+  { type: 'video_thumbnails', icon: 'mdi-video-outline',         name: 'Video Thumbnails',   desc: 'Previews for videos in a date range' },
+  { type: 'openvino',         icon: 'mdi-magnify-scan',          name: 'Object Detection',   desc: 'Local YOLO object detection on photos' },
+  { type: 'gemini',           icon: 'mdi-google',                name: 'Gemini AI Analysis', desc: 'Photo analysis with Google Gemini' },
+  { type: 'claude',           icon: 'mdi-robot',                 name: 'Claude AI Analysis', desc: 'Photo analysis with Anthropic Claude' },
+  { type: 'video_convert',    icon: 'mdi-video-check',           name: 'Video Convert',      desc: 'Video conversion via ffmpeg (H.265)' },
+  { type: 'file_organizer',   icon: 'mdi-folder-move-outline',   name: 'File Organizer',     desc: 'Sort files into YYYY/MM/DD folders' },
 ]

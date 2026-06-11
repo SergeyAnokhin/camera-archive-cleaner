@@ -151,7 +151,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) | Gemini AI analysis modal: prompt + token/cost stats. Built on `aiModal/BaseAiModal` |
 | [`ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) | Claude AI analysis modal (same structure as Gemini). Built on `aiModal/BaseAiModal` |
 | [`OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) | OpenVINO "Run" modal: confidence slider, per-photo object tags with emoji, ms/photo timing. Built on `aiModal/BaseAiModal` |
-| [`aiModal/BaseAiModal.jsx`](../frontend/src/components/aiModal/BaseAiModal.jsx) | Shared AI-modal shell: backdrop + Escape, header, run row, "В задачи" task submission. New AI provider modals start here |
+| [`aiModal/BaseAiModal.jsx`](../frontend/src/components/aiModal/BaseAiModal.jsx) | Shared AI-modal shell: backdrop + Escape, header, run row, "To tasks" submission, no-key deep-link button. New AI provider modals start here |
 | [`aiModal/StructuredAiResult.jsx`](../frontend/src/components/aiModal/StructuredAiResult.jsx) | `AiStatsRow` (tokens/cost/time) + `StructuredResponse` (scene/images/raw) — shared by Gemini and Claude modals |
 | [`DeleteConfirmModal.jsx`](../frontend/src/components/DeleteConfirmModal.jsx) | Delete confirmation modal: file list with relative paths (strips `camera.path` prefix), paired video preview |
 | [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal — thin shell: backdrop, tab bar, renders the active tab. The 8 tabs live in `tools/` (see table below) |
@@ -167,7 +167,8 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`DrilldownBreadcrumb.jsx`](../frontend/src/components/DrilldownBreadcrumb.jsx) | Navigation breadcrumb: All Years / 2024 / Nov / 16 |
 | [`StatsBar.jsx`](../frontend/src/components/StatsBar.jsx) | Recharts bar chart below the heatmap (size per period) |
 | [`ScanButton.jsx`](../frontend/src/components/ScanButton.jsx) | Scan button, spinner, data refresh on completion |
-| [`ToolsButton.jsx`](../frontend/src/components/ToolsButton.jsx) | Button that opens ToolsModal |
+| [`ToolsButton.jsx`](../frontend/src/components/ToolsButton.jsx) | Button that opens ToolsModal. Also listens for `open-tools` CustomEvent (`detail: {tab}`) to open to a specific tab |
+| [`ServiceStatus.jsx`](../frontend/src/components/ServiceStatus.jsx) | Status chips in the header (Backend / Compute): up/down dot, CPU %, RAM usage. Polls `/api/services/status` every 1 s |
 | [`TasksScreen.jsx`](../frontend/src/components/TasksScreen.jsx) | Tasks screen — polls `/tasks` every 3 s, shows system metrics bar + task card list, hosts NewTaskModal |
 | [`TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx) | Model tuning orchestrator: session sidebar + step switching. Steps live in `tuning/` (table below). See [`docs/tuning.md`](tuning.md) |
 | [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card: type icon, status badge, progress bar, speed/ETA, thumbnail, pause/resume/cancel buttons. Logs button (console icon) for `video_convert`/`file_organizer` types; dry-run amber tag |
@@ -219,7 +220,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | File | Role |
 |---|---|
 | [`hourUtils.js`](../frontend/src/components/hour/hourUtils.js) | localStorage keys/defaults, formatters (`formatTime`, `formatBytes`), mode-param load/save, AI request rate tracking, `computeUniformity(buckets)` → AF/SE/BC metrics + per-metric levels |
-| [`PhotoCard.jsx`](../frontend/src/components/hour/PhotoCard.jsx) | Single photo card: thumbnail, fullscreen lightbox (with a **Скачать**/download button → `/media/{id}`), AI icons + description overlay |
+| [`PhotoCard.jsx`](../frontend/src/components/hour/PhotoCard.jsx) | Single photo card: thumbnail, fullscreen lightbox (with download button → `/media/{id}`), AI icons + description overlay |
 | [`VideoCard.jsx`](../frontend/src/components/hour/VideoCard.jsx) | Single video card. Default (`video_preview_mode = none`): camera icon + timestamp, no image. With a preview mode set: fetches `/video_thumbnail` and shows a JPEG or animated GIF. Opens VideoModal on click |
 | [`VideoModal.jsx`](../frontend/src/components/hour/VideoModal.jsx) | Fullscreen video player: Space = play/pause, ←/→ = skip ±1/5 duration, Escape = close, download, open externally, VLC fallback |
 | [`DistributionChart.jsx`](../frontend/src/components/hour/DistributionChart.jsx) | 60-bar per-minute distribution chart; click a bar to jump to its page. Shows AF/SE/BC uniformity badges (green/yellow/red) in the header |
@@ -236,11 +237,11 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 | File | Mode |
 |---|---|
 | [`normalMode.js`](../frontend/src/components/viewModes/normalMode.js) | Normal (basic thumbnail) |
-| [`motionDiffMode.js`](../frontend/src/components/viewModes/motionDiffMode.js) | Motion Diff (per-pixel delta from page mean) |
-| [`erosionMode.js`](../frontend/src/components/viewModes/erosionMode.js) | Erosion (morphological erosion) |
-| [`openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) | OpenVINO Detection — `isAiMode`, calls `/openvino_thumbnail` with model+confidence+classes params |
-| [`geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) | Gemini AI (icon overlay from analysis results) |
-| [`claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) | Claude AI (icon overlay from analysis results) |
+| [`motionDiffMode.js`](../frontend/src/components/viewModes/motionDiffMode.js) | Motion highlight (per-pixel delta from page mean) |
+| [`erosionMode.js`](../frontend/src/components/viewModes/erosionMode.js) | Motion (noise-filtered) — MOG2 + morphological erosion |
+| [`openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) | Object detection (local) — `isAiMode`, calls `/openvino_thumbnail` with model+confidence+classes params |
+| [`geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) | AI description (Gemini) — icon overlay from analysis results |
+| [`claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) | AI description (Claude) — icon overlay from analysis results |
 | [`index.js`](../frontend/src/components/viewModes/index.js) | Mode registry — `VIEW_MODES`; `getEnabledViewModes()` hides `needsCompute` modes (OpenVINO) when the compute-service is off |
 
 > The backend also serves thumbnail styles with **no frontend mode**: `/diff_zoom_thumbnail` and `/motion_thumbnail` (neon_mask, mhi, bounding_boxes, motion_stacking). Backend-only — adding a UI mode for them means creating a `viewModes/*.js` file and registering it in `index.js`.

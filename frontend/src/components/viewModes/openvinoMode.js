@@ -2,7 +2,8 @@ import { getOpenVinoBboxThumbnailUrl, getClassesParam } from '../../api.js'
 
 export default {
   key: 'openvino_detection',
-  label: 'OpenVINO Detection',
+  label: 'Object detection (local)',
+  description: 'Local YOLO bounding boxes, no API key needed — requires the compute service',
   params: [
     { key: 'confidence', label: 'Confidence %', min: 10, max: 80, default: 25, step: 5 },
   ],

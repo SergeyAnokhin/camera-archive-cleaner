@@ -36,14 +36,9 @@ Key pattern: `mode_params_<mode_key>` (JSON object).
 
 | localStorage key | Example value | Description |
 |---|---|---|
-| `mode_params_motion_diff` | `{"threshold":20}` | Motion Diff threshold |
-| `mode_params_diff_zoom` | `{"threshold":20}` | Diff Zoom threshold |
-| `mode_params_erosion` | `{"threshold":20}` | Erosion threshold |
-| `mode_params_neon_mask` | `{"threshold":20}` | Neon Mask threshold |
-| `mode_params_mhi` | `{"threshold":20}` | MHI threshold |
-| `mode_params_bounding_boxes` | `{"threshold":20}` | Bounding Boxes threshold |
-| `mode_params_motion_stacking` | `{"threshold":20}` | Motion Stacking threshold |
-| `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Used for the AiModePanel slider and bbox thumbnail URL |
+| `mode_params_motion_diff` | `{"threshold":20}` | Motion highlight threshold |
+| `mode_params_erosion` | `{"threshold":20}` | Motion (noise-filtered) threshold |
+| `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Written by Tools → Detection tab and OpenVinoAnalysisModal. Read-only in AiModePanel and CellSelBar |
 
 Initial value for motion modes is taken from `diff_threshold` (the global default). OpenVINO defaults to 25.
 
@@ -57,20 +52,13 @@ Initial value for motion modes is taken from `diff_threshold` (the global defaul
 
 ---
 
-## Google AI settings (Tools modal → Google AI tab)
+## AI settings (Tools modal → AI tab)
 
 | localStorage key | Default | Description |
 |---|---|---|
 | `gemini_api_key` | `''` | Google AI Studio API key. Sent to the backend only as part of the analysis request body |
 | `gemini_model` | `gemini-3.1-flash-lite` | Selected Gemini model |
 | `gemini_structured_prompt` | (long template) | Prompt template for batch analysis. `{n}` is replaced with the image count at run time |
-
----
-
-## Claude AI settings (Tools modal → Claude AI tab)
-
-| localStorage key | Default | Description |
-|---|---|---|
 | `claude_api_key` | `''` | Anthropic API key. Sent to the backend only as part of the analysis request body |
 | `claude_model` | `claude-haiku-4-5-20251001` | Selected Claude model |
 
@@ -81,9 +69,8 @@ Initial value for motion modes is taken from `diff_threshold` (the global defaul
 | localStorage key | Default | Description |
 |---|---|---|
 | `openvino_model` | `yolov8n` | Selected YOLO model. Options: `yolov8n`, `yolov8s`, `yolov8m`. Written **only** by the Detection tab. `AiModePanel` and `CellSelBar` display this value read-only |
-| `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Written by the Detection tab. Read-only in `AiModePanel` and `CellSelBar` |
-| `detection_classes` | `[0,14,15,16,24,26]` (JSON array of COCO class IDs) | Which YOLO classes the model is allowed to detect — passed as the `classes=` inference param so other classes are skipped entirely. Defaults: человек, птица, кошка, собака, рюкзак, сумка. UI: 80-class emoji checklist in the Detection tab (Все / Ничего / По умолчанию). Class list lives in [`frontend/src/cocoClasses.js`](../frontend/src/cocoClasses.js). Empty/unset → detect all 80 |
-| `openvino_confidence` | `0.25` | Float 0–1. Used **only** by `OpenVinoAnalysisModal` (the standalone "Run" button). Separate from `mode_params_openvino_detection.confidence` |
+| `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Written by the Detection tab and `OpenVinoAnalysisModal`. Read-only in `AiModePanel` and `CellSelBar` |
+| `detection_classes` | `[0,14,15,16,24,26]` (JSON array of COCO class IDs) | Which YOLO classes the model is allowed to detect — passed as the `classes=` inference param so other classes are skipped entirely. UI: 80-class emoji checklist in the Detection tab (All / None / Defaults). Class list lives in [`frontend/src/cocoClasses.js`](../frontend/src/cocoClasses.js). Empty/unset → detect all 80 |
 
 ---
 

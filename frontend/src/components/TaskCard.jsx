@@ -30,13 +30,13 @@ function fmtEta(s) {
 function fmtDuration(sec) {
   if (sec == null || sec < 0) return null
   sec = Math.round(sec)
-  if (sec < 60)   return `${sec} с`
+  if (sec < 60)   return `${sec} s`
   if (sec < 3600) {
     const m = Math.floor(sec / 60), s = sec % 60
-    return s > 0 ? `${m} мин ${s} с` : `${m} мин`
+    return s > 0 ? `${m} min ${s} s` : `${m} min`
   }
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60)
-  return m > 0 ? `${h} ч ${m} мин` : `${h} ч`
+  return m > 0 ? `${h} h ${m} min` : `${h} h`
 }
 
 function fmtCompletedAt(ts) {
@@ -48,8 +48,8 @@ function fmtCompletedAt(ts) {
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const yestStart  = new Date(todayStart - 86400000)
   const hm = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-  if (d >= todayStart)  return `сегодня ${hm}`
-  if (d >= yestStart)   return `вчера ${hm}`
+  if (d >= todayStart)  return `today ${hm}`
+  if (d >= yestStart)   return `yesterday ${hm}`
   return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)} ${hm}`
 }
 
@@ -192,7 +192,7 @@ export default function TaskCard({
           gap: 5,
         }}>
           <i className="mdi mdi-clock-outline" />
-          Ожидание временного окна {sleepWindowLabel}
+          Waiting for the time window {sleepWindowLabel}
         </div>
       )}
 

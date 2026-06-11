@@ -3,24 +3,14 @@ import { openvinoAnalyzeBatch, getClassesList } from '../api.js'
 import { resolveAiIcons } from '../aiHelpers.js'
 import BaseAiModal from './aiModal/BaseAiModal.jsx'
 
-const CONFIDENCE_KEY = 'openvino_confidence'
-const DEFAULT_CONFIDENCE = 0.25
-
 // taskContext: { cameraId, dateFrom, dateTo } — if provided, shows "Send to Task" button
-export default function OpenVinoAnalysisModal({ fileIds, model, taskContext, onClose, onComplete, onTaskCreated }) {
-  const [confidence, setConfidence] = useState(
-    () => parseFloat(localStorage.getItem(CONFIDENCE_KEY) || DEFAULT_CONFIDENCE)
-  )
+// confidencePct (10–80) is the shared mode-params value owned by HourViewer.
+export default function OpenVinoAnalysisModal({ fileIds, model, confidencePct, onConfidencePctChange, taskContext, onClose, onComplete, onTaskCreated }) {
+  const confidence = (confidencePct ?? 25) / 100
   const [running, setRunning]       = useState(false)
   const [progress, setProgress]     = useState(null)   // { current, total }
   const [allResults, setAllResults] = useState([])
   const [error, setError]           = useState(null)
-
-  function handleConfidenceChange(e) {
-    const v = parseFloat(e.target.value)
-    setConfidence(v)
-    localStorage.setItem(CONFIDENCE_KEY, v)
-  }
 
   async function handleRun() {
     setRunning(true)
@@ -54,7 +44,7 @@ export default function OpenVinoAnalysisModal({ fileIds, model, taskContext, onC
   return (
     <BaseAiModal
       icon="mdi-chip" iconStyle={{ color: '#60a5fa' }}
-      title="OpenVINO Detection"
+      title="Object detection (local)"
       onClose={onClose}
       fileCount={fileIds.length} model={model}
       running={running} onRun={handleRun} runDisabled={running}
@@ -69,7 +59,7 @@ export default function OpenVinoAnalysisModal({ fileIds, model, taskContext, onC
           classes: getClassesList(),
         },
         label: `OpenVINO · ${taskContext.dateFrom?.slice(0, 16) ?? ''}`,
-        title: 'Отправить в очередь задач (обработает весь период)',
+        title: 'Send to the task queue (processes the whole period)',
       } : null}
       onTaskCreated={onTaskCreated}
     >
@@ -77,7 +67,7 @@ export default function OpenVinoAnalysisModal({ fileIds, model, taskContext, onC
       {running && progress && (
         <div className="gai-section">
           <div className="gai-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Прогресс</span>
+            <span>Progress</span>
             <span>{progress.current} / {progress.total}</span>
           </div>
           <div style={{ background: '#1f2937', borderRadius: 4, height: 6, overflow: 'hidden' }}>
@@ -91,20 +81,20 @@ export default function OpenVinoAnalysisModal({ fileIds, model, taskContext, onC
         </div>
       )}
 
-      {/* Confidence slider */}
+      {/* Confidence slider — shared with the AI mode panel / Tools → Detection */}
       <div className="gai-section">
-        <div className="gai-label">Порог уверенности: <strong>{Math.round(confidence * 100)}%</strong></div>
+        <div className="gai-label">Confidence threshold: <strong>{confidencePct ?? 25}%</strong></div>
         <input
           type="range"
-          min="0.10" max="0.80" step="0.05"
-          value={confidence}
-          onChange={handleConfidenceChange}
+          min="10" max="80" step="5"
+          value={confidencePct ?? 25}
+          onChange={e => onConfidencePctChange?.(Number(e.target.value))}
           disabled={running}
           style={{ width: '100%', accentColor: 'var(--accent)' }}
         />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'calc(var(--font-base) * 0.75)', color: 'var(--text-dim)', marginTop: 2 }}>
-          <span>10% — чувствительнее, больше шума</span>
-          <span>80% — строже, меньше объектов</span>
+          <span>10% — more sensitive, more noise</span>
+          <span>80% — stricter, fewer objects</span>
         </div>
       </div>
 
@@ -120,18 +110,18 @@ export default function OpenVinoAnalysisModal({ fileIds, model, taskContext, onC
         <div className="gai-stats">
           <span>
             <i className="mdi mdi-check-circle-outline" />
-            <span className="gai-saved-badge">{totalSaved} сохранено</span>
+            <span className="gai-saved-badge">{totalSaved} saved</span>
           </span>
-          <span><i className="mdi mdi-eye-outline" /> объекты найдены в {totalDetected}/{totalUsed} фото</span>
-          <span><i className="mdi mdi-timer-outline" /> {(totalMs / 1000).toFixed(1)} с</span>
-          <span className="gai-stats-detail">~{totalUsed > 0 ? Math.round(totalMs / totalUsed) : 0} мс/фото</span>
+          <span><i className="mdi mdi-eye-outline" /> objects found in {totalDetected}/{totalUsed} photos</span>
+          <span><i className="mdi mdi-timer-outline" /> {(totalMs / 1000).toFixed(1)} s</span>
+          <span className="gai-stats-detail">~{totalUsed > 0 ? Math.round(totalMs / totalUsed) : 0} ms/photo</span>
         </div>
       )}
 
       {/* Per-image results */}
       {allResultEntries.length > 0 && (
         <div className="gai-section">
-          <div className="gai-response-label">Результаты по фото</div>
+          <div className="gai-response-label">Per-photo results</div>
           <div className="gai-images-list">
             {allResultEntries.map(([fid, objs], idx) => {
               const icons = resolveAiIcons(objs.join(' '))
@@ -149,7 +139,7 @@ export default function OpenVinoAnalysisModal({ fileIds, model, taskContext, onC
                           ))}
                         </div>
                       )
-                      : <div className="gai-image-desc" style={{ color: 'var(--text-dim)' }}>объекты не обнаружены</div>
+                      : <div className="gai-image-desc" style={{ color: 'var(--text-dim)' }}>no objects detected</div>
                     }
                   </div>
                 </div>

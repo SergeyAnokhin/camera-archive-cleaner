@@ -5,13 +5,13 @@ export const MODEL_LABEL = { yolov8n: 'Nano', yolov8s: 'Small', yolov8m: 'Medium
 export const MODEL_COLOR = { yolov8n: '#60a5fa', yolov8s: '#34d399', yolov8m: '#f472b6' }
 
 export const STATUS_LABEL = {
-  setup: 'Загрузка', ready: 'Готова', running: 'Тест идёт', done: 'Готово', failed: 'Ошибка',
+  setup: 'Setting up', ready: 'Ready', running: 'Running', done: 'Done', failed: 'Failed',
 }
 export const STATUS_COLOR = {
   setup: '#6b7280', ready: '#10b981', running: '#f59e0b', done: '#3b82f6', failed: '#ef4444',
 }
 
-export const STEP_TITLES = ['Эталон', 'Тест', 'Результаты']
+export const STEP_TITLES = ['Ground truth', 'Benchmark', 'Results']
 
 export const S = {
   outer: { display: 'flex', gap: 0, flex: 1, minHeight: 0 },
@@ -87,7 +87,7 @@ export function ProgressBar({ current, total }) {
   const pct = total > 0 ? Math.round((current / total) * 100) : 0
   return (
     <div>
-      <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{current} / {total} операций ({pct}%)</div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{current} / {total} operations ({pct}%)</div>
       <div style={S.progressBar}><div style={S.progressFill(pct)} /></div>
     </div>
   )

@@ -26,7 +26,7 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
-## 2. Motion diff
+## 2. Motion highlight
 
 **Key:** `motion_diff` | **Cache:** `backend/diff_thumbnails_cache/`
 
@@ -44,7 +44,7 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
-## 3. Erosion
+## 3. Motion (noise-filtered)
 
 **Key:** `erosion` | **Cache:** `backend/erosion_thumbnails_cache/`
 
@@ -63,7 +63,7 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
-## 4. Gemini Analysis
+## 4. AI description (Gemini)
 
 **Key:** `gemini_analysis` | **Cache:** none (results stored in `ai_analysis` DB table) | **`isAiMode: true`**
 
@@ -73,11 +73,11 @@ Sends all photos on the current page to the Google Gemini API (or a selection if
 
 **Panel controls:** Model selector (gemini-3.1-flash-lite / gemini-2.5-flash / gemini-2.5-pro), structured prompt editor, **Analyze** button, cost estimate and token stats after each run.
 
-**Requires:** `gemini_api_key` in localStorage (set in Tools → Google AI tab).
+**Requires:** `gemini_api_key` in localStorage (set in Tools → AI tab).
 
 ---
 
-## 5. Claude Analysis
+## 5. AI description (Claude)
 
 **Key:** `claude_analysis` | **Cache:** none (results in `ai_analysis` table) | **`isAiMode: true`**
 
@@ -85,11 +85,11 @@ Same flow as Gemini but uses the Anthropic Claude API. Sends photos as base64 JP
 
 **Panel controls:** Model selector (claude-haiku-4-5 / claude-sonnet-4-6 / claude-opus-4-7), **Analyze** button, token/cost stats.
 
-**Requires:** `claude_api_key` in localStorage (set in Tools → Claude AI tab).
+**Requires:** `claude_api_key` in localStorage (set in Tools → AI tab).
 
 ---
 
-## 6. OpenVINO Detection
+## 6. Object detection (local)
 
 **Key:** `openvino_detection` | **Cache:** `backend/openvino_thumbnails_cache/` (bbox JPEG per file+model+confidence) | **`isAiMode: true`**
 

@@ -178,19 +178,19 @@ export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras })
         <div className="modal-section" style={{ paddingBottom: 6 }}>
           <div className="modal-setting-hint">
             <i className="mdi mdi-cctv" style={{ marginRight: 5 }} />
-            Камера: <strong>{camName}</strong>
+            Camera: <strong>{camName}</strong>
           </div>
         </div>
       )}
 
       {/* Date range filter */}
       <div className="modal-section">
-        <div className="modal-section-title">Диапазон дат</div>
+        <div className="modal-section-title">Date range</div>
         <div className="modal-setting-hint" style={{ marginBottom: 8 }}>
-          Все операции очистки применяются только к файлам в этом диапазоне.
+          All clear operations are applied only to files within this range.
           {datesFilled && <span style={{ color: '#86efac', marginLeft: 6 }}>
             <i className="mdi mdi-check-circle" style={{ marginRight: 3 }} />
-            авто-заполнено из камеры
+            auto-filled from camera
           </span>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -212,101 +212,101 @@ export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras })
           <button className="modal-btn neutral" onClick={() => {
             setDateFrom(''); setDateTo(''); setDatesFilled(false)
           }}>
-            <i className="mdi mdi-close" /> Весь диапазон
+            <i className="mdi mdi-close" /> All dates
           </button>
         </div>
         {(df || dt) && (
           <div className="modal-setting-hint" style={{ marginTop: 6, color: '#60a5fa' }}>
             <i className="mdi mdi-filter-outline" style={{ marginRight: 4 }} />
-            Фильтр активен: {df ? df.slice(0, 16) : '…'} → {dt ? dt.slice(0, 16) : '…'}
+            Filter active: {df ? df.slice(0, 16) : '…'} → {dt ? dt.slice(0, 16) : '…'}
           </div>
         )}
       </div>
 
       {/* Thumbnail cleanup */}
       <div className="modal-section">
-        <div className="modal-section-title">Очистка превьюшек</div>
+        <div className="modal-section-title">Thumbnail cache</div>
 
         <ActionRow
-          name="Все превьюшки"
-          desc="Базовые + motion + видео + детекция (все типы)"
+          name="All thumbnails"
+          desc="Basic + motion + video + detection (all types)"
           sizeLabel={thumbSizeStr}
           onAction={handleClearAllThumbs}
           busy={allThumb.busy}
           result={allThumb.result}
           renderResult={res => {
             const t = res?.types
-            if (!t) return 'Очищено'
+            if (!t) return 'Cleared'
             const parts = Object.entries(t)
               .filter(([, v]) => v.deleted_files > 0)
               .map(([k, v]) => `${k}: ${v.deleted_files}`)
-            return `Удалено ${res.total_files} файл(ов)${parts.length ? ` (${parts.join(', ')})` : ''}`
+            return `Deleted ${res.total_files} file(s)${parts.length ? ` (${parts.join(', ')})` : ''}`
           }}
         />
 
         <ActionRow
-          name="Базовые превьюшки"
-          desc="Миниатюры 256×256 для режима Normal"
+          name="Basic thumbnails"
+          desc="256×256 thumbnails for Normal mode"
           onAction={handleClearBasic}
           busy={basicThumb.busy}
           result={basicThumb.result}
-          renderResult={res => `Удалено ${res?.deleted_files ?? 0} файл(ов)`}
+          renderResult={res => `Deleted ${res?.deleted_files ?? 0} file(s)`}
         />
 
         <ActionRow
-          name="Motion-превьюшки"
-          desc="Diff, Diff Zoom, Erosion, MOG2 — режимы анализа движения"
+          name="Motion thumbnails"
+          desc="Motion highlight, Motion noise-filtered — motion analysis modes"
           onAction={handleClearMotion}
           busy={motionThumb.busy}
           result={motionThumb.result}
-          renderResult={res => `Удалено ${res?.total ?? 0} файл(ов)`}
+          renderResult={res => `Deleted ${res?.total ?? 0} file(s)`}
         />
 
         <ActionRow
-          name="Детекция объектов (OpenVINO)"
-          desc="Записи object_detection в БД для выбранного диапазона. Диск-кэш с bbox очищается при глобальной очистке."
+          name="Object detection (local)"
+          desc="object_detection DB records for the selected range. Disk cache with bounding boxes is cleared on full clear."
           onAction={handleClearOpenVino}
           busy={ovThumb.busy}
           result={ovThumb.result}
           renderResult={res => {
             const parts = []
-            if (res?.deleted_files) parts.push(`${res.deleted_files} файл(ов)`)
-            if (res?.deleted_rows)  parts.push(`${res.deleted_rows} записей в БД`)
-            return `Удалено: ${parts.join(', ') || '0'}`
+            if (res?.deleted_files) parts.push(`${res.deleted_files} file(s)`)
+            if (res?.deleted_rows)  parts.push(`${res.deleted_rows} DB rows`)
+            return `Deleted: ${parts.join(', ') || '0'}`
           }}
         />
 
         <ActionRow
-          name="Видео-превьюшки"
-          desc="Кэш превью для видеофайлов (первый кадр, сетка, GIF) + записи в БД"
+          name="Video thumbnails"
+          desc="Preview cache for video files (first frame, grid, GIF) + DB records"
           onAction={handleClearVideo}
           busy={videoThumb.busy}
           result={videoThumb.result}
-          renderResult={res => `Удалено ${res?.deleted_files ?? 0} файл(ов)`}
+          renderResult={res => `Deleted ${res?.deleted_files ?? 0} file(s)`}
         />
       </div>
 
       {/* Database */}
       <div className="modal-section">
-        <div className="modal-section-title">База данных</div>
+        <div className="modal-section-title">Database</div>
 
         <ActionRow
           danger
-          name="Очистить записи файлов"
-          desc={`Удалить записи${cameraId ? ` камеры «${camName}»` : ''} из БД за выбранный диапазон (файлы на диске не трогаются)`}
+          name="Clear file records"
+          desc={`Delete records${cameraId ? ` for camera "${camName}"` : ''} from the DB for the selected range (files on disk are not touched)`}
           sizeLabel={dbSizeStr}
           onAction={handleClearDb}
           busy={dbClear.busy}
           result={dbClear.result}
-          renderResult={() => 'Записи очищены.'}
+          renderResult={() => 'Records cleared.'}
         />
 
         {/* Vacuum */}
         <div className="modal-action-row" style={{ marginTop: 4 }}>
           <div className="modal-action-info">
-            <span className="modal-action-name">Оптимизировать базу данных</span>
+            <span className="modal-action-name">Optimize database</span>
             <span className="modal-action-desc">
-              VACUUM — уменьшить размер файла БД после удаления записей
+              VACUUM — shrink the DB file size after deleting records
               {dbSizeStr && <span className="modal-action-size"> · {dbSizeStr}</span>}
             </span>
           </div>
@@ -321,7 +321,7 @@ export default function MaintenanceTab({ onDatabaseCleared, cameraId, cameras })
           <div className="modal-result err">{vacuumAct.result.text}</div>
         )}
         {vacuumAct.result?.ok && (
-          <div className="modal-result ok">База данных оптимизирована.</div>
+          <div className="modal-result ok">Database optimized.</div>
         )}
       </div>
     </>

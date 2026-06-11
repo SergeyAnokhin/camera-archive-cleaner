@@ -69,9 +69,9 @@ export default function DistributionChart({ buckets, pageSize, page, total, onGo
         {uniformity && (
           <div className="hv-dist-uniformity-group">
             {[
-              { key: 'active',  label: 'AF', score: uniformity.activeFraction,    tip: 'Active Fraction: доля из 60 мин с записями' },
-              { key: 'entropy', label: 'SE', score: uniformity.normalizedEntropy, tip: 'Shannon Entropy: равномерность нагрузки' },
-              { key: 'bc',      label: 'BC', score: uniformity.blockCoverage,     tip: 'Block Coverage: сколько из 12 блоков по 5 мин активны' },
+              { key: 'active',  label: 'AF', score: uniformity.activeFraction,    tip: 'Active Fraction: share of the 60 minutes with recordings' },
+              { key: 'entropy', label: 'SE', score: uniformity.normalizedEntropy, tip: 'Shannon Entropy: how evenly the load is spread' },
+              { key: 'bc',      label: 'BC', score: uniformity.blockCoverage,     tip: 'Block Coverage: how many of the 12 five-minute blocks are active' },
             ].map(({ key, label, score, tip }) => {
               const lvl = uniformity.levelByMethod[key]
               const icon = lvl === 'alert' ? 'mdi-alert-circle-outline'
@@ -81,7 +81,7 @@ export default function DistributionChart({ buckets, pageSize, page, total, onGo
                 <span
                   key={key}
                   className={`hv-dist-uniformity-badge hv-dist-uniformity-${lvl ?? 'ok'}`}
-                  title={`${label}: ${score}/100 — ${tip}\n${lvl === 'alert' ? 'Ложные срабатывания (дождь?)' : lvl === 'warn' ? 'Подозрительно равномерно (ветер?)' : 'Норма'}`}
+                  title={`${label}: ${score}/100 — ${tip}\n${lvl === 'alert' ? 'False triggers (rain?)' : lvl === 'warn' ? 'Suspiciously uniform (wind?)' : 'Normal'}`}
                 >
                   <i className={`mdi ${icon}`} />{label} {score}
                 </span>

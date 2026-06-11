@@ -44,7 +44,7 @@ export default function VideoModal({ file, onClose }) {
           <span className="hv-video-modal-title">
             <i className="mdi mdi-video" /> {formatTime(file.timestamp)}
           </span>
-          <div className="hv-video-modal-hint">Пробел — пауза · ← → — перемотка на 1/5</div>
+          <div className="hv-video-modal-hint">Space — pause · ← → — seek 1/5</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="hv-video-modal-btn" onClick={openExternal}>
               <i className="mdi mdi-open-in-new" /> Open externally

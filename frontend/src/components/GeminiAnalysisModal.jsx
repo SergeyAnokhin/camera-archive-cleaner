@@ -37,7 +37,7 @@ export default function GeminiAnalysisModal({ fileIds, onClose, structured = fal
 
   async function handleRun() {
     if (!apiKey) {
-      setError('API key не задан. Откройте Tools → Google AI.')
+      setError('No API key set. Open Tools → AI.')
       return
     }
     setRunning(true)
@@ -62,12 +62,12 @@ export default function GeminiAnalysisModal({ fileIds, onClose, structured = fal
   return (
     <BaseAiModal
       icon="mdi-google"
-      title={structured ? 'Структурный анализ Gemini' : 'Google AI Analysis'}
+      title={structured ? 'Structured analysis (Gemini)' : 'Google AI Analysis'}
       onClose={onClose}
       fileCount={fileIds.length} model={model} showNoKey={!apiKey}
       beforeRunRow={
         <div className="gai-section">
-          <div className="gai-label">Промпт</div>
+          <div className="gai-label">Prompt</div>
           <textarea
             className="gai-prompt-area"
             value={prompt}
@@ -89,7 +89,7 @@ export default function GeminiAnalysisModal({ fileIds, onClose, structured = fal
         },
         label: `Gemini · ${taskContext.dateFrom?.slice(0, 16) ?? ''}`,
         disabled: running || !apiKey,
-        title: 'Отправить в очередь задач (обработает весь период, по одному фото)',
+        title: 'Send to the task queue (processes the whole period, one photo at a time)',
       } : null}
       onTaskCreated={onTaskCreated}
     >
@@ -106,7 +106,7 @@ export default function GeminiAnalysisModal({ fileIds, onClose, structured = fal
       {/* Free-text response */}
       {!structured && result && (
         <div className="gai-response">
-          <div className="gai-response-label">Ответ</div>
+          <div className="gai-response-label">Response</div>
           <div className="gai-response-text">{result.text}</div>
         </div>
       )}

@@ -28,13 +28,13 @@ export default function GroundTruthStep({ session, groundTruth, onGTChange, onAu
 
       <div style={{ ...S.row, marginBottom: 20, padding: '12px 16px', background: '#111827', borderRadius: 8, border: '1px solid #1f2937' }}>
         <div>
-          <div style={S.label}>Модель для авторазметки</div>
+          <div style={S.label}>Model for auto-labeling</div>
           <select style={{ ...S.input, width: 130 }} value={model} onChange={e => setModel(e.target.value)}>
             {MODELS.map(m => <option key={m} value={m}>{MODEL_LABEL[m]}</option>)}
           </select>
         </div>
         <div>
-          <div style={S.label}>Порог</div>
+          <div style={S.label}>Threshold</div>
           <div style={{ ...S.row, gap: 8 }}>
             <input type="range" min={0.1} max={0.9} step={0.05} value={conf} onChange={e => setConf(+e.target.value)} style={{ width: 110 }} />
             <span style={{ fontSize: 13, color: '#f1f5f9', minWidth: 32 }}>{conf.toFixed(2)}</span>
@@ -47,8 +47,8 @@ export default function GroundTruthStep({ session, groundTruth, onGTChange, onAu
           disabled={autolabeling}
         >
           {autolabeling
-            ? <><i className="mdi mdi-loading mdi-spin" /> Детекция…</>
-            : <><i className="mdi mdi-auto-fix" /> Детектировать</>}
+            ? <><i className="mdi mdi-loading mdi-spin" /> Detecting…</>
+            : <><i className="mdi mdi-auto-fix" /> Auto-detect</>}
         </button>
       </div>
 
@@ -61,13 +61,13 @@ export default function GroundTruthStep({ session, groundTruth, onGTChange, onAu
               <div style={{ padding: '8px 8px 6px' }}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, minHeight: 24, marginBottom: 6 }}>
                   {objs.length === 0
-                    ? <span style={{ fontSize: 11, color: '#4b5563', fontStyle: 'italic' }}>нет объектов</span>
+                    ? <span style={{ fontSize: 11, color: '#4b5563', fontStyle: 'italic' }}>no objects</span>
                     : objs.map(o => <Tag key={o} label={o} onRemove={() => removeObj(img.id, o)} />)}
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   <input
                     style={{ ...S.input, padding: '3px 6px', fontSize: 11 }}
-                    placeholder="добавить…"
+                    placeholder="add…"
                     value={addInputs[img.id] || ''}
                     onChange={e => setAdd(img.id, e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && commitAdd(img.id)}
@@ -87,8 +87,8 @@ export default function GroundTruthStep({ session, groundTruth, onGTChange, onAu
         disabled={saving || !hasLabels}
       >
         {saving
-          ? <><i className="mdi mdi-loading mdi-spin" /> Сохранение…</>
-          : <><i className="mdi mdi-check" /> Сохранить эталон и продолжить</>}
+          ? <><i className="mdi mdi-loading mdi-spin" /> Saving…</>
+          : <><i className="mdi mdi-check" /> Save ground truth and continue</>}
       </button>
     </div>
   )

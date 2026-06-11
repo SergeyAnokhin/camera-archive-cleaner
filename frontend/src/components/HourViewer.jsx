@@ -252,8 +252,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           </div>
         )}
 
-        <select className="hv-view-mode-select" value={viewMode} onChange={handleViewModeChange}>
-          {enabledModes.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+        <select className="hv-view-mode-select" value={viewMode} onChange={handleViewModeChange} title={activeMode?.description}>
+          {enabledModes.map(m => <option key={m.key} value={m.key} title={m.description}>{m.label}</option>)}
         </select>
 
         {!selectionMode && total > 0 && (
@@ -286,6 +286,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       {!peekOriginal && activeMode.isAiMode && (
         <AiModePanel
           provider={activeMode.aiProvider}
+          description={activeMode.description}
           files={files}
           selectedIds={selectedIds}
           aiAnalysisMap={aiAnalysisMap}
@@ -313,7 +314,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
       )}
       {peekOriginal && (
         <div className="hv-peek-banner">
-          <i className="mdi mdi-eye-outline" /> Просмотр оригиналов — удерживайте N
+          <i className="mdi mdi-eye-outline" /> Viewing originals — hold N
         </div>
       )}
 
@@ -478,6 +479,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           <OpenVinoAnalysisModal
             fileIds={ids}
             model={model}
+            confidencePct={modeParams.openvino_detection?.confidence ?? 25}
+            onConfidencePctChange={v => handleModeParamChange('openvino_detection', 'confidence', v)}
             taskContext={{ cameraId, dateFrom, dateTo }}
             onClose={() => setOpenVinoOpen(false)}
             onComplete={() => { recordAiRequest('openvino'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}

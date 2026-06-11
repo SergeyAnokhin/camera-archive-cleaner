@@ -170,24 +170,24 @@ export default function HourViewTab() {
 
       {/* Full-width rows */}
       <div className="modal-section col-span-2">
-        <div className="modal-section-title">Превью видео</div>
+        <div className="modal-section-title">Video previews</div>
         <select className="modal-select" value={videoPreviewMode} onChange={handleVideoPreviewModeChange}>
           {VIDEO_PREVIEW_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
         <div className="modal-setting-hint">
-          Режим отображения превью для видеофайлов на карточках. GIF генерируется дольше и кешируется.
+          How video-file previews are rendered on the cards. GIFs take longer to generate and are cached.
         </div>
       </div>
 
       <div className="modal-section col-span-2">
-        <div className="modal-section-title">Равномерность записи</div>
+        <div className="modal-section-title">Recording uniformity</div>
         <div className="u-grid">
           <div className="u-grid-head">
             <span />
-            <span><i className="mdi mdi-alert-outline" style={{color:'#fbbf24'}} /> жёлтый</span>
-            <span><i className="mdi mdi-alert-circle-outline" style={{color:'#f87171'}} /> красный</span>
+            <span><i className="mdi mdi-alert-outline" style={{color:'#fbbf24'}} /> yellow</span>
+            <span><i className="mdi mdi-alert-circle-outline" style={{color:'#f87171'}} /> red</span>
           </div>
           {U_METRICS.map(({ key, label, desc }) => (
             <div key={key} className="u-grid-row" title={desc}>
@@ -208,15 +208,15 @@ export default function HourViewTab() {
           ))}
         </div>
         <div className="u-method-row">
-          <span className="u-method-label">Метод для ячеек дня:</span>
+          <span className="u-method-label">Method for day cells:</span>
           <select className="u-method-select" value={uniformityMethod} onChange={handleUniformityMethodChange}>
-            <option value="combined">∑ Комбинированный</option>
-            <option value="active">AF — активных минут</option>
-            <option value="entropy">SE — энтропия</option>
-            <option value="bc">BC — блоки 5 мин</option>
+            <option value="combined">∑ Combined</option>
+            <option value="active">AF — active minutes</option>
+            <option value="entropy">SE — entropy</option>
+            <option value="bc">BC — 5-min blocks</option>
           </select>
         </div>
-        <div className="modal-setting-hint">0 = одно событие · 100 = запись весь час. Жёлтый — возможен ветер, красный — дождь/постоянные ложные срабатывания.</div>
+        <div className="modal-setting-hint">0 = single event · 100 = recording all hour. Yellow — possibly wind, red — rain / constant false triggers.</div>
       </div>
     </div>
   )

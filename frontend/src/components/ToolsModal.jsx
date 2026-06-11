@@ -20,8 +20,10 @@ const TABS = [
   { id: 'maintenance', label: 'Maintenance' },
 ]
 
-export default function ToolsModal({ onClose, onDatabaseCleared, cameraId, cameras }) {
-  const [activeTab, setActiveTab] = useState('general')
+export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, cameraId, cameras }) {
+  const [activeTab, setActiveTab] = useState(
+    () => TABS.some(t => t.id === initialTab) ? initialTab : 'general'
+  )
 
   function handleBackdropClick(e) {
     if (e.target === e.currentTarget) onClose()

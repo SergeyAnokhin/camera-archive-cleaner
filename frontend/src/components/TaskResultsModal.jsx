@@ -13,9 +13,9 @@ function pad2(n) { return String(n).padStart(2, '0') }
 function fmtDuration(ms) {
   if (!ms) return null
   const s = Math.round(ms / 1000)
-  if (s < 60) return `${s} с`
+  if (s < 60) return `${s} s`
   const m = Math.floor(s / 60), r = s % 60
-  return r > 0 ? `${m} мин ${r} с` : `${m} мин`
+  return r > 0 ? `${m} min ${r} s` : `${m} min`
 }
 
 export default function TaskResultsModal({ task, results, stats, totalCount, onClose, onNavigateToHour }) {
@@ -53,8 +53,8 @@ export default function TaskResultsModal({ task, results, stats, totalCount, onC
       <div className="gai-card" onClick={e => e.stopPropagation()}>
 
         <div className="gai-header">
-          <span><i className="mdi mdi-magnify-scan" style={{ color: '#60a5fa' }} /> {label} · Результаты</span>
-          <button className="gai-close" onClick={onClose} title={isRunning ? 'Вернуться к задаче' : 'Закрыть'}>
+          <span><i className="mdi mdi-magnify-scan" style={{ color: '#60a5fa' }} /> {label} · Results</span>
+          <button className="gai-close" onClick={onClose} title={isRunning ? 'Back to the task' : 'Close'}>
             {isRunning
               ? <><i className="mdi mdi-arrow-left" /> Live view</>
               : <i className="mdi mdi-close" />}
@@ -66,11 +66,11 @@ export default function TaskResultsModal({ task, results, stats, totalCount, onC
           <div className="gai-run-row">
             <div className="gai-run-info">
               <i className="mdi mdi-image-multiple-outline" />
-              <span>{isTruncated ? `${totalCount.toLocaleString()} фото` : `${results.length} фото`}</span>
+              <span>{isTruncated ? `${totalCount.toLocaleString()} photos` : `${results.length} photos`}</span>
               {model && <span className="gai-run-model">{model}</span>}
               {isRunning && (
                 <span style={{ fontSize: 'calc(var(--font-base) * 0.8)', color: '#60a5fa' }}>
-                  <i className="mdi mdi-loading mdi-spin" /> в процессе
+                  <i className="mdi mdi-loading mdi-spin" /> in progress
                 </span>
               )}
             </div>
@@ -81,7 +81,7 @@ export default function TaskResultsModal({ task, results, stats, totalCount, onC
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '4px 0 2px' }}>
               {hasDelay && (
                 <span className="tc__tag" style={{ fontSize: 'calc(var(--font-base) * 0.8)' }}>
-                  <i className="mdi mdi-timer-pause-outline" /> {delayMin}–{delayMax}s пауза
+                  <i className="mdi mdi-timer-pause-outline" /> {delayMin}–{delayMax}s pause
                 </span>
               )}
               {hasWindow && (
@@ -95,7 +95,7 @@ export default function TaskResultsModal({ task, results, stats, totalCount, onC
           {/* Stats */}
           {hasTokenStats ? (
             <div className="gai-stats">
-              <span><i className="mdi mdi-eye-outline" /> объекты в {withObjects.length}/{results.length}</span>
+              <span><i className="mdi mdi-eye-outline" /> objects in {withObjects.length}/{results.length}</span>
               <span><i className="mdi mdi-counter" /> {(stats.input_tokens + stats.output_tokens).toLocaleString()} tok</span>
               <span className="gai-stats-detail">in {stats.input_tokens.toLocaleString()} · out {stats.output_tokens.toLocaleString()}</span>
               {stats.cost_usd > 0 && <span><i className="mdi mdi-currency-usd" /> ${stats.cost_usd.toFixed(6)}</span>}
@@ -103,17 +103,17 @@ export default function TaskResultsModal({ task, results, stats, totalCount, onC
             </div>
           ) : (
             <div className="gai-stats">
-              <span><i className="mdi mdi-eye-outline" /> объекты найдены в {withObjects.length}/{results.length} фото</span>
+              <span><i className="mdi mdi-eye-outline" /> objects found in {withObjects.length}/{results.length} photos</span>
             </div>
           )}
 
           {results.length > 0 && (
             <div className="gai-section">
               <div className="gai-response-label">
-                Результаты по фото
+                Per-photo results
                 {isTruncated && (
                   <span style={{ marginLeft: 8, fontWeight: 'normal', color: 'var(--text-dim)', fontSize: 'calc(var(--font-base) * 0.85)' }}>
-                    (последние {results.length.toLocaleString()} из {totalCount.toLocaleString()})
+                    (last {results.length.toLocaleString()} of {totalCount.toLocaleString()})
                   </span>
                 )}
               </div>
@@ -134,14 +134,14 @@ export default function TaskResultsModal({ task, results, stats, totalCount, onC
                               ))}
                             </div>
                           )
-                          : <div className="gai-image-desc" style={{ color: 'var(--text-dim)' }}>объекты не обнаружены</div>
+                          : <div className="gai-image-desc" style={{ color: 'var(--text-dim)' }}>no objects detected</div>
                         }
                       </div>
                       {onNavigateToHour && (
                         <button
                           className="gai-run-btn"
                           style={{ padding: '3px 8px', fontSize: 'calc(var(--font-base) * 0.8)', whiteSpace: 'nowrap', flexShrink: 0 }}
-                          title={`Перейти к ${hourLabel(r.timestamp)}`}
+                          title={`Go to ${hourLabel(r.timestamp)}`}
                           onClick={() => onNavigateToHour(r.timestamp)}
                         >
                           <i className="mdi mdi-clock-outline" /> {hourLabel(r.timestamp)}
@@ -157,7 +157,7 @@ export default function TaskResultsModal({ task, results, stats, totalCount, onC
           {results.length === 0 && (
             <div className="gai-error" style={{ color: 'var(--text-dim)', background: 'transparent' }}>
               <i className="mdi mdi-information-outline" />
-              {isRunning ? ' Анализ ещё не завершил ни одного фото' : ' Нет сохранённых результатов для этой задачи'}
+              {isRunning ? ' Analysis has not finished any photo yet' : ' No saved results for this task'}
             </div>
           )}
 

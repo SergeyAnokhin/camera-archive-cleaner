@@ -176,7 +176,7 @@ export default function TasksScreen({ cameras, onNavigate }) {
           {tasks.length > 0 && (
             <button
               className={`modal-btn neutral${globalPaused ? ' ts__btn--paused' : ''}`}
-              title={globalPaused ? 'Возобновить очередь' : 'Приостановить очередь'}
+              title={globalPaused ? 'Resume the queue' : 'Pause the queue'}
               onClick={() => act(globalPaused ? resumeAllTasks : pauseAllTasks)}
             >
               <i className={`mdi ${globalPaused ? 'mdi-play' : 'mdi-pause'}`} />

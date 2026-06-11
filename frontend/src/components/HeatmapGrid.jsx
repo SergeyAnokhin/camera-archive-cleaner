@@ -22,7 +22,7 @@ export default function HeatmapGrid({ periods, level, loading, onDrillInto, came
       <div className="heatmap-wrapper">
         <div className="heatmap-empty">
           <i className="mdi mdi-database-off-outline" />
-          No data for this period. Run a scan first.
+          No files in this period.
         </div>
       </div>
     )

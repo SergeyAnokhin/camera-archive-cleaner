@@ -2,7 +2,8 @@ import { getThumbnailUrl, getDiffThumbnailUrl } from '../../api.js'
 
 const motionDiffMode = {
   key: 'motion_diff',
-  label: 'Motion diff',
+  label: 'Motion highlight',
+  description: 'Brightens pixels that differ from the hourly average — best for spotting changes in a static scene',
   params: [
     { key: 'threshold', label: 'Sensitivity', min: 0, max: 100, default: 20, step: 1 },
   ],

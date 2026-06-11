@@ -5,7 +5,7 @@ export default function ModeSettingsPanel({ mode, params, onChange }) {
   if (!mode.params?.length) return null
   return (
     <div className="hv-mode-settings">
-      <span className="hv-mode-settings-label">{mode.label}</span>
+      <span className="hv-mode-settings-label" title={mode.description}>{mode.label}</span>
       {mode.params.map(p => (
         <div key={p.key} className="hv-mode-param">
           <span className="hv-mode-param-name">{p.label}</span>

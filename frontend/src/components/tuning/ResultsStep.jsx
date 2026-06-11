@@ -10,7 +10,7 @@ export default function ResultsStep({ session }) {
   const [traceOpen, setTraceOpen] = useState(false)
 
   if (!session.benchmark_results) {
-    return <div style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>Результаты появятся после завершения теста.</div>
+    return <div style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>Results will appear after the benchmark completes.</div>
   }
 
   const results = JSON.parse(session.benchmark_results)
@@ -39,25 +39,25 @@ export default function ResultsStep({ session }) {
       {recommended && (
         <div style={{ background: '#1c3461', border: '1px solid #2563eb', borderRadius: 8, padding: '14px 18px', marginBottom: 24 }}>
           <div style={{ fontWeight: 600, marginBottom: 6, color: '#93c5fd' }}>
-            <i className="mdi mdi-star" style={{ marginRight: 6 }} />Рекомендация
+            <i className="mdi mdi-star" style={{ marginRight: 6 }} />Recommendation
           </div>
           <div style={{ fontSize: 14 }}>
-            <strong>{MODEL_LABEL[recommended.model]}</strong> (порог {recommended.conf?.toFixed(3)}) —
-            {' '}F1 {recommended.f1?.toFixed(3)}, точность {recommended.precision?.toFixed(3)},
-            {' '}полнота {recommended.recall?.toFixed(3)}, скорость {recommended.mean_time_ms} мс/фото
+            <strong>{MODEL_LABEL[recommended.model]}</strong> (threshold {recommended.conf?.toFixed(3)}) —
+            {' '}F1 {recommended.f1?.toFixed(3)}, precision {recommended.precision?.toFixed(3)},
+            {' '}recall {recommended.recall?.toFixed(3)}, speed {recommended.mean_time_ms} ms/photo
           </div>
         </div>
       )}
 
       {/* F1 chart */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontWeight: 600, marginBottom: 10 }}>F1-score по порогу уверенности</div>
+        <div style={{ fontWeight: 600, marginBottom: 10 }}>F1 score by confidence threshold</div>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={chartData} margin={{ right: 16, top: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
             <XAxis dataKey="conf" type="number" domain={['dataMin', 'dataMax']} tickFormatter={v => v.toFixed(2)} tick={{ fontSize: 11, fill: '#6b7280' }} />
             <YAxis domain={[0, 1]} tickFormatter={v => v.toFixed(1)} tick={{ fontSize: 11, fill: '#6b7280' }} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(v, name) => [v?.toFixed(3), MODEL_LABEL[name.split('_')[0]]]} labelFormatter={l => `порог ${(+l).toFixed(3)}`} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v, name) => [v?.toFixed(3), MODEL_LABEL[name.split('_')[0]]]} labelFormatter={l => `threshold ${(+l).toFixed(3)}`} />
             <Legend formatter={name => MODEL_LABEL[name.split('_')[0]]} />
             {MODELS.map(m => (
               <Line key={m} type="monotone" dataKey={`${m}_f1`} name={`${m}_f1`} stroke={MODEL_COLOR[m]} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls />
@@ -68,13 +68,13 @@ export default function ResultsStep({ session }) {
 
       {/* Speed chart */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontWeight: 600, marginBottom: 10 }}>Время обработки (мс/фото)</div>
+        <div style={{ fontWeight: 600, marginBottom: 10 }}>Processing time (ms/photo)</div>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData} margin={{ right: 16, top: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
             <XAxis dataKey="conf" type="number" domain={['dataMin', 'dataMax']} tickFormatter={v => v.toFixed(2)} tick={{ fontSize: 11, fill: '#6b7280' }} />
             <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} />
-            <Tooltip contentStyle={tooltipStyle} formatter={(v, name) => [`${v} мс`, MODEL_LABEL[name.split('_')[0]]]} labelFormatter={l => `порог ${(+l).toFixed(3)}`} />
+            <Tooltip contentStyle={tooltipStyle} formatter={(v, name) => [`${v} ms`, MODEL_LABEL[name.split('_')[0]]]} labelFormatter={l => `threshold ${(+l).toFixed(3)}`} />
             <Legend formatter={name => MODEL_LABEL[name.split('_')[0]]} />
             {MODELS.map(m => (
               <Line key={m} type="monotone" dataKey={`${m}_time`} name={`${m}_time`} stroke={MODEL_COLOR[m]} strokeWidth={2} dot={false} connectNulls />
@@ -85,11 +85,11 @@ export default function ResultsStep({ session }) {
 
       {/* Summary table */}
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontWeight: 600, marginBottom: 10 }}>Оптимум по каждой модели</div>
+        <div style={{ fontWeight: 600, marginBottom: 10 }}>Best per model</div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #374151' }}>
-              {['Модель', 'Лучший порог', 'F1', 'Точность', 'Полнота', 'Время (мс)', 'Проб'].map(h => (
+              {['Model', 'Best threshold', 'F1', 'Precision', 'Recall', 'Time (ms)', 'Probes'].map(h => (
                 <th key={h} style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text-dim)', fontWeight: 400 }}>{h}</th>
               ))}
             </tr>
@@ -123,7 +123,7 @@ export default function ResultsStep({ session }) {
           onClick={() => setTraceOpen(v => !v)}
         >
           <i className={`mdi mdi-chevron-${traceOpen ? 'down' : 'right'}`} />
-          Трасса поиска (как сужался интервал)
+          Search trace (interval narrowing)
         </button>
 
         {traceOpen && MODELS.map(m => {
@@ -135,7 +135,7 @@ export default function ResultsStep({ session }) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #374151', color: 'var(--text-dim)' }}>
-                    {['#', 'Интервал [lo–hi]', 'Ширина', 'Проба (порог)', 'F1'].map(h => (
+                    {['#', 'Interval [lo–hi]', 'Width', 'Probe (threshold)', 'F1'].map(h => (
                       <th key={h} style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 400 }}>{h}</th>
                     ))}
                   </tr>

@@ -8,23 +8,23 @@ export const AI_PROVIDER_CONFIG = {
     modelKey: 'gemini_model',
     defaultModel: 'gemini-3.1-flash-lite',
     icon: 'mdi-google',
-    label: 'Gemini Analysis',
+    label: 'AI description (Gemini)',
   },
   claude: {
     modelKey: 'claude_model',
     defaultModel: 'claude-haiku-4-5-20251001',
     icon: 'mdi-robot',
-    label: 'Claude Analysis',
+    label: 'AI description (Claude)',
   },
   openvino: {
     modelKey: 'openvino_model',
     defaultModel: 'yolov8n',
     icon: 'mdi-chip',
-    label: 'OpenVINO Detection',
+    label: 'Object detection (local)',
   },
 }
 
-export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMap, onRun, statsKey, params, onParamChange }) {
+export default function AiModePanel({ provider, description, files, selectedIds, aiAnalysisMap, onRun, statsKey, params, onParamChange }) {
   const cfg = AI_PROVIDER_CONFIG[provider] ?? AI_PROVIDER_CONFIG.gemini
   const model = localStorage.getItem(cfg.modelKey) || cfg.defaultModel
 
@@ -59,18 +59,18 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
   return (
     <div className="hv-mode-settings hv-ai-panel">
       {/* Row 1: label · model name (read-only) · run button */}
-      <span className="hv-mode-settings-label">
+      <span className="hv-mode-settings-label" title={description}>
         <i className={`mdi ${cfg.icon}`} /> {cfg.label}
       </span>
-      <span className="hv-ai-model-label" title="Изменить модель: Tools → настройки">
+      <span className="hv-ai-model-label" title="Change the model in Tools → settings">
         <i className="mdi mdi-cog-outline" style={{ marginRight: 4, opacity: 0.6 }} />
         {model}
       </span>
       <button className="hv-ai-run-btn" onClick={onRun}>
         <i className="mdi mdi-play" />
         {selectedIds.size > 0
-          ? `Анализ выбранных (${targetCount})`
-          : `Анализ страницы (${photoFiles.length})`
+          ? `Analyze selected (${targetCount})`
+          : `Analyze page (${photoFiles.length})`
         }
       </button>
 
@@ -94,8 +94,8 @@ export default function AiModePanel({ provider, files, selectedIds, aiAnalysisMa
               {(stats.lastMinute > 0 || stats.last24h > 0) && (
                 <span className="hv-ai-stats">
                   <i className="mdi mdi-chart-timeline-variant" />
-                  {stats.lastMinute > 0 && <span>{stats.lastMinute}/мин</span>}
-                  <span>{stats.last24h}/24ч</span>
+                  {stats.lastMinute > 0 && <span>{stats.lastMinute}/min</span>}
+                  <span>{stats.last24h}/24h</span>
                 </span>
               )}
               {pageIcons.length > 0 && pageIcons.map((ic, i) => (

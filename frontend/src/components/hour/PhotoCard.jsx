@@ -87,7 +87,7 @@ export default function PhotoCard({ file, hoverZoom, mode, pagePhotoIds, params,
           <div
             className={`hv-card-ai-desc${descExpanded ? ' expanded' : ''}`}
             onClick={e => { e.stopPropagation(); setDescExpanded(v => !v) }}
-            title={descExpanded ? 'Нажмите чтобы свернуть' : 'Нажмите чтобы развернуть'}
+            title={descExpanded ? 'Click to collapse' : 'Click to expand'}
           >
             <div className="hv-card-ai-desc-text">{aiData.ai.image_description}</div>
             {aiData.ai.objects && (

@@ -64,7 +64,7 @@ export default function TaskLogsModal({ task, onClose }) {
             )}
           </div>
           <div className="tlm-header-actions">
-            <button className="tlm-close" onClick={() => setMaximized(m => !m)} title={maximized ? 'Восстановить' : 'Развернуть'}>
+            <button className="tlm-close" onClick={() => setMaximized(m => !m)} title={maximized ? 'Restore' : 'Maximize'}>
               <i className={`mdi ${maximized ? 'mdi-fullscreen-exit' : 'mdi-fullscreen'}`} />
             </button>
             <button className="tlm-close" onClick={onClose}>
@@ -76,12 +76,12 @@ export default function TaskLogsModal({ task, onClose }) {
         <div className="tlm-log">
           {lines.length === 0 ? (
             <div className="tlm-empty">
-              {isActive ? 'Ожидание первых записей…' : 'Лог пуст'}
+              {isActive ? 'Waiting for the first entries…' : 'Log is empty'}
             </div>
           ) : (
             <>
               {truncated > 0 && (
-                <div className="tlm-truncated">…скрыто {truncated} строк (показаны последние {tailLimit})</div>
+                <div className="tlm-truncated">…{truncated} lines hidden (showing the last {tailLimit})</div>
               )}
               {visibleLines.map((line, i) => (
                 <div key={i} className={`tlm-line${line.includes('[DRY]') ? ' tlm-line--dry' : line.includes('ERROR') ? ' tlm-line--error' : line.includes('Skip') ? ' tlm-line--skip' : ''}`}>
@@ -94,8 +94,8 @@ export default function TaskLogsModal({ task, onClose }) {
         </div>
 
         <div className="tlm-footer">
-          <span className="tlm-count">{lines.length} записей</span>
-          <button className="modal-btn neutral" onClick={onClose}>Закрыть</button>
+          <span className="tlm-count">{lines.length} entries</span>
+          <button className="modal-btn neutral" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>

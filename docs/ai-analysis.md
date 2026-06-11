@@ -23,9 +23,7 @@ Results are stored in two separate tables: cloud AI (Gemini/Claude) in `ai_analy
 | Anthropic Claude | `claude` | `claude_api_key` | `claude_model` |
 | OpenVINO (local) | `openvino` | — | `openvino_model` |
 
-OpenVINO stores two separate confidence values:
-- `openvino_confidence` (float, default `0.25`) in localStorage — used by `OpenVinoAnalysisModal` (the "Run" button)
-- `confidence` mode param (integer %, default `25`) in React `modeParams` state — used by the `AiModePanel` slider and the bbox thumbnail URL
+OpenVINO uses a single confidence value: `mode_params_openvino_detection.confidence` (integer %, default `25`). Written by the Detection tab and `OpenVinoAnalysisModal`; read-only in `AiModePanel` and `CellSelBar`.
 
 ---
 
@@ -33,9 +31,9 @@ OpenVINO stores two separate confidence values:
 
 | Mode key | Label | `isAiMode` | File |
 |----------|-------|-----------|------|
-| `gemini_analysis` | Gemini Analysis | ✓ | [`viewModes/geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) |
-| `claude_analysis` | Claude Analysis | ✓ | [`viewModes/claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) |
-| `openvino_detection` | OpenVINO Detection | ✓ | [`viewModes/openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) — calls `/openvino_thumbnail` with model + confidence + classes params |
+| `gemini_analysis` | AI description (Gemini) | ✓ | [`viewModes/geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) |
+| `claude_analysis` | AI description (Claude) | ✓ | [`viewModes/claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) |
+| `openvino_detection` | Object detection (local) | ✓ | [`viewModes/openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) — calls `/openvino_thumbnail` with model + confidence + classes params |
 
 Modes with `isAiMode: true`:
 - Replace the normal mode-settings panel with `AiModePanel` (read-only model label + confidence display for openvino + Run button + stats)
@@ -102,7 +100,7 @@ Opens `OpenVinoAnalysisModal` → `POST /openvino_analyze_batch` → saves to DB
 **Modal files:**
 - [`frontend/src/components/GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) — editable prompt, token stats, cost estimate
 - [`frontend/src/components/ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) — same format
-- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider (reads `openvino_confidence` from localStorage), per-photo object list, ms/photo timing
+- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider (reads/writes `mode_params_openvino_detection` shared with the Detection tab), per-photo object list, ms/photo timing
 - All three are built on [`aiModal/BaseAiModal.jsx`](../frontend/src/components/aiModal/BaseAiModal.jsx) (shell: Escape, header, run row, task submission); Gemini/Claude also share [`aiModal/StructuredAiResult.jsx`](../frontend/src/components/aiModal/StructuredAiResult.jsx) (stats row + scene/images rendering)
 - Shared CSS: [`frontend/src/components/GeminiAnalysisModal.css`](../frontend/src/components/GeminiAnalysisModal.css)
 
@@ -375,17 +373,17 @@ Displayed in `AiModePanel` after each completed analysis.
 
 ## Settings (Tools modal)
 
-**Files:** [`tools/DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx), [`tools/GoogleAiTab.jsx`](../frontend/src/components/tools/GoogleAiTab.jsx), [`tools/ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx) — keys/defaults in [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js)
+**Files:** [`tools/DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx), [`tools/AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) — keys/defaults in [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js)
 
 | Tab | Setting | localStorage key |
 |-----|---------|-----------------|
 | **Detection** | YOLO model | `openvino_model` (default `yolov8n`; options: `yolov8n/s/m`) |
-| **Detection** | Default OpenVINO confidence | `mode_params_openvino_detection` → `{confidence: N}` (integer %) |
+| **Detection** | OpenVINO confidence | `mode_params_openvino_detection` → `{confidence: N}` (integer %, 10–80) |
 | **Detection** | Detected YOLO classes (80-class checklist) | `detection_classes` (JSON array of COCO class IDs) |
-| Google AI | API key | `gemini_api_key` |
-| Google AI | Model | `gemini_model` |
-| Google AI | Prompt template | `gemini_structured_prompt` |
-| Claude AI | API key | `claude_api_key` |
-| Claude AI | Model | `claude_model` |
+| **AI** | Gemini API key | `gemini_api_key` |
+| **AI** | Gemini model | `gemini_model` |
+| **AI** | Prompt template | `gemini_structured_prompt` |
+| **AI** | Claude API key | `claude_api_key` |
+| **AI** | Claude model | `claude_model` |
 
 **Model selection is centralised in the Tools modal only.** `AiModePanel` and `CellSelBar` show the active model as a read-only label. `NewTaskModal` reads model/mode from localStorage and shows a read-only summary for the selected task type.

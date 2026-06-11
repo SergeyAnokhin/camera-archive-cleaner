@@ -27,6 +27,18 @@ import { computeViewedStatusMap, cacheDataHours, cacheDataDays, cacheDataMonths 
 
 const _nav = loadNavState()
 
+function FirstRunNotice({ icon, title, children }) {
+  return (
+    <div className="heatmap-wrapper">
+      <div className="heatmap-empty">
+        <i className={`mdi ${icon}`} />
+        <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: 'var(--gap-sm)' }}>{title}</div>
+        <div style={{ fontSize: 'calc(var(--font-base) * 0.88)', lineHeight: 1.6 }}>{children}</div>
+      </div>
+    </div>
+  )
+}
+
 function DayDeleteBar({ label, onPreview, loading }) {
   return (
     <button
@@ -58,6 +70,7 @@ export default function App() {
   const restorePeriodRef = useRef(null)
   const [showTasks, setShowTasks] = useState(false)
   const [showTuning, setShowTuning] = useState(false)
+  const [camerasLoaded, setCamerasLoaded] = useState(false)
   const [viewedRefreshKey, setViewedRefreshKey] = useState(0)
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
@@ -90,7 +103,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    getCameras().then(setCameras).catch(() => {})
+    getCameras().then(setCameras).catch(() => {}).finally(() => setCamerasLoaded(true))
   }, [])
 
   // Auto-select first camera if none selected or saved camera no longer exists
@@ -315,6 +328,15 @@ export default function App() {
             onBack={handleBackFromHour}
             onFilesDeleted={handleScanComplete}
           />
+        ) : camerasLoaded && cameras.length === 0 ? (
+          <FirstRunNotice icon="mdi-cctv-off" title="No cameras configured">
+            Add your cameras to <code>backend/cameras.yaml</code>, set the <code>CAMERA_ROOT</code><br />
+            environment variable to your camera share, then restart the backend.
+          </FirstRunNotice>
+        ) : totals && totals.photo_count === 0 && totals.video_count === 0 ? (
+          <FirstRunNotice icon="mdi-magnify-scan" title="Archive not indexed yet">
+            Click <strong>Scan</strong> in the toolbar to index the files of this camera.
+          </FirstRunNotice>
         ) : (
           <>
             <HeatmapGrid

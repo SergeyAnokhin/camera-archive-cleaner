@@ -135,15 +135,15 @@ export default function CellSelBar({ level, periods, selectedMap, onSelectAll, o
           <button className="modal-btn neutral"
             disabled={count === 0 || analyzing}
             onClick={() => onSendToTask(providerKey, currentModel, ovConf / 100)}
-            title="Отправить выбранные ячейки в очередь задач"
+            title="Send the selected cells to the task queue"
             style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', borderColor: 'rgba(99,102,241,0.3)' }}
           >
-            <i className="mdi mdi-tray-arrow-down" /> В задачи
+            <i className="mdi mdi-tray-arrow-down" /> To tasks
           </button>
         )}
         {taskSent && (
           <span style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: '#86efac' }}>
-            <i className="mdi mdi-check-circle-outline" /> Задачи добавлены
+            <i className="mdi mdi-check-circle-outline" /> Tasks added
           </span>
         )}
         {taskSendError && (

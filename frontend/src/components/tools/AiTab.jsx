@@ -81,7 +81,7 @@ export default function AiTab() {
           value={geminiPrompt}
           onChange={handleGeminiPromptChange}
         />
-        <div className="modal-setting-hint"><code style={{fontFamily:'monospace'}}>{'{n}'}</code> заменяется на количество снимков при запуске. Промт редактируется перед каждым запуском в окне анализа.</div>
+        <div className="modal-setting-hint"><code style={{fontFamily:'monospace'}}>{'{n}'}</code> is replaced with the number of photos at run time. The prompt can be edited before each run in the analysis window.</div>
       </div>
 
       {/* ── Claude AI ── */}

@@ -11,7 +11,7 @@ export function AiStatsRow({ result }) {
       <span><i className="mdi mdi-currency-usd" /> ${result.cost_usd.toFixed(6)}</span>
       {result.saved_count > 0 && (
         <span className="gai-saved-badge">
-          <i className="mdi mdi-database-check-outline" /> {result.saved_count} сохранено
+          <i className="mdi mdi-database-check-outline" /> {result.saved_count} saved
         </span>
       )}
     </div>
@@ -28,7 +28,7 @@ export function StructuredResponse({ result }) {
       {parsedScene && (
         <div className="gai-response">
           <div className="gai-response-label">
-            <i className="mdi mdi-image-filter-hdr-outline" /> Общая сцена
+            <i className="mdi mdi-image-filter-hdr-outline" /> Overall scene
           </div>
           <div className="gai-response-text gai-scene-text">{parsedScene}</div>
         </div>
@@ -36,7 +36,7 @@ export function StructuredResponse({ result }) {
       {parsedImages && (
         <div className="gai-response">
           <div className="gai-response-label">
-            <i className="mdi mdi-format-list-numbered" /> Анализ по снимкам ({parsedImages.length})
+            <i className="mdi mdi-format-list-numbered" /> Per-image analysis ({parsedImages.length})
           </div>
           <div className="gai-images-list">
             {parsedImages.map((img, i) => (
@@ -57,7 +57,7 @@ export function StructuredResponse({ result }) {
       )}
       {!parsedScene && result.raw_text && (
         <div className="gai-response">
-          <div className="gai-response-label">Ответ (raw — не удалось разобрать JSON)</div>
+          <div className="gai-response-label">Response (raw — failed to parse JSON)</div>
           <div className="gai-response-text">{result.raw_text}</div>
         </div>
       )}

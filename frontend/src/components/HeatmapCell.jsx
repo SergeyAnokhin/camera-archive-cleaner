@@ -128,11 +128,11 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
         const level = uniformity.levelByMethod?.[uMethod] ?? uniformity.level
         if (!level) return null
         const icon = level === 'alert' ? 'mdi-alert-circle-outline' : 'mdi-alert-outline'
-        const hint = level === 'alert' ? 'Ложные срабатывания (дождь?)' : 'Подозрительно равномерно (ветер?)'
+        const hint = level === 'alert' ? 'False triggers (rain?)' : 'Suspiciously uniform (wind?)'
         return (
           <span
             className={`cell-uniformity-badge cell-uniformity-${level}`}
-            title={`Равномерность [${uMethod}]: ${score}/100 — ${hint}`}
+            title={`Uniformity [${uMethod}]: ${score}/100 — ${hint}`}
           >
             <i className={`mdi ${icon}`} />{score}
           </span>
@@ -176,7 +176,7 @@ export default function HeatmapCell({ cell, level, onDrillInto, cameraId, previe
       {!isEmpty && viewedStatus !== 'none' && (
         <span
           className={`cell-viewed-strip cell-viewed-${viewedStatus}`}
-          title={viewedStatus === 'full' ? 'Просмотрено полностью' : 'Частично просмотрено'}
+          title={viewedStatus === 'full' ? 'Fully viewed' : 'Partially viewed'}
         />
       )}
     </div>

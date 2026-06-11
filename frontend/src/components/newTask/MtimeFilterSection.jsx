@@ -7,11 +7,11 @@ export default function MtimeFilterSection({
   return (
     <div className="ntm__section">
       <div className="ntm__date-header">
-        <label className="ntm__label" style={{margin:0}}>Фильтр по дате файла (mtime)</label>
+        <label className="ntm__label" style={{margin:0}}>File-date filter (mtime)</label>
         {autoFilled && (
           <span className="ntm__date-hint">
             <i className="mdi mdi-check-circle" style={{fontSize:12,marginRight:3}} />
-            авто-заполнено
+            auto-filled
           </span>
         )}
       </div>
@@ -23,11 +23,11 @@ export default function MtimeFilterSection({
           value={dateTo} onChange={e => onDateTo(e.target.value)} />
       </div>
       <div className="ntm__param-hint" style={{ marginTop: 4 }}>
-        Пусто = обрабатывать все файлы без фильтра по дате
+        Empty = process all files without a date filter
       </div>
       {countLoading ? (
         <div style={{ marginTop: 6, color: 'var(--text-dim)', fontSize: 'calc(var(--font-base)*0.85)' }}>
-          <i className="mdi mdi-loading mdi-spin" style={{ marginRight: 4 }} />Подсчёт файлов…
+          <i className="mdi mdi-loading mdi-spin" style={{ marginRight: 4 }} />Counting files…
         </div>
       ) : count != null ? (
         count > 0 ? (

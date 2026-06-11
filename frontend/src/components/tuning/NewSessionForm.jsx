@@ -47,7 +47,7 @@ export default function NewSessionForm({ onCreated, onCancel }) {
   return (
     <div>
       <div style={{ fontWeight: 600, fontSize: 'calc(var(--font-base) * 1.1)', marginBottom: 20 }}>
-        Новая сессия тюнинга
+        New tuning session
       </div>
 
       <Err msg={error} />
@@ -62,8 +62,8 @@ export default function NewSessionForm({ onCreated, onCancel }) {
         }}
       >
         <i className="mdi mdi-cloud-upload-outline" style={{ fontSize: 36, opacity: 0.6 }} />
-        <div style={{ marginTop: 8 }}>Нажмите, чтобы выбрать фотографии</div>
-        <div style={{ fontSize: 12, marginTop: 4 }}>можно выбрать сразу 10–30 файлов</div>
+        <div style={{ marginTop: 8 }}>Click to choose photos</div>
+        <div style={{ fontSize: 12, marginTop: 4 }}>select 10–30 files at once</div>
         <input
           ref={fileInputRef}
           type="file"
@@ -78,7 +78,7 @@ export default function NewSessionForm({ onCreated, onCancel }) {
       {files.length > 0 && (
         <>
           <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 10 }}>
-            Выбрано <strong style={{ color: '#f1f5f9' }}>{files.length}</strong> фото
+            Selected <strong style={{ color: '#f1f5f9' }}>{files.length}</strong> photos
           </div>
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
@@ -101,10 +101,10 @@ export default function NewSessionForm({ onCreated, onCancel }) {
       {/* Name + create */}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 200 }}>
-          <div style={S.label}>Название сессии</div>
+          <div style={S.label}>Session name</div>
           <input
             style={S.input}
-            placeholder="Например: Тест двора"
+            placeholder="e.g. Backyard test"
             value={sessionName}
             onChange={e => setSessionName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleCreate()}
@@ -117,11 +117,11 @@ export default function NewSessionForm({ onCreated, onCancel }) {
           disabled={creating || !sessionName.trim() || files.length === 0}
         >
           {creating
-            ? <><i className="mdi mdi-loading mdi-spin" /> Загрузка…</>
-            : <><i className="mdi mdi-plus" /> Создать ({files.length})</>}
+            ? <><i className="mdi mdi-loading mdi-spin" /> Uploading…</>
+            : <><i className="mdi mdi-plus" /> Create ({files.length})</>}
         </button>
         <button className="modal-btn neutral" style={{ fontSize: 'calc(var(--font-base) * 0.9)' }} onClick={onCancel}>
-          Отмена
+          Cancel
         </button>
       </div>
     </div>

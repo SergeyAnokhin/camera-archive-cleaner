@@ -3,7 +3,7 @@ import { createTask } from '../../api.js'
 import '../GeminiAnalysisModal.css'
 
 // Shared shell for the AI analysis modals (Gemini / Claude / OpenVINO):
-// backdrop + Escape-to-close, header, run row with optional "В задачи" button,
+// backdrop + Escape-to-close, header, run row with optional "To tasks" button,
 // task-queue submission and its feedback. Provider-specific content goes into
 // `beforeRunRow` (e.g. prompt textarea) and `children` (stats, results, errors).
 //
@@ -56,9 +56,20 @@ export default function BaseAiModal({
           <div className="gai-run-row">
             <div className="gai-run-info">
               <i className="mdi mdi-image-multiple-outline" />
-              {fileCount} фото
+              {fileCount} photos
               <span className="gai-run-model">{model}</span>
-              {showNoKey && <span className="gai-no-key"> · нет API key</span>}
+              {showNoKey && (
+                <button
+                  className="gai-no-key"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', font: 'inherit', color: 'inherit', padding: 0 }}
+                  onClick={() => {
+                    onClose()
+                    window.dispatchEvent(new CustomEvent('open-tools', { detail: { tab: 'ai' } }))
+                  }}
+                >
+                  · no API key — open AI settings
+                </button>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {task && (
@@ -69,13 +80,13 @@ export default function BaseAiModal({
                   disabled={task.disabled}
                   title={task.title}
                 >
-                  <i className="mdi mdi-tray-arrow-down" /> В задачи
+                  <i className="mdi mdi-tray-arrow-down" /> To tasks
                 </button>
               )}
               <button className="gai-run-btn" onClick={onRun} disabled={runDisabled}>
                 {running
-                  ? <><i className="mdi mdi-loading mdi-spin" /> Анализ…</>
-                  : <><i className="mdi mdi-play" /> Запустить</>
+                  ? <><i className="mdi mdi-loading mdi-spin" /> Analyzing…</>
+                  : <><i className="mdi mdi-play" /> Run</>
                 }
               </button>
             </div>
@@ -83,7 +94,7 @@ export default function BaseAiModal({
 
           {taskSent && (
             <div className="gai-stats" style={{ color: '#86efac' }}>
-              <i className="mdi mdi-check-circle-outline" /> Задача добавлена в очередь
+              <i className="mdi mdi-check-circle-outline" /> Task added to the queue
             </div>
           )}
           {taskError && (

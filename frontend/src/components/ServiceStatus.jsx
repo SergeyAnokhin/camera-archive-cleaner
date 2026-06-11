@@ -28,7 +28,7 @@ function MiniBar({ pct, color }) {
 }
 
 function ServiceChip({ name, url, docsUrl, up, cpuPct, memPct, memUsed }) {
-  const tooltip = url ? `${url}\nНажмите для открытия API docs` : 'Адрес не задан'
+  const tooltip = url ? `${url}\nClick to open API docs` : 'No URL configured'
   return (
     <a
       className="svc-chip"

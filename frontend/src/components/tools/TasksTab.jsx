@@ -28,21 +28,21 @@ export default function TasksTab() {
   return (
     <>
       <SliderSetting
-        title="ETA window (минуты)"
+        title="ETA window (minutes)"
         min={ETA_WINDOW_MIN} max={ETA_WINDOW_MAX} step={1}
         value={etaWindow} onChange={handleEtaWindowChange}
         minLabel={String(ETA_WINDOW_MIN)} maxLabel={String(ETA_WINDOW_MAX)}
-        valueLabel={`${etaWindow} мин`}
-        hint="Скорость обработки и ETA рассчитываются по последним N минутам, а не с начала задачи."
+        valueLabel={`${etaWindow} min`}
+        hint="Processing speed and ETA are computed over the last N minutes, not since the task started."
       />
 
       <SliderSetting
-        title="Строк в логе задачи"
+        title="Task log lines"
         min={LOG_TAIL_MIN} max={LOG_TAIL_MAX} step={5}
         value={logTailLines} onChange={handleLogTailChange}
         minLabel={String(LOG_TAIL_MIN)} maxLabel={String(LOG_TAIL_MAX)}
-        valueLabel={`${logTailLines} строк`}
-        hint="Сколько последних строк показывать в окне «Посмотреть логи». Уменьшите, если браузер подвисает при открытии."
+        valueLabel={`${logTailLines} lines`}
+        hint="How many trailing lines to show in the log viewer. Reduce if the browser freezes when opening it."
       />
     </>
   )

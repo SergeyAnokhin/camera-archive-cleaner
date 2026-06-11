@@ -52,9 +52,9 @@ export default function DetectionTab() {
   return (
     <>
       <div className="modal-section">
-        <div className="modal-section-title">OpenVINO — модель YOLO</div>
+        <div className="modal-section-title">Detection — YOLO model</div>
         <div className="modal-setting-hint" style={{ marginBottom: 6 }}>
-          Модель для детекции объектов. Применяется при следующем запуске OpenVINO-задачи.
+          Model used for object detection. Applied on the next detection run.
         </div>
         <select className="modal-select" value={ovModel} onChange={handleOvModelChange}
           style={{ width: '100%' }}>
@@ -63,25 +63,25 @@ export default function DetectionTab() {
       </div>
 
       <SliderSetting
-        title="OpenVINO — порог уверенности"
+        title="Detection — confidence threshold"
         min={10} max={80} step={5}
         value={ovConfidence} onChange={handleOvConfidenceChange}
         minLabel="10%" maxLabel="80%"
         valueLabel={`${ovConfidence}%`}
-        hint="Минимальная уверенность детекции объекта. Применяется при следующем открытии режима OpenVINO."
+        hint="Minimum detection confidence per object. Applied the next time the detection mode is opened."
       />
 
       {/* Detected YOLO classes */}
       <div className="modal-section">
-        <div className="modal-section-title">Объекты для детекции (YOLO)</div>
+        <div className="modal-section-title">Objects to detect (YOLO)</div>
         <div className="modal-setting-hint" style={{ marginBottom: 6 }}>
-          YOLO ищет только отмеченные объекты ({classes.size} из {COCO_CLASSES.length}) — остальные классы игнорируются на этапе распознавания. Применяется при следующем открытии режима OpenVINO.
+          YOLO looks only for the checked objects ({classes.size} of {COCO_CLASSES.length}) — other classes are skipped at inference time. Applied the next time the detection mode is opened.
         </div>
         <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-          <button className="modal-btn neutral" onClick={() => saveClasses(new Set(COCO_CLASSES.map(c => c.id)))}>Все</button>
-          <button className="modal-btn neutral" onClick={() => saveClasses(new Set())}>Ничего</button>
+          <button className="modal-btn neutral" onClick={() => saveClasses(new Set(COCO_CLASSES.map(c => c.id)))}>All</button>
+          <button className="modal-btn neutral" onClick={() => saveClasses(new Set())}>None</button>
           <button className="modal-btn neutral" onClick={() => saveClasses(new Set(DETECTION_CLASSES_DEFAULT))}>
-            <i className="mdi mdi-restore" /> По умолчанию
+            <i className="mdi mdi-restore" /> Defaults
           </button>
         </div>
         <div className="detection-emoji-grid">

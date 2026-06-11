@@ -86,7 +86,7 @@ export default function Lightbox({ files, index, onClose, onNavigate }) {
             className="lb-nav-btn"
             onClick={() => index > 0 && onNavigate(index - 1)}
             disabled={index === 0}
-            title="Предыдущий (←)"
+            title="Previous (←)"
           >
             <i className="mdi mdi-chevron-left" />
           </button>
@@ -94,7 +94,7 @@ export default function Lightbox({ files, index, onClose, onNavigate }) {
             className="lb-nav-btn"
             onClick={() => index < files.length - 1 && onNavigate(index + 1)}
             disabled={index === files.length - 1}
-            title="Следующий (→)"
+            title="Next (→)"
           >
             <i className="mdi mdi-chevron-right" />
           </button>
@@ -112,9 +112,9 @@ export default function Lightbox({ files, index, onClose, onNavigate }) {
                 href={thumbUrl}
                 download={makeThumbName(file)}
                 onClick={e => e.stopPropagation()}
-                title="Скачать превью (T)"
+                title="Download preview (T)"
               >
-                <i className="mdi mdi-image-size-select-small" /> Превью
+                <i className="mdi mdi-image-size-select-small" /> Preview
               </a>
             )}
             <a
@@ -122,11 +122,11 @@ export default function Lightbox({ files, index, onClose, onNavigate }) {
               href={mediaUrl}
               download={makeOrigName(file)}
               onClick={e => e.stopPropagation()}
-              title="Скачать оригинал (S)"
+              title="Download original (S)"
             >
-              <i className="mdi mdi-download" /> Оригинал
+              <i className="mdi mdi-download" /> Original
             </a>
-            <button className="lb-action-btn" onClick={onClose} title="Закрыть (Esc)">
+            <button className="lb-action-btn" onClick={onClose} title="Close (Esc)">
               <i className="mdi mdi-close" />
             </button>
           </div>
@@ -138,7 +138,7 @@ export default function Lightbox({ files, index, onClose, onNavigate }) {
             videoError ? (
               <div className="lb-video-error">
                 <i className="mdi mdi-alert-circle-outline lb-video-error-icon" />
-                <p>Видео нельзя воспроизвести в браузере</p>
+                <p>This video cannot be played in the browser</p>
                 <div className="lb-video-cmd">
                   <code>vlc &quot;{file.file_path}&quot;</code>
                   <button

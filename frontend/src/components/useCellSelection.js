@@ -96,14 +96,14 @@ export function useCellSelection({ cameraId, drillStack, currentLevel, onFilesDe
         }
       } else {
         const apiKey = localStorage.getItem(provider === 'gemini' ? 'gemini_api_key' : 'claude_api_key')
-        if (!apiKey) throw new Error(`Нет API ключа ${provider === 'gemini' ? 'Gemini' : 'Claude'}. Откройте Tools.`)
+        if (!apiKey) throw new Error(`No ${provider === 'gemini' ? 'Gemini' : 'Claude'} API key. Open Tools → AI.`)
         const fileIds = []
         for (const cell of cells) {
           const { dateFrom, dateTo } = getCellDateRange(cell.period)
           const data = await getPreviews(cameraId, dateFrom, dateTo, 1)
           if (data.file_ids?.length) fileIds.push(...data.file_ids)
         }
-        if (!fileIds.length) throw new Error('В выбранных ячейках нет фотографий')
+        if (!fileIds.length) throw new Error('No photos in the selected cells')
         const prompt = CELL_ANALYSIS_PROMPT(fileIds.length)
         if (provider === 'gemini') {
           await geminiAnalyzeBatch({ fileIds, model, apiKey, prompt })
@@ -130,7 +130,7 @@ export function useCellSelection({ cameraId, drillStack, currentLevel, onFilesDe
         ? localStorage.getItem('claude_api_key') || ''
         : null
     if ((provider === 'gemini' || provider === 'claude') && !apiKey) {
-      setTaskError(`Нет API ключа ${provider === 'gemini' ? 'Gemini' : 'Claude'}`)
+      setTaskError(`No ${provider === 'gemini' ? 'Gemini' : 'Claude'} API key`)
       return
     }
     try {

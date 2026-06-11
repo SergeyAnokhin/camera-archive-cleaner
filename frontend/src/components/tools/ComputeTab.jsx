@@ -7,23 +7,23 @@ import './ComputeTab.css'
 const MODES = [
   {
     value: 'off',
-    label: 'Отключён',
-    hint: 'Тяжёлые расчёты недоступны. Режимы OpenVINO и видео-превью скрыты.',
+    label: 'Off',
+    hint: 'Heavy compute unavailable. Detection modes and video previews are hidden.',
   },
   {
     value: 'cluster',
-    label: 'Кластер (бэкенд-сервер)',
-    hint: 'Compute-сервис в том же окружении, что и бэкенд — Kubernetes, Docker или localhost.',
+    label: 'Cluster (backend server)',
+    hint: 'Compute service in the same environment as the backend — Kubernetes, Docker or localhost.',
   },
   {
     value: 'browser',
-    label: 'Эта машина',
-    hint: 'Compute-сервис на компьютере, где открыт этот сайт. IP определяется через браузер.',
+    label: 'This machine',
+    hint: 'Compute service on the computer where this site is open. IP detected via the browser.',
   },
   {
     value: 'remote',
-    label: 'Свой адрес',
-    hint: 'Один или несколько URL. При недоступности первого — автоматически пробуется следующий.',
+    label: 'Custom address',
+    hint: 'One or more URLs. If the first is unreachable, the next one is tried automatically.',
   },
 ]
 
@@ -116,8 +116,8 @@ export default function ComputeTab() {
         } else {
           setClusterUrl('')
           setClusterDiscovered(false)
-          setProbes({ backend: { reachable: false, url: '(не найдено)',
-                                 error: 'localhost:8001 и camera-cleaner-compute:8001 недоступны' } })
+          setProbes({ backend: { reachable: false, url: '(not found)',
+                                 error: 'localhost:8001 and camera-cleaner-compute:8001 are unreachable' } })
         }
 
       } else if (mode === 'browser') {
@@ -233,15 +233,15 @@ export default function ComputeTab() {
   // ── Save ──────────────────────────────────────────────────────────────────
   async function handleSave() {
     if (uiMode === 'cluster' && !clusterUrl) {
-      setSavedMsg('Ошибка: сервис не обнаружен — проверьте состояние кластера')
+      setSavedMsg('Error: service not discovered — check the cluster state')
       return
     }
     if (uiMode === 'browser' && !URL_RE.test(browserUrl)) {
-      setSavedMsg('Ошибка: IP не определён — проверьте или введите вручную')
+      setSavedMsg('Error: IP not detected — check it or enter manually')
       return
     }
     if (uiMode === 'remote' && !remoteUrls.some(u => URL_RE.test(u.trim()))) {
-      setSavedMsg('Ошибка: введите хотя бы один действительный URL (http://...)')
+      setSavedMsg('Error: enter at least one valid URL (http://...)')
       return
     }
     setSaving(true)
@@ -252,26 +252,26 @@ export default function ComputeTab() {
       localStorage.setItem(COMPUTE_MODE_UI_KEY, uiMode)
       localStorage.setItem(COMPUTE_MODE_KEY,    cfg.mode)
       localStorage.setItem(COMPUTE_URL_KEY,     cfg.remote_url || '')
-      setSavedMsg('Сохранено')
+      setSavedMsg('Saved')
       // Re-probe after save to confirm connectivity
       runCheck(uiMode, clusterUrl, browserUrl, remoteUrls)
     } catch (e) {
-      setSavedMsg('Ошибка: ' + e.message)
+      setSavedMsg('Error: ' + e.message)
     } finally {
       setSaving(false)
     }
   }
 
-  if (!loaded) return <div className="modal-section">Загрузка…</div>
+  if (!loaded) return <div className="modal-section">Loading…</div>
 
   return (
     <>
       {/* Mode cards */}
       <div className="modal-section">
-        <div className="modal-section-title">Compute-сервис (тяжёлые расчёты)</div>
+        <div className="modal-section-title">Compute service (heavy processing)</div>
         <div className="modal-setting-hint">
-          Детекция объектов (YOLO/OpenVINO) и обработка видео. Проверка выполняется
-          автоматически при переключении режима.
+          Object detection (YOLO/OpenVINO) and video processing. Connectivity is
+          checked automatically when switching modes.
         </div>
         <div className="compute-modes">
           {MODES.map(m => (
@@ -294,7 +294,7 @@ export default function ComputeTab() {
       {uiMode === 'cluster' && clusterDiscovered && clusterUrl && (
         <div className="modal-section">
           <div className="modal-setting-hint">
-            Обнаружен в кластере: <strong>{clusterUrl}</strong>
+            Discovered in the cluster: <strong>{clusterUrl}</strong>
           </div>
         </div>
       )}
@@ -302,7 +302,7 @@ export default function ComputeTab() {
       {/* Browser: editable URL (pre-filled by WebRTC) */}
       {uiMode === 'browser' && (
         <div className="modal-section">
-          <div className="modal-section-title">Адрес на этой машине</div>
+          <div className="modal-section-title">Address on this machine</div>
           <input
             className="compute-url-input"
             type="text"
@@ -311,7 +311,7 @@ export default function ComputeTab() {
             onChange={e => { setBrowserUrl(e.target.value); setSavedMsg('') }}
           />
           <div className="modal-setting-hint">
-            IP определяется через браузер (WebRTC). Если неверный — исправьте вручную.
+            IP is detected via the browser (WebRTC). If it is wrong, fix it manually.
           </div>
         </div>
       )}
@@ -319,7 +319,7 @@ export default function ComputeTab() {
       {/* Remote: list of URLs */}
       {uiMode === 'remote' && (
         <div className="modal-section">
-          <div className="modal-section-title">Адреса сервиса</div>
+          <div className="modal-section-title">Service addresses</div>
           {remoteUrls.map((url, i) => (
             <div key={i} className="compute-url-row">
               <input
@@ -337,7 +337,7 @@ export default function ComputeTab() {
               {remoteUrls.length > 1 && (
                 <button
                   className="compute-url-remove"
-                  title="Удалить"
+                  title="Remove"
                   onClick={() => {
                     setRemoteUrls(remoteUrls.filter((_, j) => j !== i))
                     setSavedMsg('')
@@ -352,11 +352,11 @@ export default function ComputeTab() {
             className="compute-url-add"
             onClick={() => { setRemoteUrls([...remoteUrls, '']); setSavedMsg('') }}
           >
-            <i className="mdi mdi-plus" /> Добавить URL
+            <i className="mdi mdi-plus" /> Add URL
           </button>
           <div className="modal-setting-hint" style={{ marginTop: 8 }}>
-            При недоступности первого адреса — автоматически пробуется следующий.
-            Полезно, если сервис доступен по разным IP (Wi-Fi / проводная сеть).
+            If the first address is unreachable, the next one is tried automatically.
+            Useful when the service is reachable via different IPs (Wi-Fi / wired network).
           </div>
         </div>
       )}
@@ -365,19 +365,19 @@ export default function ComputeTab() {
       {uiMode !== 'off' && (
         <div className="modal-section">
           {checking ? (
-            <div className="compute-status off">⏳ Проверка…</div>
+            <div className="compute-status off">⏳ Checking…</div>
           ) : probes ? (
             <div className="compute-probe-rows">
-              {probes.backend && <ProbeRow label="Бэкенд" probe={probes.backend} />}
-              {probes.browser && <ProbeRow label="Браузер" probe={probes.browser} />}
+              {probes.backend && <ProbeRow label="Backend" probe={probes.backend} />}
+              {probes.browser && <ProbeRow label="Browser" probe={probes.browser} />}
               {probes.urls && probes.urls.map((p, i) => (
                 <ProbeRow key={i} label={`URL ${i + 1}`} probe={p} />
               ))}
             </div>
           ) : uiMode === 'remote' && !remoteUrls.some(u => URL_RE.test(u)) ? (
-            <div className="compute-status off">— Введите URL для автопроверки</div>
+            <div className="compute-status off">— Enter a URL for the auto-check</div>
           ) : uiMode === 'browser' && !URL_RE.test(browserUrl) ? (
-            <div className="compute-status off">— Определение IP…</div>
+            <div className="compute-status off">— Detecting IP…</div>
           ) : null}
         </div>
       )}
@@ -389,14 +389,14 @@ export default function ComputeTab() {
           onClick={handleSave}
           disabled={saving || uiMode === 'off'}
         >
-          <i className="mdi mdi-content-save" /> Сохранить
+          <i className="mdi mdi-content-save" /> Save
         </button>
         {savedMsg && <span className="compute-saved">{savedMsg}</span>}
       </div>
 
       {/* Task error threshold */}
       <div className="modal-section">
-        <div className="modal-section-title">Обработка ошибок задач</div>
+        <div className="modal-section-title">Task error handling</div>
         <MaxErrorsSetting />
       </div>
     </>
@@ -427,9 +427,8 @@ function MaxErrorsSetting() {
   return (
     <>
       <div className="modal-setting-hint">
-        Максимальное количество ошибок при обработке файлов в задаче, после которых задача
-        останавливается. Применяется к новым задачам. <strong>0</strong> — без ограничений
-        (пропускать ошибки бесконечно).
+        Maximum number of per-file errors before a task stops. Applies to new tasks.
+        <strong> 0</strong> — no limit (skip errors indefinitely).
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
         <input
@@ -449,9 +448,9 @@ function MaxErrorsSetting() {
           }}
         />
         <button className="modal-btn" onClick={handleSave}>
-          <i className="mdi mdi-content-save" /> Сохранить
+          <i className="mdi mdi-content-save" /> Save
         </button>
-        {saved && <span className="compute-saved">Сохранено</span>}
+        {saved && <span className="compute-saved">Saved</span>}
       </div>
     </>
   )
@@ -465,8 +464,8 @@ function ProbeRow({ label, probe }) {
       <span className="probe-label">{label}</span>
       <span className="probe-detail">
         {ok
-          ? `🟢 Доступен — ${probe.url}${probe.capabilities?.length ? ' · ' + probe.capabilities.join(', ') : ''}`
-          : `🔴 Недоступен${probe.url ? ' — ' + probe.url : ''}${probe.error ? ' (' + probe.error + ')' : ''}`
+          ? `🟢 Reachable — ${probe.url}${probe.capabilities?.length ? ' · ' + probe.capabilities.join(', ') : ''}`
+          : `🔴 Unreachable${probe.url ? ' — ' + probe.url : ''}${probe.error ? ' (' + probe.error + ')' : ''}`
         }
       </span>
     </div>
