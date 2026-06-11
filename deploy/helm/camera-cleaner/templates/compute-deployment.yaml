@@ -4,8 +4,10 @@ metadata:
   name: {{ include "camera-cleaner.fullname" . }}-compute
   labels:
     {{- include "camera-cleaner.labels" . | nindent 4 }}
+    camera-cleaner/optional: "true"
 spec:
   replicas: {{ .Values.compute.replicas }}
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
       {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "compute") | nindent 6 }}

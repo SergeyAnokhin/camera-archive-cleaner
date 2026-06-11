@@ -1,6 +1,12 @@
 # ArgoCD Application — deploy with:
 #   kubectl apply -f deploy/argocd/application.yaml
 # ArgoCD watches the repo; when CI rewrites image tags in values.yaml it syncs.
+#
+# REQUIRED one-time cluster setup — apply the argocd-cm health patch so that
+# the optional compute deployment never marks the app Degraded:
+#   kubectl patch configmap argocd-cm -n argocd \
+#     --type=merge --patch-file deploy/argocd/argocd-cm-patch.yaml
+#   kubectl rollout restart deployment argocd-application-controller -n argocd
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

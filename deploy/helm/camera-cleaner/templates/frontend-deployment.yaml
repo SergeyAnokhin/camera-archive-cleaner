@@ -6,6 +6,7 @@ metadata:
     {{- include "camera-cleaner.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.frontend.replicas }}
+  revisionHistoryLimit: 2
   selector:
     matchLabels:
       {{- include "camera-cleaner.selectorLabels" (dict "ctx" . "component" "frontend") | nindent 6 }}
