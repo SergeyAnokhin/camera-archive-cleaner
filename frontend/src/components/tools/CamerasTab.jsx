@@ -262,7 +262,7 @@ export default function CamerasTab({ onSaveSuccess }) {
       </div>
 
       {/* Save Button and Status Message */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid var(--border)', paddingTop: var(--gap-md), marginTop: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderTop: '1px solid var(--border)', paddingTop: 'var(--gap-md)', marginTop: 4 }}>
         <button className="modal-btn" onClick={handleSave} disabled={saving} style={{ alignSelf: 'flex-end', minWidth: 120 }}>
           {saving ? <i className="mdi mdi-loading mdi-spin" /> : <><i className="mdi mdi-content-save-outline" /> Save Cameras</>}
         </button>
