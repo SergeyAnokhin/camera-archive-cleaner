@@ -11,7 +11,7 @@ from database import get_connection
 
 from task_executors.common import (
     PROGRESS_INTERVAL, SpeedTracker, append_log, mark_completed, pause_if_requested,
-    write_progress,
+    pause_on_compute_unavailable, write_progress,
 )
 
 logger = logging.getLogger("api")
@@ -100,8 +100,13 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
                     compute_client.convert_video, str(f), str(dst), codec, crf, preset
                 )
                 await asyncio.to_thread(append_log, task_id, f"Done: {dst.name}")
-            except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable) as e:
-                raise Exception(f"Compute service unavailable: {e}")
+            except compute_client.ComputeDisabled as e:
+                raise Exception(f"Compute service is disabled: {e}")
+            except compute_client.ComputeUnavailable as e:
+                await asyncio.to_thread(append_log, task_id, f"Compute unavailable — задача поставлена на паузу: {e}")
+                await pause_on_compute_unavailable(task_id, e, resume_from + processed,
+                                                   total, None, str(f))
+                return
             except Exception as e:
                 await asyncio.to_thread(append_log, task_id, f"ERROR {rel}: {e}")
 

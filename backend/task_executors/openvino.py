@@ -9,7 +9,8 @@ from compute_cache import ov_cache_path, OV_THUMB_DIR
 from database import get_connection, save_object_detection
 
 from task_executors.common import (
-    PROGRESS_INTERVAL, SpeedTracker, mark_completed, pause_if_requested, write_progress,
+    PROGRESS_INTERVAL, SpeedTracker, mark_completed, pause_if_requested,
+    pause_on_compute_unavailable, write_progress,
 )
 from task_executors.video_thumbnails import pregen_video_thumbs_sync
 
@@ -86,8 +87,12 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
         try:
             await asyncio.to_thread(_detect_and_save, file_id, file_path, model_name, confidence,
                                     classes, classes_tuple)
-        except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable) as e:
-            raise Exception(f"Compute service unavailable: {e}")
+        except compute_client.ComputeDisabled as e:
+            raise Exception(f"Compute service is disabled: {e}")
+        except compute_client.ComputeUnavailable as e:
+            await pause_on_compute_unavailable(task_id, e, resume_from + processed,
+                                               total, file_id, file_path)
+            return
         except Exception as e:
             logger.warning("OpenVINO error %s: %s", file_path, e)
             error_count += 1
@@ -115,7 +120,10 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
     final = resume_from + processed
 
     if video_thumb_mode and video_thumb_mode != "none":
-        await asyncio.to_thread(pregen_video_thumbs_sync, camera_id, date_from, date_to, video_thumb_mode)
+        try:
+            await asyncio.to_thread(pregen_video_thumbs_sync, camera_id, date_from, date_to, video_thumb_mode)
+        except compute_client.ComputeUnavailable as e:
+            logger.warning("Task %s: video thumbnails skipped — compute unavailable: %s", task_id[:8], e)
 
     mark_completed(task_id, final, total)
     logger.info("✅ Task %s done (%d photos)", task_id[:8], final)

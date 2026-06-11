@@ -84,6 +84,20 @@ async def pause_if_requested(task_id: str, current: int, total: int,
     return True
 
 
+async def pause_on_compute_unavailable(task_id: str, e: Exception,
+                                       current: int, total: int,
+                                       file_id, file_path) -> None:
+    """Pause a task when the compute service is unreachable (network error).
+    Always call with `return` immediately after so the executor exits cleanly."""
+    await asyncio.to_thread(write_progress, task_id, current, total, file_id, file_path, None, None)
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE tasks SET status='paused', error_message=? WHERE id=?",
+            (str(e)[:500], task_id),
+        )
+    logger.warning("⏸ Task %s paused — compute unavailable: %s", task_id[:8], e)
+
+
 def mark_completed(task_id: str, final: int, total: int) -> None:
     with get_connection() as conn:
         conn.execute(

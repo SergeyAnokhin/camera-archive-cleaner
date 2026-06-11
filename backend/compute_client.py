@@ -46,7 +46,12 @@ class ComputeDisabled(Exception):
 
 
 class ComputeUnavailable(Exception):
-    """Compute-service is configured but could not be reached / returned an error."""
+    """Compute-service is configured but could not be reached (network/timeout error)."""
+
+
+class ComputeRequestError(Exception):
+    """Compute-service responded but returned a non-200 for this specific request (e.g., corrupted file).
+    The URL is alive — this is a per-file error, not a service availability issue."""
 
 
 def _get_urls() -> list[str]:
@@ -91,6 +96,11 @@ def _request_with_failover(fn: Callable[[str], T]) -> T:
             result = fn(url)
             _last_good_url = url
             return result
+        except ComputeRequestError:
+            # Service responded (URL is alive) but rejected this specific request.
+            # Update last-good URL and propagate immediately — no failover needed.
+            _last_good_url = url
+            raise
         except ComputeUnavailable as e:
             last_err = e
             if len(ordered) > 1:
@@ -113,7 +123,7 @@ def detect(path: str, model: str, confidence: float,
         except httpx.HTTPError as e:
             raise ComputeUnavailable(f"Compute-service unreachable at {url}: {e}")
         if resp.status_code != 200:
-            raise ComputeUnavailable(f"Compute-service error {resp.status_code}: {resp.text}")
+            raise ComputeRequestError(f"Compute-service error {resp.status_code}: {resp.text[:300]}")
         return DetectResponse(**resp.json())
 
     return _request_with_failover(_do)

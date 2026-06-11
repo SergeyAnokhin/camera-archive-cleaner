@@ -8,7 +8,8 @@ from compute_cache import video_cache_path, VID_THUMB_DIR
 from database import get_connection, save_video_preview
 
 from task_executors.common import (
-    PROGRESS_INTERVAL, SpeedTracker, mark_completed, pause_if_requested, write_progress,
+    PROGRESS_INTERVAL, SpeedTracker, mark_completed, pause_if_requested,
+    pause_on_compute_unavailable, write_progress,
 )
 
 logger = logging.getLogger("api")
@@ -105,8 +106,12 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
         if not cache_path.exists():
             try:
                 await asyncio.to_thread(_make_video_thumb, file_path, mode, cache_path)
-            except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable) as e:
-                raise Exception(f"Compute service unavailable: {e}")
+            except compute_client.ComputeDisabled as e:
+                raise Exception(f"Compute service is disabled: {e}")
+            except compute_client.ComputeUnavailable as e:
+                await pause_on_compute_unavailable(task_id, e, resume_from + processed,
+                                                   total, file_id, file_path)
+                return
             except Exception as e:
                 logger.warning("Video thumb error %s: %s", file_path, e)
                 error_count += 1
