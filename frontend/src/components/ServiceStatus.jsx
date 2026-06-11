@@ -93,7 +93,7 @@ export default function ServiceStatus() {
   if (!status) return null
 
   const backendUrl = status.backend_url || (window.location.origin + '/api')
-  const backendDocsUrl = status.backend_url ? `${status.backend_url}/docs` : null
+  const backendDocsUrl = `${window.location.origin}/api/docs`
 
   const compute = status.compute
   const showCompute = compute?.mode !== 'off'
