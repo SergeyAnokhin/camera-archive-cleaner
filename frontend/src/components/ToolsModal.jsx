@@ -7,6 +7,7 @@ import GoogleAiTab from './tools/GoogleAiTab.jsx'
 import ClaudeAiTab from './tools/ClaudeAiTab.jsx'
 import ComputeTab from './tools/ComputeTab.jsx'
 import MaintenanceTab from './tools/MaintenanceTab.jsx'
+import LoggingTab from './tools/LoggingTab.jsx'
 
 const TABS = [
   { id: 'general',     label: 'General' },
@@ -15,6 +16,7 @@ const TABS = [
   { id: 'google_ai',   label: 'Google AI' },
   { id: 'claude_ai',   label: 'Claude AI' },
   { id: 'compute',     label: 'Compute' },
+  { id: 'logging',     label: 'Logging' },
   { id: 'maintenance', label: 'Maintenance' },
 ]
 
@@ -58,6 +60,7 @@ export default function ToolsModal({ onClose, onDatabaseCleared, cameraId, camer
           {activeTab === 'google_ai'   && <GoogleAiTab />}
           {activeTab === 'claude_ai'   && <ClaudeAiTab />}
           {activeTab === 'compute'     && <ComputeTab />}
+          {activeTab === 'logging'     && <LoggingTab />}
           {activeTab === 'maintenance' && (
             <MaintenanceTab
               onDatabaseCleared={onDatabaseCleared}

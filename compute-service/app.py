@@ -12,13 +12,17 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
+import collections
+import json
 import logging
 import re
+import threading
 import time
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from pydantic import BaseModel
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from shared.contract import (DetectRequest, DetectResponse,
@@ -34,20 +38,140 @@ try:
 except ImportError:
     _psutil = None
 
-# Уровень лога compute-сервиса. Меняй только здесь.
-# logging.WARNING  — только ошибки
-# logging.INFO     — старт моделей + одна строка на detect/video (рекомендуется)
-# logging.DEBUG    — подробная разбивка по стадиям (image open, YOLO, draw, encode)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# ── Logging setup ──────────────────────────────────────────────────────────────
+TRACE = 5
+logging.addLevelName(TRACE, "TRACE")
+
+_LEVEL_MAP: dict[str, int] = {
+    "TRACE":    TRACE,
+    "DEBUG":    logging.DEBUG,
+    "INFO":     logging.INFO,
+    "WARNING":  logging.WARNING,
+    "ERROR":    logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
+_LEVEL_NAME_MAP: dict[int, str] = {v: k for k, v in _LEVEL_MAP.items()}
+
+_HERE = Path(__file__).parent
+_CONFIG_FILE = _HERE / "logging_config.json"
+_LOG_FILE    = _HERE / "compute.log"
+
+
+def _load_config() -> dict:
+    if _CONFIG_FILE.exists():
+        try:
+            data = json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
+            level = data.get("level", "INFO")
+            if level not in _LEVEL_MAP:
+                level = "INFO"
+            return {"level": level, "file_max_lines": int(data.get("file_max_lines", 200))}
+        except Exception:
+            pass
+    return {"level": "INFO", "file_max_lines": 200}
+
+
+def _save_config(cfg: dict):
+    try:
+        _CONFIG_FILE.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+class _PlainFmt(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        ts = self.formatTime(record, "%H:%M:%S")
+        lv = f"{record.levelname:<8}"
+        return f"{ts}  {lv}  {record.name}: {record.getMessage()}"
+
+
+class _RingBufferHandler(logging.Handler):
+    """Keeps last max_lines records in memory; flushes to file every 10 s."""
+    def __init__(self, max_lines: int = 200, filepath: Path | None = None):
+        super().__init__(TRACE)
+        self._buf: collections.deque[str] = collections.deque(maxlen=max_lines)
+        self._filepath = filepath
+        self._lock = threading.Lock()
+        self._dirty = False
+        self._fmt = _PlainFmt()
+        threading.Thread(target=self._flush_loop, daemon=True).start()
+
+    def _flush_loop(self):
+        while True:
+            time.sleep(10)
+            self._flush()
+
+    def emit(self, record: logging.LogRecord):
+        try:
+            line = self._fmt.format(record)
+        except Exception:
+            line = record.getMessage()
+        with self._lock:
+            self._buf.append(line)
+            self._dirty = True
+
+    def get_tail(self, n: int | None = None) -> list[str]:
+        with self._lock:
+            lines = list(self._buf)
+        return lines[-n:] if (n is not None and n < len(lines)) else lines
+
+    @property
+    def max_lines(self) -> int:
+        return self._buf.maxlen or 0
+
+    def set_max_lines(self, n: int):
+        with self._lock:
+            self._buf = collections.deque(self._buf, maxlen=n)
+
+    def _flush(self):
+        if not self._filepath or not self._dirty:
+            return
+        with self._lock:
+            content = '\n'.join(self._buf)
+            self._dirty = False
+        try:
+            self._filepath.write_text(content + '\n', encoding='utf-8')
+        except Exception:
+            pass
+
+
+_cfg = _load_config()
+
+# Console handler (simple format, matches existing style)
+_console_handler = logging.StreamHandler()
+_console_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+_console_handler.setLevel(TRACE)
+
+_ring_buffer = _RingBufferHandler(max_lines=_cfg["file_max_lines"], filepath=_LOG_FILE)
+
+logging.root.handlers = [_console_handler, _ring_buffer]
+logging.root.setLevel(_LEVEL_MAP[_cfg["level"]])
+
 logger = logging.getLogger("compute")
 
-_SILENT_RE = re.compile(r'"(?:GET|HEAD) /(?:api/health|health|metrics)\b')
+_SILENT_RE = re.compile(r'"(?:GET|HEAD) /(?:api/health|health|metrics|logging)\b')
 
 
 class _SilentFilter(logging.Filter):
-    """Drop access-log lines for /health and /metrics polls."""
+    """Drop access-log lines for health, metrics and logging polls."""
     def filter(self, record: logging.LogRecord) -> bool:
         return not _SILENT_RE.search(record.getMessage())
+
+
+def get_log_config() -> dict:
+    return {
+        "level": _LEVEL_NAME_MAP.get(logging.root.level, "INFO"),
+        "file_max_lines": _ring_buffer.max_lines,
+    }
+
+
+def configure_logging(cfg: dict):
+    level_name = cfg.get("level", "INFO")
+    level = _LEVEL_MAP.get(level_name, logging.INFO)
+    max_lines = max(50, int(cfg.get("file_max_lines", 200)))
+    logging.root.setLevel(level)
+    _ring_buffer.set_max_lines(max_lines)
+    _save_config({"level": level_name, "file_max_lines": max_lines})
+    logger.info("Log config updated: level=%s  file_max_lines=%d", level_name, max_lines)
 
 
 app = FastAPI(title="Camera Snapshots Compute Service", version="1.0.0")
@@ -169,3 +293,27 @@ def video_convert_endpoint(req: VideoConvertRequest):
     logger.info("convert %-30s  codec=%-8s  crf=%d  preset=%-10s  %.2f s",
                 Path(src).name, req.codec, req.crf, req.preset, elapsed_ms / 1000)
     return VideoConvertResponse(ok=True, elapsed_ms=elapsed_ms)
+
+
+# ── Logging API ────────────────────────────────────────────────────────────────
+
+class _LogConfigUpdate(BaseModel):
+    level: str = "INFO"
+    file_max_lines: int = 200
+
+
+@app.get("/logging/config", summary="Get compute log config")
+def logging_config_get():
+    return get_log_config()
+
+
+@app.put("/logging/config", summary="Update compute log level and buffer size (live)")
+def logging_config_put(req: _LogConfigUpdate):
+    configure_logging({"level": req.level, "file_max_lines": req.file_max_lines})
+    return get_log_config()
+
+
+@app.get("/logging/tail", summary="Return last N lines from compute log buffer")
+def logging_tail(n: int = Query(200, ge=1, le=5000)):
+    lines = _ring_buffer.get_tail(n)
+    return {"lines": lines, "total": len(lines)}

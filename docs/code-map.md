@@ -10,7 +10,7 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | File | Role |
 |---|---|
 | [`main.py`](../backend/main.py) | FastAPI app factory — CORS, global exception handler, startup hook, mounts the routers. No endpoint logic |
-| [`logging_setup.py`](../backend/logging_setup.py) | Logging config: ANSI colours, TRACE/DEBUG/INFO levels, custom formatter, uvicorn access filter. Configures the root logger on import |
+| [`logging_setup.py`](../backend/logging_setup.py) | Logging config: ANSI colours, TRACE/DEBUG/INFO levels, custom formatter, uvicorn access filter. `RingBufferHandler` keeps last N lines in memory + flushes to `backend.log`. `configure_logging(cfg)` / `get_log_config()` / `get_log_tail(n)` — live level changes via `/logging/config` API |
 | [`api_helpers.py`](../backend/api_helpers.py) | Shared router helpers: `fmt_range()` (log date ranges), `row_to_dict()` (stats-row → dict) |
 | [`ai_pricing.py`](../backend/ai_pricing.py) | Per-million-token USD pricing tables for Gemini and Claude models |
 | [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `convert_video`, `health`). Strips `CAMERA_ROOT` prefix from all paths before sending (so compute can apply its own root). Raises `ComputeDisabled` / `ComputeUnavailable`. Timeouts: detect 120 s, thumbnail 120 s, convert 7200 s |
@@ -57,6 +57,7 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 | [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status` — routing config for the compute-service |
 | [`tasks.py`](../backend/routers/tasks.py) | `/tasks` CRUD + `/tasks/metrics` + `GET /tasks/{id}/logs` — task queue REST endpoints. `log_tail` is excluded from the list response; fetch separately via `/logs` |
 | [`tuning.py`](../backend/routers/tuning.py) | `/tuning/sessions/*` — model tuning: image upload, autolabel, ground truth, background golden-section confidence search. See [`docs/tuning.md`](tuning.md) |
+| [`logging_api.py`](../backend/routers/logging_api.py) | `/logging/config` (GET/PUT), `/logging/tail` — live log level + buffer control. `/logging/compute/*` — proxied equivalents for the compute-service |
 
 ### AI providers (`backend/ai_providers/`)
 
@@ -94,7 +95,7 @@ Optional stateless service for heavy compute. Full architecture: [`compute-servi
 
 | File | Role |
 |---|---|
-| [`app.py`](../compute-service/app.py) | FastAPI app on :8001 — `/health`, `/detect`, `/video/thumbnail`, `/video/convert`. Logs elapsed seconds per request |
+| [`app.py`](../compute-service/app.py) | FastAPI app on :8001 — `/health`, `/detect`, `/video/thumbnail`, `/video/convert`. Also `/logging/config` (GET/PUT), `/logging/tail` — same live log-level API as the backend. `_RingBufferHandler` + `_SilentFilter` (drops `/health`/`/metrics`/`/logging` from access log) |
 | [`detection.py`](../compute-service/detection.py) | YOLO model loading (lazy) + object detection. Prefers `models/<name>_openvino_model/` over `.pt` |
 | [`video.py`](../compute-service/video.py) | Video thumbnail generation (first/last frame, 2×2 grid, max-change GIF) + `convert_video()` — runs ffmpeg (H.265/H.264, up to 2 h timeout) |
 | [`config.py`](../compute-service/config.py) | `CAMERA_ROOT` env var (default `/camera`); `to_absolute(relative_path)` converts relative paths received from the backend to absolute. Set `CAMERA_ROOT=\\192.168.1.91\Camera` for local Windows dev. |
@@ -153,7 +154,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`aiModal/BaseAiModal.jsx`](../frontend/src/components/aiModal/BaseAiModal.jsx) | Shared AI-modal shell: backdrop + Escape, header, run row, "В задачи" task submission. New AI provider modals start here |
 | [`aiModal/StructuredAiResult.jsx`](../frontend/src/components/aiModal/StructuredAiResult.jsx) | `AiStatsRow` (tokens/cost/time) + `StructuredResponse` (scene/images/raw) — shared by Gemini and Claude modals |
 | [`DeleteConfirmModal.jsx`](../frontend/src/components/DeleteConfirmModal.jsx) | Delete confirmation modal: file list with relative paths (strips `camera.path` prefix), paired video preview |
-| [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal — thin shell: backdrop, tab bar, renders the active tab. The 6 tabs live in `tools/` (see table below) |
+| [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal — thin shell: backdrop, tab bar, renders the active tab. The 8 tabs live in `tools/` (see table below) |
 | [`CellSelBar.jsx`](../frontend/src/components/CellSelBar.jsx) | Heatmap cell-selection toolbar: bulk select, delete (hour level), and AI analysis across selected day/hour cells. Rendered by `App.jsx` in selection mode |
 | [`navUtils.js`](../frontend/src/components/navUtils.js) | Heatmap navigation helpers: `LEVELS`, `GRID_COLS`, `dateRangeForPeriod`, `computeIntensity`, `formatBytes`, nav-state persistence |
 | [`useHeatmapKeyboard.js`](../frontend/src/components/useHeatmapKeyboard.js) | Custom hook — arrow-key navigation + selection/delete shortcuts for the heatmap grid. Inactive while HourViewer is open |
@@ -188,6 +189,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`GoogleAiTab.jsx`](../frontend/src/components/tools/GoogleAiTab.jsx) | Gemini API key, model, structured prompt template |
 | [`ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx) | Claude API key, model |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
+| [`LoggingTab.jsx`](../frontend/src/components/tools/LoggingTab.jsx) | Dynamic log-level control for backend and compute (TRACE/DEBUG/INFO/WARNING/ERROR). Buffer size sliders, live log viewer with auto-refresh. Calls `/logging/*` and `/logging/compute/*` |
 | [`MaintenanceTab.jsx`](../frontend/src/components/tools/MaintenanceTab.jsx) | Clear database, clear all thumbnails, storage info. Date-range picker (auto-filled from camera's range) — all cleanup operations filter to the selected range |
 
 ### New Task modal parts (`frontend/src/components/newTask/`)
