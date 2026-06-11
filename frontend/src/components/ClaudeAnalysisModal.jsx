@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
-import { claudeAnalyzeBatch, createTask } from '../api.js'
+import { useState } from 'react'
+import { claudeAnalyzeBatch } from '../api.js'
 import { STRUCTURED_ANALYSIS_TEMPLATE } from '../prompts.js'
-import './GeminiAnalysisModal.css'
+import BaseAiModal from './aiModal/BaseAiModal.jsx'
+import { AiStatsRow, StructuredResponse } from './aiModal/StructuredAiResult.jsx'
 
 const CLAUDE_API_KEY_KEY   = 'claude_api_key'
 const CLAUDE_MODEL_KEY     = 'claude_model'
@@ -16,18 +17,10 @@ export default function ClaudeAnalysisModal({ fileIds, onClose, onComplete, task
   const apiKey = localStorage.getItem(CLAUDE_API_KEY_KEY) || ''
   const model  = localStorage.getItem(CLAUDE_MODEL_KEY)  || CLAUDE_DEFAULT_MODEL
 
-  const [prompt, setPrompt]     = useState(() => buildStructuredPrompt(fileIds.length))
-  const [running, setRunning]   = useState(false)
-  const [result, setResult]     = useState(null)
-  const [error, setError]       = useState(null)
-  const [taskSent, setTaskSent] = useState(false)
-  const [taskError, setTaskError] = useState(null)
-
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') { e.stopImmediatePropagation(); onClose() } }
-    window.addEventListener('keydown', onKey, true)
-    return () => window.removeEventListener('keydown', onKey, true)
-  }, [onClose])
+  const [prompt, setPrompt]   = useState(() => buildStructuredPrompt(fileIds.length))
+  const [running, setRunning] = useState(false)
+  const [result, setResult]   = useState(null)
+  const [error, setError]     = useState(null)
 
   async function handleRun() {
     if (!apiKey) {
@@ -48,13 +41,26 @@ export default function ClaudeAnalysisModal({ fileIds, onClose, onComplete, task
     }
   }
 
-  async function handleSendToTask() {
-    if (!taskContext) return
-    if (!apiKey) { setTaskError('API key не задан. Откройте Tools → Claude AI.'); return }
-    setTaskSent(false)
-    setTaskError(null)
-    try {
-      await createTask({
+  return (
+    <BaseAiModal
+      icon="mdi-robot"
+      title="Структурный анализ Claude"
+      onClose={onClose}
+      fileCount={fileIds.length} model={model} showNoKey={!apiKey}
+      beforeRunRow={
+        <div className="gai-section">
+          <div className="gai-label">Промпт</div>
+          <textarea
+            className="gai-prompt-area"
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            rows={12}
+            disabled={running}
+          />
+        </div>
+      }
+      running={running} onRun={handleRun} runDisabled={running || !apiKey}
+      task={taskContext ? {
         type: 'claude',
         params: {
           camera_id: taskContext.cameraId,
@@ -64,147 +70,20 @@ export default function ClaudeAnalysisModal({ fileIds, onClose, onComplete, task
           api_key: apiKey,
         },
         label: `Claude · ${taskContext.dateFrom?.slice(0, 16) ?? ''}`,
-      })
-      setTaskSent(true)
-      onTaskCreated?.()
-    } catch (e) {
-      setTaskError(e.message)
-    }
-  }
+        disabled: running || !apiKey,
+        title: 'Отправить в очередь задач (обработает весь период, по одному фото)',
+      } : null}
+      onTaskCreated={onTaskCreated}
+    >
+      <AiStatsRow result={result} />
 
-  function handleBackdrop(e) {
-    if (e.target === e.currentTarget) onClose()
-  }
-
-  const parsedImages = result?.parsed?.images ?? null
-  const parsedScene  = result?.parsed?.scene ?? null
-
-  return (
-    <div className="gai-backdrop" onClick={handleBackdrop}>
-      <div className="gai-card">
-        <div className="gai-header">
-          <span>
-            <i className="mdi mdi-robot" />
-            Структурный анализ Claude
-          </span>
-          <button className="gai-close" onClick={onClose}>×</button>
+      {error && (
+        <div className="gai-error">
+          <i className="mdi mdi-alert-circle-outline" /> {error}
         </div>
+      )}
 
-        <div className="gai-body">
-          <div className="gai-section">
-            <div className="gai-label">Промпт</div>
-            <textarea
-              className="gai-prompt-area"
-              value={prompt}
-              onChange={e => setPrompt(e.target.value)}
-              rows={12}
-              disabled={running}
-            />
-          </div>
-
-          <div className="gai-run-row">
-            <div className="gai-run-info">
-              <i className="mdi mdi-image-multiple-outline" />
-              {fileIds.length} фото
-              <span className="gai-run-model">{model}</span>
-              {!apiKey && <span className="gai-no-key"> · нет API key</span>}
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {taskContext && (
-                <button
-                  className="gai-run-btn"
-                  style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', borderColor: 'rgba(99,102,241,0.3)' }}
-                  onClick={handleSendToTask}
-                  disabled={running || !apiKey}
-                  title="Отправить в очередь задач (обработает весь период, по одному фото)"
-                >
-                  <i className="mdi mdi-tray-arrow-down" /> В задачи
-                </button>
-              )}
-              <button
-                className="gai-run-btn"
-                onClick={handleRun}
-                disabled={running || !apiKey}
-              >
-                {running
-                  ? <><i className="mdi mdi-loading mdi-spin" /> Анализ…</>
-                  : <><i className="mdi mdi-play" /> Запустить</>
-                }
-              </button>
-            </div>
-          </div>
-
-          {taskSent && (
-            <div className="gai-stats" style={{ color: '#86efac' }}>
-              <i className="mdi mdi-check-circle-outline" /> Задача добавлена в очередь
-            </div>
-          )}
-          {taskError && (
-            <div className="gai-error">
-              <i className="mdi mdi-alert-circle-outline" /> {taskError}
-            </div>
-          )}
-
-          {result && (
-            <div className="gai-stats">
-              <span><i className="mdi mdi-timer-outline" /> {(result.elapsed_ms / 1000).toFixed(1)} s</span>
-              <span><i className="mdi mdi-image-outline" /> {result.images_used}</span>
-              <span><i className="mdi mdi-counter" /> {result.total_tokens.toLocaleString()} tok</span>
-              <span className="gai-stats-detail">in {result.input_tokens.toLocaleString()} · out {result.output_tokens.toLocaleString()}</span>
-              <span><i className="mdi mdi-currency-usd" /> ${result.cost_usd.toFixed(6)}</span>
-              {result.saved_count > 0 && (
-                <span className="gai-saved-badge">
-                  <i className="mdi mdi-database-check-outline" /> {result.saved_count} сохранено
-                </span>
-              )}
-            </div>
-          )}
-
-          {error && (
-            <div className="gai-error">
-              <i className="mdi mdi-alert-circle-outline" /> {error}
-            </div>
-          )}
-
-          {parsedScene && (
-            <div className="gai-response">
-              <div className="gai-response-label">
-                <i className="mdi mdi-image-filter-hdr-outline" /> Общая сцена
-              </div>
-              <div className="gai-response-text gai-scene-text">{parsedScene}</div>
-            </div>
-          )}
-          {parsedImages && (
-            <div className="gai-response">
-              <div className="gai-response-label">
-                <i className="mdi mdi-format-list-numbered" /> Анализ по снимкам ({parsedImages.length})
-              </div>
-              <div className="gai-images-list">
-                {parsedImages.map((img, i) => (
-                  <div key={i} className="gai-image-entry">
-                    <div className="gai-image-idx">#{i + 1}</div>
-                    <div className="gai-image-content">
-                      <div className="gai-image-desc">{img.description}</div>
-                      {img.objects?.length > 0 && (
-                        <div className="gai-image-objects">
-                          {img.objects.map((o, j) => <span key={j} className="gai-obj-tag">{o}</span>)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {result && !parsedScene && result.raw_text && (
-            <div className="gai-response">
-              <div className="gai-response-label">Ответ (raw — не удалось разобрать JSON)</div>
-              <div className="gai-response-text">{result.raw_text}</div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      <StructuredResponse result={result} />
+    </BaseAiModal>
   )
 }

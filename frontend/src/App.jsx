@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { getCameras, getStatsTotal, getStatsGrouped, previewDeleteRange, confirmDelete, deleteByRange, getPreviews, openvinoAnalyzeRange, geminiAnalyzeBatch, claudeAnalyzeBatch, getClassesList, createTask, getAiAnalysisInRange } from './api.js'
+import { getCameras, getStatsTotal, getStatsGrouped } from './api.js'
 import DeleteConfirmModal from './components/DeleteConfirmModal.jsx'
 import Header from './components/Header.jsx'
 import CameraSelector from './components/CameraSelector.jsx'
@@ -12,14 +12,17 @@ import ToolsButton from './components/ToolsButton.jsx'
 import TasksScreen from './components/TasksScreen.jsx'
 import TaskResultsModal from './components/TaskResultsModal.jsx'
 import TuningScreen from './components/TuningScreen.jsx'
+import KeyboardHints from './components/KeyboardHints.jsx'
 import { initFontSize } from './components/tools/settingsIO.js'
 import CellSelBar from './components/CellSelBar.jsx'
 import { useHeatmapKeyboard } from './components/useHeatmapKeyboard.js'
+import { useCellSelection } from './components/useCellSelection.js'
+import { useTaskNavigation } from './components/useTaskNavigation.js'
+import { useRangeDelete } from './components/useRangeDelete.js'
 import {
   LEVELS, dateRangeForPeriod, computeIntensity, getPreviewsPerCell,
   loadNavState, saveNavState,
 } from './components/navUtils.js'
-import { CELL_ANALYSIS_PROMPT } from './prompts.js'
 import { computeViewedStatusMap, cacheDataHours, cacheDataDays, cacheDataMonths } from './viewedStatus.js'
 
 const _nav = loadNavState()
@@ -40,32 +43,6 @@ function DayDeleteBar({ label, onPreview, loading }) {
   )
 }
 
-function KeyboardHints({ hints }) {
-  if (!hints.length) return null
-  return (
-    <div style={{
-      padding: '4px 16px 6px',
-      fontSize: 'calc(var(--font-base) * 0.75)',
-      color: 'var(--text-dim)',
-      textAlign: 'center',
-      userSelect: 'none',
-      marginTop: 'var(--gap-md)',
-    }}>
-      {hints.map((h, i) => (
-        <span key={i}>
-          {i > 0 && <span style={{ margin: '0 8px', opacity: 0.4 }}>·</span>}
-          <kbd style={{
-            background: '#1f2937', border: '1px solid #374151',
-            borderRadius: '3px', padding: '0px 4px', fontSize: 'inherit',
-            fontFamily: 'inherit', marginRight: 4,
-          }}>{h.key}</kbd>
-          {h.label}
-        </span>
-      ))}
-    </div>
-  )
-}
-
 export default function App() {
   const [cameras, setCameras]           = useState([])
   const [cameraId, setCameraId]         = useState(_nav.cameraId ?? null)
@@ -77,30 +54,24 @@ export default function App() {
   const [refreshKey, setRefreshKey]     = useState(0)
   const [selectedHour, setSelectedHour] = useState(_nav.selectedHour ?? null)
   const [previewsPerCell, setPreviewsPerCell] = useState(getPreviewsPerCell)
-  const [selMode, setSelMode]             = useState(false)
-  const [selectedPeriods, setSelectedPeriods] = useState(new Map())
-  const [selDelLoading, setSelDelLoading] = useState(false)
-  const [selDelError, setSelDelError]     = useState(null)
-  const [selDelConfirm, setSelDelConfirm] = useState(false)
-  const [aiRefreshKey, setAiRefreshKey]   = useState(0)
-  const [selAnalyzing, setSelAnalyzing]   = useState(false)
-  const [selAnalyzeError, setSelAnalyzeError] = useState(null)
-  const [selAnalyzeProgress, setSelAnalyzeProgress] = useState('')
-  const [selTaskSent, setSelTaskSent]     = useState(false)
-  const [selTaskError, setSelTaskError]   = useState(null)
-  const [rangeDeletePreview, setRangeDeletePreview]           = useState(null)
-  const [rangeDeletePreviewLoading, setRangeDeletePreviewLoading] = useState(false)
-  const [rangeDeleteDeleteLoading, setRangeDeleteDeleteLoading]   = useState(false)
-  const [rangeDeleteError, setRangeDeleteError]               = useState(null)
-  const rangeDeleteDrillBack = useRef(null)
   const [focusedPeriod, setFocusedPeriod] = useState(null)
   const restorePeriodRef = useRef(null)
   const [showTasks, setShowTasks] = useState(false)
   const [showTuning, setShowTuning] = useState(false)
-  const [taskResultsModal, setTaskResultsModal] = useState(null) // {task, results}
   const [viewedRefreshKey, setViewedRefreshKey] = useState(0)
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
+
+  const handleScanComplete = useCallback(() => setRefreshKey(k => k + 1), [])
+
+  // Cell selection mode: bulk delete / AI analysis / send-to-task (useCellSelection.js)
+  const sel = useCellSelection({ cameraId, drillStack, currentLevel, onFilesDeleted: handleScanComplete })
+
+  // Tasks screen → heatmap/hour navigation (useTaskNavigation.js)
+  const taskNav = useTaskNavigation({ setCameraId, setDrillStack, setSelectedHour, setShowTasks, setShowTuning })
+
+  // Date-range delete preview/confirm flow (useRangeDelete.js)
+  const rangeDelete = useRangeDelete({ cameraId, onDeleted: handleScanComplete, drillUpTo })
 
   useEffect(() => { initFontSize() }, [])
 
@@ -117,16 +88,6 @@ export default function App() {
     document.addEventListener('hour-viewed-change', onViewed)
     return () => document.removeEventListener('hour-viewed-change', onViewed)
   }, [])
-
-  useEffect(() => {
-    setSelMode(false)
-    setSelectedPeriods(new Map())
-    setSelDelError(null)
-    setSelDelConfirm(false)
-    setSelAnalyzeError(null)
-    setSelTaskSent(false)
-    setSelTaskError(null)
-  }, [drillStack, cameraId])
 
   useEffect(() => {
     getCameras().then(setCameras).catch(() => {})
@@ -218,8 +179,6 @@ export default function App() {
     setSelectedHour(null)
   }
 
-  const handleScanComplete = useCallback(() => setRefreshKey(k => k + 1), [])
-
   // Auto-focus: restore cursor to where we drilled from, or fall back to first non-empty cell
   useEffect(() => {
     if (restorePeriodRef.current !== null) {
@@ -242,205 +201,12 @@ export default function App() {
 
   // Heatmap keyboard navigation (only active when HourViewer is not open)
   useHeatmapKeyboard({
-    selectedHour, periods, focusedPeriod, currentLevel, drillStack, selMode, selectedPeriods,
-    setFocusedPeriod, setSelMode, setSelectedPeriods, setDrillStack, setSelDelConfirm,
-    restorePeriodRef, drillInto, handleRangeDeletePreview,
+    selectedHour, periods, focusedPeriod, currentLevel, drillStack,
+    selMode: sel.selMode, selectedPeriods: sel.selectedPeriods,
+    setFocusedPeriod, setSelMode: sel.setSelMode, setSelectedPeriods: sel.setSelectedPeriods,
+    setDrillStack, setSelDelConfirm: sel.setDelConfirm,
+    restorePeriodRef, drillInto, handleRangeDeletePreview: rangeDelete.handlePreview,
   })
-
-  function handleTogglePeriod(cell) {
-    setSelectedPeriods(prev => {
-      const next = new Map(prev)
-      next.has(cell.period) ? next.delete(cell.period) : next.set(cell.period, cell)
-      return next
-    })
-  }
-
-  async function handleDeleteHours() {
-    setSelDelLoading(true)
-    setSelDelError(null)
-    try {
-      const dayContext = drillStack[drillStack.length - 1]
-      const date = dayContext?.dateFrom?.substring(0, 10)
-      for (const [period] of selectedPeriods) {
-        const h = period.padStart(2, '0')
-        await deleteByRange(cameraId, `${date}T${h}:00:00`, `${date}T${h}:59:59`)
-      }
-      setSelMode(false)
-      setSelDelConfirm(false)
-      setSelectedPeriods(new Map())
-      handleScanComplete()
-    } catch (e) {
-      setSelDelError(e.message)
-    } finally {
-      setSelDelLoading(false)
-    }
-  }
-
-  function getCellDateRange(period) {
-    if (currentLevel === 'hour') {
-      const date = drillStack[drillStack.length - 1]?.dateFrom?.substring(0, 10) ?? ''
-      const h = period.padStart(2, '0')
-      return { dateFrom: `${date}T${h}:00:00`, dateTo: `${date}T${h}:59:59` }
-    }
-    return dateRangeForPeriod(period, currentLevel)
-  }
-
-  async function handleAnalyzeCells(provider, model, confidence) {
-    setSelAnalyzing(true)
-    setSelAnalyzeError(null)
-    setSelAnalyzeProgress('')
-    try {
-      const cells = [...selectedPeriods.values()]
-
-      if (provider === 'openvino') {
-        for (let i = 0; i < cells.length; i++) {
-          setSelAnalyzeProgress(`${i + 1}/${cells.length}`)
-          const { dateFrom, dateTo } = getCellDateRange(cells[i].period)
-          const videoMode = localStorage.getItem('video_preview_mode') || 'none'
-          await openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName: model, confidence, classes: getClassesList(), videoThumbMode: videoMode })
-        }
-      } else {
-        const apiKey = localStorage.getItem(provider === 'gemini' ? 'gemini_api_key' : 'claude_api_key')
-        if (!apiKey) throw new Error(`Нет API ключа ${provider === 'gemini' ? 'Gemini' : 'Claude'}. Откройте Tools.`)
-        const fileIds = []
-        for (const cell of cells) {
-          const { dateFrom, dateTo } = getCellDateRange(cell.period)
-          const data = await getPreviews(cameraId, dateFrom, dateTo, 1)
-          if (data.file_ids?.length) fileIds.push(...data.file_ids)
-        }
-        if (!fileIds.length) throw new Error('В выбранных ячейках нет фотографий')
-        const prompt = CELL_ANALYSIS_PROMPT(fileIds.length)
-        if (provider === 'gemini') {
-          await geminiAnalyzeBatch({ fileIds, model, apiKey, prompt })
-        } else {
-          await claudeAnalyzeBatch({ fileIds, model, apiKey, prompt })
-        }
-      }
-
-      setAiRefreshKey(k => k + 1)
-    } catch (e) {
-      setSelAnalyzeError(e.message)
-    } finally {
-      setSelAnalyzing(false)
-      setSelAnalyzeProgress('')
-    }
-  }
-
-  async function handleNavigateFromTask(task) {
-    const params = task.params || {}
-    const camId = params.camera_id
-    if (!camId || !params.date_from || !params.date_to) return
-    try {
-      const data = await getAiAnalysisInRange(camId, params.date_from, params.date_to, task.type)
-      setTaskResultsModal({ task, results: data.results ?? [], stats: data.stats ?? null })
-    } catch {
-      // fallback: navigate to heatmap
-      _navigateToTaskPeriod(task)
-    }
-  }
-
-  function _navigateToTaskPeriod(task) {
-    const params = task.params || {}
-    const camId = params.camera_id
-    const dateStr = params.date_from
-    if (!camId || !dateStr) return
-    const year  = dateStr.slice(0, 4)
-    const month = dateStr.slice(0, 7)
-    const lastDay = new Date(+year, +month.slice(5), 0).getDate()
-    setCameraId(camId)
-    setDrillStack([
-      { level: 'year',  label: year,  dateFrom: `${year}-01-01T00:00:00`,  dateTo: `${year}-12-31T23:59:59` },
-      { level: 'month', label: month, dateFrom: `${month}-01T00:00:00`, dateTo: `${month}-${String(lastDay).padStart(2,'0')}T23:59:59` },
-    ])
-    setSelectedHour(null)
-    setShowTasks(false)
-    setShowTuning(false)
-  }
-
-  function handleNavigateToHour(timestamp) {
-    // timestamp: "2024-07-30T17:29:54"
-    const date  = timestamp.slice(0, 10)
-    const hour  = timestamp.slice(11, 13)
-    const year  = date.slice(0, 4)
-    const month = date.slice(0, 7)
-    const lastDay = new Date(+year, +month.slice(5), 0).getDate()
-    const taskCamId = taskResultsModal?.task?.params?.camera_id
-    setTaskResultsModal(null)
-    if (taskCamId) setCameraId(taskCamId)
-    setDrillStack([
-      { level: 'year',  label: year,  dateFrom: `${year}-01-01T00:00:00`,  dateTo: `${year}-12-31T23:59:59` },
-      { level: 'month', label: month, dateFrom: `${month}-01T00:00:00`, dateTo: `${month}-${String(lastDay).padStart(2,'0')}T23:59:59` },
-      { level: 'day',   label: date,  dateFrom: `${date}T00:00:00`,      dateTo: `${date}T23:59:59` },
-    ])
-    setSelectedHour({ dateFrom: `${date}T${hour}:00:00`, dateTo: `${date}T${hour}:59:59`, label: `${date} ${hour}:00` })
-    setShowTasks(false)
-    setShowTuning(false)
-  }
-
-  async function handleSendCellsToTask(provider, model, confidence) {
-    setSelTaskSent(false)
-    setSelTaskError(null)
-    const apiKey = provider === 'gemini'
-      ? localStorage.getItem('gemini_api_key') || ''
-      : provider === 'claude'
-        ? localStorage.getItem('claude_api_key') || ''
-        : null
-    if ((provider === 'gemini' || provider === 'claude') && !apiKey) {
-      setSelTaskError(`Нет API ключа ${provider === 'gemini' ? 'Gemini' : 'Claude'}`)
-      return
-    }
-    try {
-      const cells = [...selectedPeriods.values()]
-      for (const cell of cells) {
-        const { dateFrom, dateTo } = getCellDateRange(cell.period)
-        const typeName = { openvino: 'YOLO', gemini: 'Gemini', claude: 'Claude' }[provider] || provider
-        const label = `${typeName} · ${cameraId} · ${dateFrom.slice(0, 10)}`
-        const params = { camera_id: cameraId, date_from: dateFrom, date_to: dateTo }
-        if (provider === 'openvino') { params.model_name = model; params.confidence = confidence; params.classes = getClassesList() }
-        else { params.model = model; params.api_key = apiKey }
-        await createTask({ type: provider, params, label })
-      }
-      setSelTaskSent(true)
-    } catch (e) {
-      setSelTaskError(e.message)
-    }
-  }
-
-  async function handleRangeDeletePreview(dateFrom, dateTo, afterConfirmDrillTo) {
-    setRangeDeletePreviewLoading(true)
-    setRangeDeleteError(null)
-    rangeDeleteDrillBack.current = afterConfirmDrillTo
-    try {
-      const data = await previewDeleteRange(cameraId, dateFrom, dateTo)
-      setRangeDeletePreview(data)
-    } catch (e) {
-      setRangeDeleteError(e.message)
-    } finally {
-      setRangeDeletePreviewLoading(false)
-    }
-  }
-
-  async function handleRangeDeleteConfirm() {
-    const allIds = [
-      ...rangeDeletePreview.selected.map(f => f.id),
-      ...rangeDeletePreview.related_videos.map(f => f.id),
-    ]
-    setRangeDeleteDeleteLoading(true)
-    setRangeDeleteError(null)
-    try {
-      await confirmDelete(allIds)
-      setRangeDeletePreview(null)
-      handleScanComplete()
-      if (rangeDeleteDrillBack.current !== null) {
-        drillUpTo(rangeDeleteDrillBack.current)
-        rangeDeleteDrillBack.current = null
-      }
-    } catch (e) {
-      setRangeDeleteError(e.message)
-    } finally {
-      setRangeDeleteDeleteLoading(false)
-    }
-  }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -488,44 +254,44 @@ export default function App() {
 
         {(currentLevel === 'hour' || currentLevel === 'day') && !selectedHour && !showTasks && !showTuning && (
           <>
-            {selMode ? (
+            {sel.selMode ? (
               <CellSelBar
                 level={currentLevel}
                 periods={periods}
-                selectedMap={selectedPeriods}
-                onSelectAll={() => setSelectedPeriods(new Map(periods.filter(p => p.total_size_bytes > 0).map(p => [p.period, p])))}
-                onSelectNone={() => setSelectedPeriods(new Map())}
-                onClose={() => { setSelMode(false); setSelDelConfirm(false); setSelectedPeriods(new Map()); setSelAnalyzeError(null); setSelTaskSent(false); setSelTaskError(null) }}
-                onDelete={handleDeleteHours}
-                loading={selDelLoading}
-                error={selDelError}
-                confirmOpen={selDelConfirm}
-                onSetConfirmOpen={setSelDelConfirm}
-                onAnalyze={handleAnalyzeCells}
-                analyzing={selAnalyzing}
-                analyzeProgress={selAnalyzeProgress}
-                analyzeError={selAnalyzeError}
-                onSendToTask={handleSendCellsToTask}
-                taskSent={selTaskSent}
-                taskSendError={selTaskError}
+                selectedMap={sel.selectedPeriods}
+                onSelectAll={() => sel.setSelectedPeriods(new Map(periods.filter(p => p.total_size_bytes > 0).map(p => [p.period, p])))}
+                onSelectNone={() => sel.setSelectedPeriods(new Map())}
+                onClose={sel.closeSelection}
+                onDelete={sel.handleDeleteHours}
+                loading={sel.delLoading}
+                error={sel.delError}
+                confirmOpen={sel.delConfirm}
+                onSetConfirmOpen={sel.setDelConfirm}
+                onAnalyze={sel.handleAnalyzeCells}
+                analyzing={sel.analyzing}
+                analyzeProgress={sel.analyzeProgress}
+                analyzeError={sel.analyzeError}
+                onSendToTask={sel.handleSendCellsToTask}
+                taskSent={sel.taskSent}
+                taskSendError={sel.taskError}
               />
             ) : (
               <div style={{ display: 'flex', gap: 'var(--gap-sm)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 {currentLevel === 'hour' && drillStack.length > 0 && (
                   <DayDeleteBar
                     label={drillStack[drillStack.length - 1].label}
-                    onPreview={() => handleRangeDeletePreview(
+                    onPreview={() => rangeDelete.handlePreview(
                       drillStack[drillStack.length - 1].dateFrom,
                       drillStack[drillStack.length - 1].dateTo,
                       drillStack.length - 2,
                     )}
-                    loading={rangeDeletePreviewLoading}
+                    loading={rangeDelete.previewLoading}
                   />
                 )}
                 <button
                   className="modal-btn neutral"
                   style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}
-                  onClick={() => setSelMode(true)}
+                  onClick={() => sel.setSelMode(true)}
                 >
                   <i className="mdi mdi-checkbox-multiple-marked-outline" />
                   {currentLevel === 'hour' ? ' Select hours' : ' Select days'}
@@ -538,7 +304,7 @@ export default function App() {
         {showTuning ? (
           <TuningScreen />
         ) : showTasks ? (
-          <TasksScreen cameras={cameras} onNavigate={handleNavigateFromTask} />
+          <TasksScreen cameras={cameras} onNavigate={taskNav.handleNavigateFromTask} />
         ) : selectedHour ? (
           <HourViewer
             cameraId={cameraId}
@@ -559,10 +325,10 @@ export default function App() {
               cameraId={cameraId}
               previewsPerCell={previewsPerCell}
               contextDateFrom={drillStack[drillStack.length - 1]?.dateFrom ?? null}
-              selectionMode={selMode}
-              selectedPeriods={selectedPeriods}
-              onTogglePeriod={handleTogglePeriod}
-              aiRefreshKey={aiRefreshKey}
+              selectionMode={sel.selMode}
+              selectedPeriods={sel.selectedPeriods}
+              onTogglePeriod={sel.handleTogglePeriod}
+              aiRefreshKey={sel.aiRefreshKey}
               focusedPeriod={focusedPeriod}
               viewedStatusMap={viewedStatusMap}
             />
@@ -571,7 +337,7 @@ export default function App() {
             )}
             {!selectedHour && (
               <KeyboardHints hints={
-                selMode
+                sel.selMode
                   ? [
                       { key: '↑ ↓ ← →', label: 'navigate' },
                       { key: 'Space', label: 'toggle' },
@@ -593,23 +359,23 @@ export default function App() {
 
       </main>
 
-      {taskResultsModal && (
+      {taskNav.taskResultsModal && (
         <TaskResultsModal
-          task={taskResultsModal.task}
-          results={taskResultsModal.results}
-          stats={taskResultsModal.stats}
-          onClose={() => setTaskResultsModal(null)}
-          onNavigateToHour={handleNavigateToHour}
+          task={taskNav.taskResultsModal.task}
+          results={taskNav.taskResultsModal.results}
+          stats={taskNav.taskResultsModal.stats}
+          onClose={() => taskNav.setTaskResultsModal(null)}
+          onNavigateToHour={taskNav.handleNavigateToHour}
         />
       )}
 
-      {rangeDeletePreview && (
+      {rangeDelete.preview && (
         <DeleteConfirmModal
-          preview={rangeDeletePreview}
-          onConfirm={handleRangeDeleteConfirm}
-          onCancel={() => { setRangeDeletePreview(null); setRangeDeleteError(null) }}
-          busy={rangeDeleteDeleteLoading}
-          error={rangeDeleteError}
+          preview={rangeDelete.preview}
+          onConfirm={rangeDelete.handleConfirm}
+          onCancel={rangeDelete.handleCancel}
+          busy={rangeDelete.deleteLoading}
+          error={rangeDelete.error}
           camera={cameras.find(c => c.id === cameraId)}
         />
       )}

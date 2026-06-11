@@ -131,13 +131,15 @@ its upload directory.
 ## Frontend
 
 [`frontend/src/components/TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx)
-— the whole screen in one file: a session sidebar plus the 3-step panel
-(`NewSessionForm`, `GroundTruthStep`, `BenchmarkStep`, `ResultsStep`). Charts use
-`recharts` (same dependency as `StatsBar`). API calls live in
-[`frontend/src/api.js`](../frontend/src/api.js) (`createTuningSession`,
-`getTuningImageUrl`, `runAutolabel`, `saveTuningGroundTruth`,
-`startTuningBenchmark`, …). The screen is mounted from
-[`App.jsx`](../frontend/src/App.jsx) behind the `showTuning` toggle.
+— orchestrator: session sidebar + step switching. The steps live in
+[`components/tuning/`](../frontend/src/components/tuning/): `NewSessionForm`,
+`GroundTruthStep`, `BenchmarkStep`, `ResultsStep`, plus shared constants/styles
+in `tuningShared.jsx`. Charts use `recharts` (same dependency as `StatsBar`).
+API calls live in [`frontend/src/api/tuning.js`](../frontend/src/api/tuning.js)
+(re-exported via `api.js`): `createTuningSession`, `getTuningImageUrl`,
+`runAutolabel`, `saveTuningGroundTruth`, `startTuningBenchmark`, …
+The screen is mounted from [`App.jsx`](../frontend/src/App.jsx) behind the
+`showTuning` toggle.
 
 ---
 

@@ -17,7 +17,7 @@ For a flat per-file listing see [`code-map.md`](code-map.md). This doc is the *g
 | **Thumbnail pipeline** | `thumbnails.py`, `diff_thumbnails.py`, `diff_zoom_thumbnails.py`, `erosion_thumbnails.py`, `motion_thumbnails.py` | Indexing/DB (cache paths) | Pillow, numpy, opencv |
 | **Compute delegation** | `compute_client.py`, `compute_config.py`, `compute_cache.py`, `ai_providers/openvino.py`, `routers/compute.py` | Indexing/DB, compute-service | httpx |
 | **Cloud AI** | `ai_providers/gemini.py`, `ai_providers/claude.py`, `ai_providers/common.py`, `ai_pricing.py` | Indexing/DB | google-genai, anthropic, Pillow |
-| **Task queue** | `task_runner.py`, `routers/tasks.py` | Indexing/DB, Compute delegation | asyncio (stdlib) |
+| **Task queue** | `task_runner.py`, `task_executors/*`, `routers/tasks.py` | Indexing/DB, Compute delegation | asyncio (stdlib) |
 | **Compute-service** (separate process) | `compute-service/*` | `shared/` | ultralytics, openvino, opencv, Pillow |
 | **Shared block** | `shared/*` | — | pydantic |
 

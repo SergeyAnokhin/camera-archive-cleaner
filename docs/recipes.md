@@ -18,7 +18,7 @@ A server-side motion mode (like Erosion). Mode registry: [`viewModes/index.js`](
 | 1 | `backend/<name>_thumbnails.py` | New generator `get_or_create_<name>_thumbnail(conn, file_id, page_file_ids, threshold)`; a `<NAME>_THUMB_DIR` cache-dir constant; a `_CACHE_VERSION` to bump when the algorithm changes |
 | 2 | [`backend/routers/thumbnails_api.py`](../backend/routers/thumbnails_api.py) | New `GET /<name>_thumbnail/{file_id}` endpoint — reuse the `_parse_page_ids()` + `_page_thumbnail_response()` helpers |
 | 3 | [`backend/routers/maintenance.py`](../backend/routers/maintenance.py) | New `DELETE /<name>_thumbnails`; also add the dir to `clear_all_thumbnails()` and `get_storage_info()` |
-| 4 | [`frontend/src/api.js`](../frontend/src/api.js) | `get<Name>ThumbnailUrl(fileId, pageIds, threshold)` |
+| 4 | [`frontend/src/api/files.js`](../frontend/src/api/files.js) | `get<Name>ThumbnailUrl(fileId, pageIds, threshold)` (re-exported via `api.js`) |
 | 5 | `frontend/src/components/viewModes/<name>Mode.js` | Export `{ key, label, params, getImageUrl }` (copy [`erosionMode.js`](../frontend/src/components/viewModes/erosionMode.js)) |
 | 6 | [`viewModes/index.js`](../frontend/src/components/viewModes/index.js) | `import` it and append to `VIEW_MODES` |
 | 7 | **(docs)** [`visualization-modes.md`](visualization-modes.md) | New mode section + a row in the cache-management table |
@@ -40,9 +40,9 @@ Beside Gemini / Claude / OpenVINO. Provider logic lives in [`ai_providers/`](../
 | 2 | [`ai_providers/__init__.py`](../backend/ai_providers/__init__.py) | Export the new module |
 | 3 | [`backend/routers/ai.py`](../backend/routers/ai.py) | Request `BaseModel` + `POST /<provider>_analyze_batch` endpoint delegating to the provider |
 | 4 | [`backend/ai_pricing.py`](../backend/ai_pricing.py) | Per-token pricing table (cloud providers only) |
-| 5 | [`frontend/src/api.js`](../frontend/src/api.js) | `<provider>AnalyzeBatch()` client function |
+| 5 | [`frontend/src/api/analysis.js`](../frontend/src/api/analysis.js) | `<provider>AnalyzeBatch()` client function (re-exported via `api.js`) |
 | 6 | `frontend/src/components/viewModes/<provider>Mode.js` + [`index.js`](../frontend/src/components/viewModes/index.js) | Mode with `isAiMode: true`, `aiProvider: '<provider>'` |
-| 7 | `frontend/src/components/<Provider>AnalysisModal.jsx` | Analysis modal (copy [`ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx)) |
+| 7 | `frontend/src/components/<Provider>AnalysisModal.jsx` | Analysis modal — build on [`aiModal/BaseAiModal.jsx`](../frontend/src/components/aiModal/BaseAiModal.jsx) (copy [`ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) as a template) |
 | 8 | [`hour/AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx) | Add the provider + its model list to `AI_PROVIDER_CONFIG` |
 | 9 | `frontend/src/components/tools/<Provider>AiTab.jsx` | Settings tab; register it in [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx); add keys to [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js) |
 | 10 | [`aiHelpers.js`](../frontend/src/aiHelpers.js) | Extend `OBJECT_EMOJI_DEFAULTS` if the provider returns new object words |
@@ -57,7 +57,7 @@ Beside Gemini / Claude / OpenVINO. Provider logic lives in [`ai_providers/`](../
 | 1 | `backend/routers/<area>.py` | Add the endpoint to the router that matches its responsibility (see the [`code-map.md`](code-map.md) routers table). Create a new router file only for a genuinely new area |
 | 2 | [`backend/main.py`](../backend/main.py) | Only if a new router file: `app.include_router(...)` + update the docstring endpoint map |
 | 3 | [`backend/database.py`](../backend/database.py) | If the endpoint reads/writes the DB, add a query function here rather than inline SQL — see the seam rule in [`subsystems.md`](subsystems.md) |
-| 4 | [`frontend/src/api.js`](../frontend/src/api.js) | Client function — the only frontend file that knows API URLs |
+| 4 | `frontend/src/api/<domain>.js` | Client function in the matching domain module (see the [`code-map.md`](code-map.md) API client table); `api.js` re-exports it |
 | 5 | **(docs)** [`api.md`](api.md), [`code-map.md`](code-map.md) | New endpoint row; new router row if a file was added |
 
 ---

@@ -70,6 +70,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 Check `README.md` → Documentation table for relevant docs, then read the doc before touching the area. Example: changing AI analysis → read [`docs/ai-analysis.md`](docs/ai-analysis.md) first.
 
+**To find which file owns something, open [`docs/code-map.md`](docs/code-map.md) first** — it maps every file to its responsibility. Grep only when the code-map doesn't answer.
+
 ### When to create a doc
 
 Create a new `docs/<topic>.md` when a feature area is large enough that future work requires understanding its architecture before editing it. Good candidates:
@@ -82,6 +84,8 @@ Do **not** create docs for: single-function fixes, UI tweaks, settings additions
 ### When to update a doc
 
 Update the relevant doc whenever you change the architecture of a documented area — new endpoints, DB schema changes, new display locations, new providers, changed localStorage keys. The user may also say **"обнови документацию"** — treat that as: update all docs affected by recent changes.
+
+**Whenever you add, delete, rename, or move a source file, update [`docs/code-map.md`](docs/code-map.md) in the same change.** A stale code-map sends every future search to a dead end — this rule is not optional.
 
 **Also fix gaps found during search.** When updating docs, look back at what was slow to locate at the start of the session (had to grep instead of reading a doc, found nothing in `ai.py` but the endpoint was in `thumbnails_api.py`, a file wasn't listed in code-map, etc.). Add exactly that missing fact to the relevant doc — even if it's unrelated to what was changed. One or two targeted additions per session, not a full rewrite.
 

@@ -42,9 +42,9 @@ All thumbnail endpoints generate and cache on first request.
 |---|---|---|
 | `GET` | `/thumbnail/{file_id}` | Basic 256×256 JPEG thumbnail |
 | `GET` | `/diff_thumbnail/{file_id}` | Motion Diff: delta from page mean. Params: `page_ids` (comma-separated), `threshold` (0–255, default 20) |
-| `GET` | `/diff_zoom_thumbnail/{file_id}` | Diff Zoom: crop to the most active 1/9 tile. Same params |
+| `GET` | `/diff_zoom_thumbnail/{file_id}` | Diff Zoom: crop to the most active 1/9 tile. Same params. **No frontend view mode calls this** — backend-only |
 | `GET` | `/erosion_thumbnail/{file_id}` | Erosion/MOG2: morphological erosion. Same params |
-| `GET` | `/motion_thumbnail/{file_id}` | One of 4 motion modes: `neon_mask` / `mhi` / `bounding_boxes` / `motion_stacking`. Params: `page_ids`, `threshold`, `mode` |
+| `GET` | `/motion_thumbnail/{file_id}` | One of 4 motion modes: `neon_mask` / `mhi` / `bounding_boxes` / `motion_stacking`. Params: `page_ids`, `threshold`, `mode`. **No frontend view mode calls this** — backend-only |
 | `GET` | `/video_thumbnail/{file_id}` | Video preview image. `mode`: `first_frame` / `last_frame` / `four_frames` (2×2 JPEG grid) / `max_change_gif` (2-frame GIF: first→most-changed) / `four_frames_gif` (4-frame GIF: evenly spaced) / `max_change_4_gif` (4-frame GIF: first→max-diff-from-first→max-diff-from-last→last). Computed by the [compute-service](compute-service.md); cache in `video_thumbnails_cache/`. Returns `503` when compute is off/unreachable |
 
 ---

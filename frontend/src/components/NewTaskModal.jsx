@@ -1,51 +1,12 @@
 import { useState, useEffect } from 'react'
 import { getStatsTotal, getCameraDateRange, getFileEstimate } from '../api.js'
+import {
+  toLocalInput, nowLocalInput, monthStartInput, isAiType, isDbType,
+  readGlobalSettings, VIDEO_MODE_LABELS, TASK_TYPES,
+} from './newTask/newTaskHelpers.js'
+import VideoConvertPanel from './newTask/VideoConvertPanel.jsx'
+import FileOrganizerPanel from './newTask/FileOrganizerPanel.jsx'
 import './NewTaskModal.css'
-
-function toLocalInput(isoStr) {
-  return isoStr ? isoStr.slice(0, 16) : ''
-}
-
-function nowLocalInput() {
-  const d = new Date()
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function monthStartInput() {
-  const d = new Date()
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-01T00:00`
-}
-
-function isAiType(type)  { return type === 'gemini' || type === 'claude' }
-function isDbType(type)  { return ['video_thumbnails','openvino','gemini','claude'].includes(type) }
-
-function readGlobalSettings() {
-  const videoMode = localStorage.getItem('video_preview_mode') || 'four_frames'
-  const ovModel   = localStorage.getItem('openvino_model') || 'yolov8n'
-  const ovConf    = (() => {
-    try { return JSON.parse(localStorage.getItem('mode_params_openvino_detection') || '{}').confidence ?? 25 }
-    catch { return 25 }
-  })()
-  const geminiModel = localStorage.getItem('gemini_model') || 'gemini-3.1-flash-lite'
-  const claudeModel = localStorage.getItem('claude_model') || 'claude-haiku-4-5-20251001'
-  const etaWindowMinutes = Number(localStorage.getItem('eta_window_minutes')) || 5
-  return { videoMode, ovModel, ovConf, geminiModel, claudeModel, etaWindowMinutes }
-}
-
-const VIDEO_MODE_LABELS = {
-  'none':           'Нет (иконка камеры)',
-  'first_frame':    'Первый кадр',
-  'last_frame':     'Последний кадр',
-  'four_frames':    '4 кадра (2×2)',
-  'max_change_gif': 'GIF — 2 кадра (макс. изменение)',
-  'four_frames_gif':'GIF — 4 кадра равномерно',
-  'max_change_4_gif':'GIF — 4 кадра (макс. изменение)',
-}
-
-const VC_CODECS  = ['libx265', 'libx264', 'libvpx-vp9', 'copy']
-const VC_PRESETS = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'veryslow']
 
 export default function NewTaskModal({ cameras, onAdd, onClose }) {
   const [type, setType]         = useState('video_thumbnails')
@@ -62,31 +23,27 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
   const [loading, setLoading]                 = useState(false)
   const [datesFromCamera, setDatesFromCamera] = useState(false)
 
-  // ── video_convert params ─────────────────────────────────────
-  const [vcInputPattern,    setVcInputPattern]    = useState('*.mp4')
-  const [vcOutputSuffix,    setVcOutputSuffix]    = useState('_web')
-  const [vcOutputExtension, setVcOutputExtension] = useState('mp4')
-  const [vcCodec,           setVcCodec]           = useState('libx265')
-  const [vcCrf,             setVcCrf]             = useState(30)
-  const [vcPreset,          setVcPreset]          = useState('medium')
-  const [vcDryRun,          setVcDryRun]          = useState(false)
-  const [vcDateFrom,        setVcDateFrom]        = useState('')
-  const [vcDateTo,          setVcDateTo]          = useState('')
+  // video_convert params (panel: newTask/VideoConvertPanel.jsx)
+  const [vc, setVc] = useState({
+    inputPattern: '*.mp4', outputSuffix: '_web', outputExtension: 'mp4',
+    codec: 'libx265', crf: 30, preset: 'medium', dryRun: false,
+    dateFrom: '', dateTo: '',
+  })
+  const patchVc = p => setVc(v => ({ ...v, ...p }))
 
-  // ── file_organizer params ────────────────────────────────────
-  const [foSourceType,   setFoSourceType]   = useState('snapshots')
-  const [foInputPattern, setFoInputPattern] = useState('*.jpg')
-  const [foOutputFolder, setFoOutputFolder] = useState('organized')
-  const [foDateRegex,    setFoDateRegex]    = useState('(\\d{4})(\\d{2})(\\d{2})')
-  const [foDryRun,       setFoDryRun]       = useState(false)
-  const [foDateFrom,     setFoDateFrom]     = useState('')
-  const [foDateTo,       setFoDateTo]       = useState('')
+  // file_organizer params (panel: newTask/FileOrganizerPanel.jsx)
+  const [fo, setFo] = useState({
+    sourceType: 'snapshots', inputPattern: '*.jpg', outputFolder: 'organized',
+    dateRegex: '(\\d{4})(\\d{2})(\\d{2})', dryRun: false,
+    dateFrom: '', dateTo: '',
+  })
+  const patchFo = p => setFo(v => ({ ...v, ...p }))
 
   // shared: whether vc/fo date fields were auto-filled from camera range
   const [vcFoDatesFromCamera, setVcFoDatesFromCamera] = useState(false)
 
   // dynamic file count estimate for video_convert / file_organizer
-  const [vcFoFileCount,        setVcFoFileCount]        = useState(null)
+  const [vcFoFileCount, setVcFoFileCount]               = useState(null)
   const [vcFoFileCountLoading, setVcFoFileCountLoading] = useState(false)
 
   const settings = readGlobalSettings()
@@ -117,10 +74,8 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
         if (range.date_from && range.date_to) {
           const from = toLocalInput(range.date_from)
           const to   = toLocalInput(range.date_to)
-          setVcDateFrom(from)
-          setVcDateTo(to)
-          setFoDateFrom(from)
-          setFoDateTo(to)
+          patchVc({ dateFrom: from, dateTo: to })
+          patchFo({ dateFrom: from, dateTo: to })
           setVcFoDatesFromCamera(true)
         } else {
           setVcFoDatesFromCamera(false)
@@ -147,36 +102,32 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
     }
     if (!cameraId) { setVcFoFileCount(null); return }
 
-    const inputPat    = type === 'video_convert' ? vcInputPattern    : foInputPattern
-    const dateFrom_   = type === 'video_convert' ? vcDateFrom        : foDateFrom
-    const dateTo_     = type === 'video_convert' ? vcDateTo          : foDateTo
-    const outputSuffix = type === 'video_convert' ? vcOutputSuffix   : null
-
+    const isVc = type === 'video_convert'
     setVcFoFileCountLoading(true)
     const timer = setTimeout(() => {
       getFileEstimate({
         cameraId,
         taskType:     type,
-        inputPattern: inputPat,
-        dateFrom:     dateFrom_ ? dateFrom_ + ':00' : null,
-        dateTo:       dateTo_   ? dateTo_   + ':00' : null,
-        outputSuffix,
+        inputPattern: isVc ? vc.inputPattern : fo.inputPattern,
+        dateFrom:     (isVc ? vc.dateFrom : fo.dateFrom) ? (isVc ? vc.dateFrom : fo.dateFrom) + ':00' : null,
+        dateTo:       (isVc ? vc.dateTo   : fo.dateTo)   ? (isVc ? vc.dateTo   : fo.dateTo)   + ':00' : null,
+        outputSuffix: isVc ? vc.outputSuffix : null,
       })
         .then(d => { setVcFoFileCount(d.file_count); setVcFoFileCountLoading(false) })
         .catch(() => { setVcFoFileCount(null);        setVcFoFileCountLoading(false) })
     }, 600)
     return () => clearTimeout(timer)
-  }, [cameraId, type, vcInputPattern, vcDateFrom, vcDateTo, vcOutputSuffix,
-      foInputPattern, foDateFrom, foDateTo])
+  }, [cameraId, type, vc.inputPattern, vc.dateFrom, vc.dateTo, vc.outputSuffix,
+      fo.inputPattern, fo.dateFrom, fo.dateTo])
 
   function buildLabel() {
     const cam = cameras.find(c => c.id === cameraId)
     if (type === 'video_convert') {
-      const ext = vcOutputExtension || 'mp4'
-      return `Video Convert · ${cam?.name || cameraId} · ${vcInputPattern} → ${vcOutputSuffix}.${ext}`
+      const ext = vc.outputExtension || 'mp4'
+      return `Video Convert · ${cam?.name || cameraId} · ${vc.inputPattern} → ${vc.outputSuffix}.${ext}`
     }
     if (type === 'file_organizer') {
-      return `File Organizer · ${cam?.name || cameraId} · ${foInputPattern} → ${foOutputFolder}/`
+      return `File Organizer · ${cam?.name || cameraId} · ${fo.inputPattern} → ${fo.outputFolder}/`
     }
     const typeName = { video_thumbnails: 'Video', openvino: 'YOLO', gemini: 'Gemini', claude: 'Claude' }[type] || type
     return `${typeName} · ${cam?.name || cameraId} · ${dateFrom.slice(0,10)} – ${dateTo.slice(0,10)}`
@@ -212,23 +163,23 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
         if (delayMax > 0) { params.delay_min_sec = delayMin; params.delay_max_sec = delayMax }
         if (useTimeWindow) { params.active_from_hour = activeFromHour; params.active_to_hour = activeToHour }
       } else if (type === 'video_convert') {
-        params.input_pattern    = vcInputPattern
-        params.output_suffix    = vcOutputSuffix
-        params.output_extension = vcOutputExtension.replace(/^\./, '')
-        params.codec            = vcCodec
-        params.crf              = vcCrf
-        params.preset           = vcPreset
-        params.dry_run          = vcDryRun
-        if (vcDateFrom) params.date_from = vcDateFrom + ':00'
-        if (vcDateTo)   params.date_to   = vcDateTo   + ':00'
+        params.input_pattern    = vc.inputPattern
+        params.output_suffix    = vc.outputSuffix
+        params.output_extension = vc.outputExtension.replace(/^\./, '')
+        params.codec            = vc.codec
+        params.crf              = vc.crf
+        params.preset           = vc.preset
+        params.dry_run          = vc.dryRun
+        if (vc.dateFrom) params.date_from = vc.dateFrom + ':00'
+        if (vc.dateTo)   params.date_to   = vc.dateTo   + ':00'
       } else if (type === 'file_organizer') {
-        params.source_type    = foSourceType
-        params.input_pattern  = foInputPattern
-        params.output_folder  = foOutputFolder
-        params.date_regex     = foDateRegex
-        params.dry_run        = foDryRun
-        if (foDateFrom) params.date_from = foDateFrom + ':00'
-        if (foDateTo)   params.date_to   = foDateTo   + ':00'
+        params.source_type    = fo.sourceType
+        params.input_pattern  = fo.inputPattern
+        params.output_folder  = fo.outputFolder
+        params.date_regex     = fo.dateRegex
+        params.dry_run        = fo.dryRun
+        if (fo.dateFrom) params.date_from = fo.dateFrom + ':00'
+        if (fo.dateTo)   params.date_to   = fo.dateTo   + ':00'
       }
 
       await onAdd({ type, params, label: buildLabel() })
@@ -259,42 +210,15 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
           <div className="ntm__section">
             <div className="ntm__label">Task type</div>
             <div className="ntm__type-grid">
-              <button className={`ntm__type-card${type === 'video_thumbnails' ? ' ntm__type-card--active' : ''}`}
-                onClick={() => setType('video_thumbnails')}>
-                <i className="mdi mdi-video-outline ntm__type-icon" />
-                <span className="ntm__type-name">Video Thumbnails</span>
-                <span className="ntm__type-desc">Превью для видео в диапазоне дат</span>
-              </button>
-              <button className={`ntm__type-card${type === 'openvino' ? ' ntm__type-card--active' : ''}`}
-                onClick={() => setType('openvino')}>
-                <i className="mdi mdi-magnify-scan ntm__type-icon" />
-                <span className="ntm__type-name">OpenVINO Detection</span>
-                <span className="ntm__type-desc">YOLO детекция объектов на фото</span>
-              </button>
-              <button className={`ntm__type-card${type === 'gemini' ? ' ntm__type-card--active' : ''}`}
-                onClick={() => setType('gemini')}>
-                <i className="mdi mdi-google ntm__type-icon" />
-                <span className="ntm__type-name">Gemini AI Analysis</span>
-                <span className="ntm__type-desc">Анализ фото с Google Gemini</span>
-              </button>
-              <button className={`ntm__type-card${type === 'claude' ? ' ntm__type-card--active' : ''}`}
-                onClick={() => setType('claude')}>
-                <i className="mdi mdi-robot ntm__type-icon" />
-                <span className="ntm__type-name">Claude AI Analysis</span>
-                <span className="ntm__type-desc">Анализ фото с Anthropic Claude</span>
-              </button>
-              <button className={`ntm__type-card${type === 'video_convert' ? ' ntm__type-card--active' : ''}`}
-                onClick={() => setType('video_convert')}>
-                <i className="mdi mdi-video-check ntm__type-icon" />
-                <span className="ntm__type-name">Video Convert</span>
-                <span className="ntm__type-desc">Конвертация видео через ffmpeg (H.265)</span>
-              </button>
-              <button className={`ntm__type-card${type === 'file_organizer' ? ' ntm__type-card--active' : ''}`}
-                onClick={() => setType('file_organizer')}>
-                <i className="mdi mdi-folder-move-outline ntm__type-icon" />
-                <span className="ntm__type-name">File Organizer</span>
-                <span className="ntm__type-desc">Раскладывание файлов по ГГГГ/ММ/ДД</span>
-              </button>
+              {TASK_TYPES.map(t => (
+                <button key={t.type}
+                  className={`ntm__type-card${type === t.type ? ' ntm__type-card--active' : ''}`}
+                  onClick={() => setType(t.type)}>
+                  <i className={`mdi ${t.icon} ntm__type-icon`} />
+                  <span className="ntm__type-name">{t.name}</span>
+                  <span className="ntm__type-desc">{t.desc}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -442,226 +366,18 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════════
-              Video Convert params
-          ══════════════════════════════════════════════════════ */}
           {type === 'video_convert' && (
-            <>
-              <div className="ntm__section ntm__params-grid">
-                <div className="ntm__param">
-                  <label className="ntm__label">Входной паттерн</label>
-                  <input type="text" className="modal-text-input" value={vcInputPattern}
-                    onChange={e => setVcInputPattern(e.target.value)}
-                    placeholder="*.mp4" />
-                  <div className="ntm__param-hint">Glob: *.mp4, *.mkv, *.avi</div>
-                </div>
-                <div className="ntm__param">
-                  <label className="ntm__label">Суффикс выходного файла</label>
-                  <input type="text" className="modal-text-input" value={vcOutputSuffix}
-                    onChange={e => setVcOutputSuffix(e.target.value)}
-                    placeholder="_web" />
-                  <div className="ntm__param-hint">Добавляется к имени файла</div>
-                </div>
-                <div className="ntm__param">
-                  <label className="ntm__label">Расширение выходного файла</label>
-                  <input type="text" className="modal-text-input" value={vcOutputExtension}
-                    onChange={e => setVcOutputExtension(e.target.value)}
-                    placeholder="mp4" />
-                </div>
-                <div className="ntm__param">
-                  <label className="ntm__label">Кодек</label>
-                  <select className="modal-select" value={vcCodec} onChange={e => setVcCodec(e.target.value)}>
-                    {VC_CODECS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-                <div className="ntm__param">
-                  <label className="ntm__label">CRF (качество, 18–51)</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input type="range" min="18" max="51" step="1" value={vcCrf}
-                      onChange={e => setVcCrf(+e.target.value)}
-                      style={{ flex: 1, accentColor: 'var(--accent)' }} />
-                    <span style={{ minWidth: 24, fontWeight: 600 }}>{vcCrf}</span>
-                  </div>
-                  <div className="ntm__param-hint">Меньше = лучше качество, больше файл</div>
-                </div>
-                <div className="ntm__param">
-                  <label className="ntm__label">Preset (скорость кодирования)</label>
-                  <select className="modal-select" value={vcPreset} onChange={e => setVcPreset(e.target.value)}>
-                    {VC_PRESETS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="ntm__section">
-                <div className="ntm__date-header">
-                  <label className="ntm__label" style={{margin:0}}>Фильтр по дате файла (mtime)</label>
-                  {vcFoDatesFromCamera && (
-                    <span className="ntm__date-hint">
-                      <i className="mdi mdi-check-circle" style={{fontSize:12,marginRight:3}} />
-                      авто-заполнено
-                    </span>
-                  )}
-                </div>
-                <div className="ntm__dates">
-                  <input type="datetime-local" className="modal-text-input ntm__date-input"
-                    value={vcDateFrom}
-                    onChange={e => { setVcDateFrom(e.target.value); setVcFoDatesFromCamera(false) }} />
-                  <span className="ntm__date-sep">→</span>
-                  <input type="datetime-local" className="modal-text-input ntm__date-input"
-                    value={vcDateTo}
-                    onChange={e => { setVcDateTo(e.target.value); setVcFoDatesFromCamera(false) }} />
-                </div>
-                <div className="ntm__param-hint" style={{ marginTop: 4 }}>
-                  Пусто = обрабатывать все файлы без фильтра по дате
-                </div>
-                {vcFoFileCountLoading ? (
-                  <div style={{ marginTop: 6, color: 'var(--text-dim)', fontSize: 'calc(var(--font-base)*0.85)' }}>
-                    <i className="mdi mdi-loading mdi-spin" style={{ marginRight: 4 }} />Подсчёт файлов…
-                  </div>
-                ) : vcFoFileCount != null ? (
-                  vcFoFileCount > 0 ? (
-                    <div className="ntm__estimate" style={{ marginTop: 6 }}>
-                      <i className="mdi mdi-information-outline" />
-                      <strong>{vcFoFileCount.toLocaleString()}</strong>&nbsp;видео подходит под фильтр
-                    </div>
-                  ) : (
-                    <div className="ntm__warn" style={{ marginTop: 6 }}>
-                      <i className="mdi mdi-alert-outline" /> Видео по фильтру не найдено
-                    </div>
-                  )
-                ) : null}
-              </div>
-
-              <div className="ntm__section ntm__example-row">
-                <i className="mdi mdi-information-outline" style={{ color: 'var(--accent)' }} />
-                <span>
-                  Пример: <code>{vcInputPattern || '*.mp4'}</code> →{' '}
-                  <code>{'<basename>'}{vcOutputSuffix || '_web'}.{vcOutputExtension || 'mp4'}</code>
-                  &nbsp;· Конвертируется в ту же папку
-                </span>
-              </div>
-
-              <div className="ntm__section">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
-                  <input type="checkbox" checked={vcDryRun}
-                    onChange={e => setVcDryRun(e.target.checked)}
-                    style={{ accentColor: '#f59e0b', width: 14, height: 14 }} />
-                  <span className="ntm__label" style={{ margin: 0, color: vcDryRun ? '#f59e0b' : undefined }}>
-                    Режим симуляции (dry run)
-                  </span>
-                </label>
-                <div style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--text-dim)', marginTop: 4, paddingLeft: 22 }}>
-                  {vcDryRun ? 'Только лог — файлы не изменяются.' : 'Реальная конвертация файлов.'}
-                </div>
-              </div>
-            </>
+            <VideoConvertPanel vc={vc} patch={patchVc}
+              datesFromCamera={vcFoDatesFromCamera}
+              onDatesEdited={() => setVcFoDatesFromCamera(false)}
+              countLoading={vcFoFileCountLoading} count={vcFoFileCount} />
           )}
 
-          {/* ══════════════════════════════════════════════════════
-              File Organizer params
-          ══════════════════════════════════════════════════════ */}
           {type === 'file_organizer' && (
-            <>
-              <div className="ntm__section ntm__row">
-                <label className="ntm__label">Источник</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {['snapshots', 'videos'].map(s => (
-                    <button key={s}
-                      className={`ntm__toggle-btn${foSourceType === s ? ' ntm__toggle-btn--active' : ''}`}
-                      onClick={() => setFoSourceType(s)}>
-                      <i className={`mdi ${s === 'snapshots' ? 'mdi-camera' : 'mdi-video-outline'}`} />
-                      {s === 'snapshots' ? 'Фото (snapshots)' : 'Видео (videos)'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="ntm__section ntm__params-grid">
-                <div className="ntm__param">
-                  <label className="ntm__label">Паттерн файлов</label>
-                  <input type="text" className="modal-text-input" value={foInputPattern}
-                    onChange={e => setFoInputPattern(e.target.value)}
-                    placeholder="*.jpg" />
-                  <div className="ntm__param-hint">Glob: *.jpg, *.mp4, *.*</div>
-                </div>
-                <div className="ntm__param">
-                  <label className="ntm__label">Папка назначения</label>
-                  <input type="text" className="modal-text-input" value={foOutputFolder}
-                    onChange={e => setFoOutputFolder(e.target.value)}
-                    placeholder="organized" />
-                  <div className="ntm__param-hint">Создаётся внутри директории камеры</div>
-                </div>
-                <div className="ntm__param ntm__param--wide">
-                  <label className="ntm__label">Regex для даты в имени файла</label>
-                  <input type="text" className="modal-text-input" value={foDateRegex}
-                    onChange={e => setFoDateRegex(e.target.value)}
-                    placeholder="(\d{4})(\d{2})(\d{2})" style={{ fontFamily: 'monospace' }} />
-                  <div className="ntm__param-hint">Группы 1–3: год, месяц, день</div>
-                </div>
-              </div>
-
-              <div className="ntm__section ntm__example-row">
-                <i className="mdi mdi-information-outline" style={{ color: 'var(--accent)' }} />
-                <span>
-                  Файлы из корня папки → <code>{foOutputFolder || 'organized'}/ГГГГ/ММ/ДД/</code>
-                  &nbsp;· Уже перемещённые пропускаются
-                </span>
-              </div>
-
-              <div className="ntm__section">
-                <div className="ntm__date-header">
-                  <label className="ntm__label" style={{margin:0}}>Фильтр по дате файла (mtime)</label>
-                  {vcFoDatesFromCamera && (
-                    <span className="ntm__date-hint">
-                      <i className="mdi mdi-check-circle" style={{fontSize:12,marginRight:3}} />
-                      авто-заполнено
-                    </span>
-                  )}
-                </div>
-                <div className="ntm__dates">
-                  <input type="datetime-local" className="modal-text-input ntm__date-input"
-                    value={foDateFrom}
-                    onChange={e => { setFoDateFrom(e.target.value); setVcFoDatesFromCamera(false) }} />
-                  <span className="ntm__date-sep">→</span>
-                  <input type="datetime-local" className="modal-text-input ntm__date-input"
-                    value={foDateTo}
-                    onChange={e => { setFoDateTo(e.target.value); setVcFoDatesFromCamera(false) }} />
-                </div>
-                <div className="ntm__param-hint" style={{ marginTop: 4 }}>
-                  Пусто = обрабатывать все файлы без фильтра по дате
-                </div>
-                {vcFoFileCountLoading ? (
-                  <div style={{ marginTop: 6, color: 'var(--text-dim)', fontSize: 'calc(var(--font-base)*0.85)' }}>
-                    <i className="mdi mdi-loading mdi-spin" style={{ marginRight: 4 }} />Подсчёт файлов…
-                  </div>
-                ) : vcFoFileCount != null ? (
-                  vcFoFileCount > 0 ? (
-                    <div className="ntm__estimate" style={{ marginTop: 6 }}>
-                      <i className="mdi mdi-information-outline" />
-                      <strong>{vcFoFileCount.toLocaleString()}</strong>&nbsp;файл(ов) подходит под фильтр
-                    </div>
-                  ) : (
-                    <div className="ntm__warn" style={{ marginTop: 6 }}>
-                      <i className="mdi mdi-alert-outline" /> Файлов по фильтру не найдено
-                    </div>
-                  )
-                ) : null}
-              </div>
-
-              <div className="ntm__section">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
-                  <input type="checkbox" checked={foDryRun}
-                    onChange={e => setFoDryRun(e.target.checked)}
-                    style={{ accentColor: '#f59e0b', width: 14, height: 14 }} />
-                  <span className="ntm__label" style={{ margin: 0, color: foDryRun ? '#f59e0b' : undefined }}>
-                    Режим симуляции (dry run)
-                  </span>
-                </label>
-                <div style={{ fontSize: 'calc(var(--font-base) * 0.82)', color: 'var(--text-dim)', marginTop: 4, paddingLeft: 22 }}>
-                  {foDryRun ? 'Только лог — файлы не перемещаются.' : 'Реальное перемещение файлов.'}
-                </div>
-              </div>
-            </>
+            <FileOrganizerPanel fo={fo} patch={patchFo}
+              datesFromCamera={vcFoDatesFromCamera}
+              onDatesEdited={() => setVcFoDatesFromCamera(false)}
+              countLoading={vcFoFileCountLoading} count={vcFoFileCount} />
           )}
 
         </div>

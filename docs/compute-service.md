@@ -50,8 +50,9 @@ run it yourself on the other machine.
 
 ```
 browser ──► main backend (:8000) ──────────────► compute-service (:8001)
-              │  1. DB: file_id → file_path        │  remap path prefix
-              │  4. write disk cache               │  read file
+              │  1. DB: file_id → file_path        │  prepend own CAMERA_ROOT
+              │     strip CAMERA_ROOT prefix       │  read file
+              │  4. write disk cache               │
               │  5. DB: save detected objects      │  run YOLO / decode video
               │                                    │  return objects + JPEG/GIF
               ◄────────────────────────────────────┘
@@ -77,21 +78,21 @@ FastAPI app on port `8001` — [`compute-service/app.py`](../compute-service/app
 
 ---
 
-## Path remapping
+## Path handling (`CAMERA_ROOT`)
 
-The compute-service receives the file path **as stored in the main backend's
-DB**. When it runs on another machine, the camera share may be mounted under a
-different root. [`compute-service/config.py`](../compute-service/config.py)
-swaps the leading prefix:
+Both services use a single env var, `CAMERA_ROOT` — the root under which the
+camera share is mounted **on that machine**. The main backend strips its
+`CAMERA_ROOT` prefix before sending a path
+([`backend/compute_client.py`](../backend/compute_client.py)); the
+compute-service prepends its own
+([`compute-service/config.py`](../compute-service/config.py) →
+`to_absolute()`). So only **relative** paths cross the wire, and each side can
+mount the share wherever it likes.
 
-| Env var | Meaning |
+| Machine | Example `CAMERA_ROOT` |
 |---|---|
-| `COMPUTE_PATH_REMAP_FROM` | Prefix as stored in the main backend's DB |
-| `COMPUTE_PATH_REMAP_TO` | Prefix as seen by the compute-service machine |
-
-Only the leading prefix changes; the rest of the path is identical. Default:
-both empty → identity (no remap), which is correct when both run on the same
-machine.
+| k3s pod (Helm `camera.smb.mountPath`) | `/camera` (default) |
+| Windows local dev | `\\192.168.1.91\Camera` |
 
 ---
 
@@ -102,7 +103,7 @@ machine.
 | [`compute-service/app.py`](../compute-service/app.py) | FastAPI app — `/health`, `/detect`, `/video/thumbnail`. Logs elapsed time for every request |
 | [`compute-service/detection.py`](../compute-service/detection.py) | YOLO model loading (lazy, cached) + detection. Logs model load time and per-image inference time |
 | [`compute-service/video.py`](../compute-service/video.py) | Video thumbnail generation (was `backend/video_thumbnails.py`) |
-| [`compute-service/config.py`](../compute-service/config.py) | Path-remap config (env driven) |
+| [`compute-service/config.py`](../compute-service/config.py) | `CAMERA_ROOT` env var + `to_absolute()` |
 | [`compute-service/export_models.py`](../compute-service/export_models.py) | **Build-time only** — downloads yolov8n/s/m `.pt` weights, exports each to OpenVINO IR (`models/<name>_openvino_model/`), removes the `.pt` files. Run by the Dockerfile `RUN` step; never executed at runtime |
 | [`shared/contract.py`](../shared/contract.py) | Pydantic API models — shared by both backends |
 | [`shared/coco_names.py`](../shared/coco_names.py) | `COCO_TO_RUSSIAN` map (23 entries; others fall back to English) |
@@ -151,9 +152,8 @@ frontend). To run the compute-service alone on a separate machine:
 ```powershell
 cd compute-service
 pip install -r requirements.txt
-# optional path remap:
-$env:COMPUTE_PATH_REMAP_FROM = "\\192.168.1.99\Camera"
-$env:COMPUTE_PATH_REMAP_TO   = "/mnt/camera"
+# root under which the camera share is mounted on THIS machine:
+$env:CAMERA_ROOT = "\\192.168.1.91\Camera"
 uvicorn app:app --host 0.0.0.0 --port 8001
 ```
 
@@ -200,40 +200,24 @@ Move-Item yolov8s_openvino_model models\
 Move-Item yolov8m_openvino_model models\
 ```
 
-### Step 3 — Configure path remapping
+### Step 3 — Set `CAMERA_ROOT`
 
-The backend stores file paths **as they are recorded in its database**. What
-that prefix looks like depends on how the backend runs:
-
-| Backend deployment | Path prefix in DB | Example |
-|---|---|---|
-| Local dev (`npm start`) | Windows UNC path | `\\192.168.1.91\Camera\Foscam\snap\file.jpg` |
-| k3s (Helm chart, `mountPath: /camera`) | Linux path inside pod | `/camera/Foscam/snap/file.jpg` |
-
-Set the two env vars to remap the prefix from what the DB stores to what
-this Windows machine can open:
-
-**Local dev backend → Windows compute machine** (same UNC path, no remap needed):
-```powershell
-# leave both empty — no remap
-```
-
-**k3s backend → Windows compute machine** (Linux pod path → Windows UNC):
+The backend sends **relative** paths (e.g. `Foscam/snap/file.jpg`); the
+compute-service prepends its own `CAMERA_ROOT`. Set it to the root under which
+**this Windows machine** can open the camera share — usually the UNC path:
 
 PowerShell:
 ```powershell
-$env:COMPUTE_PATH_REMAP_FROM = "/camera"
-$env:COMPUTE_PATH_REMAP_TO   = "\\192.168.1.91\Camera"
+$env:CAMERA_ROOT = "\\192.168.1.91\Camera"
 ```
 
 Bash (Git Bash / MSYS2 — use single quotes so backslashes are literal):
 ```bash
-export COMPUTE_PATH_REMAP_FROM="/camera"
-export COMPUTE_PATH_REMAP_TO='\\192.168.1.91\Camera'
+export CAMERA_ROOT='\\192.168.1.91\Camera'
 ```
 
-The Windows machine accesses the NAS directly via UNC — no need to mount
-the share as a drive letter. The path after remapping looks like
+The Windows machine accesses the NAS directly via UNC — no need to mount the
+share as a drive letter. The reconstructed path looks like
 `\\192.168.1.91\Camera\Foscam\snap\file.jpg` which Windows opens natively.
 
 ### Step 4 — Open Windows Firewall
@@ -258,20 +242,16 @@ PowerShell:
 ```powershell
 cd C:\path\to\camera-snapshots-cleaner-claude\compute-service
 
-# k3s backend (mountPath: /camera) → Windows UNC:
-$env:COMPUTE_PATH_REMAP_FROM = "/camera"
-$env:COMPUTE_PATH_REMAP_TO   = "\\192.168.1.91\Camera"
+$env:CAMERA_ROOT = "\\192.168.1.91\Camera"
 
 uvicorn app:app --host 0.0.0.0 --port 8001
 ```
 
-Bash (Git Bash / MSYS2):
+Bash (Git Bash / MSYS2 — single quotes so backslashes are literal):
 ```bash
 cd /c/path/to/camera-snapshots-cleaner-claude/compute-service
 
-# k3s backend (mountPath: /camera) → Windows UNC (single quotes — backslashes literal):
-export COMPUTE_PATH_REMAP_FROM="/camera"
-export COMPUTE_PATH_REMAP_TO='\\192.168.1.91\Camera'
+export CAMERA_ROOT='\\192.168.1.91\Camera'
 
 uvicorn app:app --host 0.0.0.0 --port 8001
 ```
@@ -329,15 +309,14 @@ resulting image contains the OpenVINO IR models baked in.
 docker run -d \
   --name camera-compute \
   -p 8001:8001 \
-  -e COMPUTE_PATH_REMAP_FROM="\\\\192.168.1.99\\Camera" \
-  -e COMPUTE_PATH_REMAP_TO="/camera" \
+  -e CAMERA_ROOT="/camera" \
   -v //192.168.1.99/Camera:/camera:ro \
   camera-compute
 ```
 
 > On Windows with Docker Desktop, use `//server/share` (forward-slash) for
-> volume mounts. The env var values still use the Windows path as stored in the
-> backend DB, and the container path for `_TO`.
+> volume mounts. `CAMERA_ROOT` is the path **inside the container** where the
+> share is mounted (`/camera` here — also the default).
 
 Expose port 8001, open the Windows Firewall rule (Step 4 above), and point the
 backend to `http://<windows-ip>:8001` as in Step 6.

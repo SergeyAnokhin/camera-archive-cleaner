@@ -16,7 +16,7 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `convert_video`, `health`). Strips `CAMERA_ROOT` prefix from all paths before sending (so compute can apply its own root). Raises `ComputeDisabled` / `ComputeUnavailable`. Timeouts: detect 120 s, thumbnail 120 s, convert 7200 s |
 | [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` |
 | [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
-| [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks, processes files one by one, writes progress to DB every 5 s. Supports pause/resume by checking task status between files. Task types: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert`, `file_organizer` |
+| [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks and dispatches to `task_executors/` by type (registry `EXECUTORS`). Owns global pause and stuck-task reset; per-type logic lives in the executors (see table below) |
 | [`database.py`](../backend/database.py) | SQLite: table schema + migrations, all SQL queries. Tables: `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks` (has `log_tail TEXT` for video_convert/file_organizer logs), `tuning_sessions`. `append_task_log()` stores last 300 log lines per task |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed (used by `file_organizer` task) |
 | [`config.py`](../backend/config.py) | Parses `cameras.yaml` → `Camera(id, name, path)`. `path` = `CAMERA_ROOT` env var + relative path from yaml. **When changing `Camera` fields, also update:** `routers/catalog.py` (serialises to JSON), `scanner.py` (reads `camera.path`), `compute_client.py` (strips root), `DeleteConfirmModal.jsx` (displays `camera.path`). |
@@ -27,6 +27,19 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`diff_zoom_thumbnails.py`](../backend/diff_zoom_thumbnails.py) | Diff Zoom thumbnails: crop to most active 1/9 tile. Cache in `diff_zoom_thumbnails_cache/` |
 | `cameras.yaml` | **Single source of truth** for camera config. Stores relative paths (e.g. `FoscamHut`); `CAMERA_ROOT` is prepended at runtime. CI auto-injects this file into `deploy/helm/.../values.yaml` `camerasConfig` on every push — **do not edit `camerasConfig` directly**. |
 | `snapshots.db` | SQLite database (auto-created on startup) |
+
+### Task executors (`backend/task_executors/`)
+
+One module per task type; each exposes `async run(task_id, params, resume_from)`. Registered in [`__init__.py`](../backend/task_executors/__init__.py) (`EXECUTORS` dict — add new task types there).
+
+| File | Task type |
+|---|---|
+| [`common.py`](../backend/task_executors/common.py) | Shared loop helpers: `SpeedTracker`, `pause_if_requested()`, `write_progress()`, `mark_completed()`, `append_log()`, `parse_dt()` |
+| [`video_thumbnails.py`](../backend/task_executors/video_thumbnails.py) | `video_thumbnails` — pre-generate video previews; also `pregen_video_thumbs_sync()` reused by openvino |
+| [`openvino.py`](../backend/task_executors/openvino.py) | `openvino` — YOLO detection per photo via compute-service |
+| [`ai.py`](../backend/task_executors/ai.py) | `gemini` / `claude` — per-photo cloud AI analysis with optional delays |
+| [`video_convert.py`](../backend/task_executors/video_convert.py) | `video_convert` — ffmpeg re-encode via compute-service, dry-run support |
+| [`file_organizer.py`](../backend/task_executors/file_organizer.py) | `file_organizer` — move files into YYYY/MM/DD folders, dry-run support |
 
 ### Backend routers (`backend/routers/`)
 
@@ -104,12 +117,28 @@ Imported by both the main backend and the compute-service.
 
 | File | Role |
 |---|---|
-| [`App.jsx`](../frontend/src/App.jsx) | Root component. Owns all state: selected camera, drill-down level (year/month/day/hour), date range, delete mode. Orchestrates level transitions |
-| [`api.js`](../frontend/src/api.js) | All HTTP calls to the backend. The only file that knows API URLs |
+| [`App.jsx`](../frontend/src/App.jsx) | Root component: camera + drill-down navigation state, layout, screen switching. Cell selection / task navigation / range delete live in hooks (`useCellSelection`, `useTaskNavigation`, `useRangeDelete` in `components/`) |
+| [`api.js`](../frontend/src/api.js) | Barrel re-export of `src/api/` domain modules — import from here; **add new endpoints to the matching `api/*.js` module** (see table below) |
 | [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI display utilities: `resolveAiIcons(str)` → `[{emoji,label}]` — builds emoji lookup from `COCO_CLASSES` (both `en` and `ru` keys) |
 | [`cocoClasses.js`](../frontend/src/cocoClasses.js) | The 80 COCO classes (`{id, en, ru, emoji}`) in class-ID order + `DETECTION_CLASSES_DEFAULT`. Source for the Detection-tab class checklist; IDs flow to YOLO's `classes=` param |
 | [`prompts.js`](../frontend/src/prompts.js) | Single source of truth for all AI prompt templates: `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude), `GEMINI_FREEFORM_PROMPT`, `CELL_ANALYSIS_PROMPT(n)` (heatmap batch). `{n}` = image count |
 | [`main.jsx`](../frontend/src/main.jsx) | React entry point. Mounts `<App />` |
+
+### API client (`frontend/src/api/`)
+
+HTTP calls to the backend, split by domain. `api.js` re-exports everything, so components import from `'../api.js'`.
+
+| File | Endpoints |
+|---|---|
+| [`http.js`](../frontend/src/api/http.js) | Shared helpers: `BASE`, `get`/`post`/`del`, `buildQuery`, `sendJson`/`postJson`/`putJson` |
+| [`catalog.js`](../frontend/src/api/catalog.js) | `/cameras`, `/scan` |
+| [`files.js`](../frontend/src/api/files.js) | `/stats`, `/files`, `/previews`, `/distribution`, thumbnail/media URL builders |
+| [`maintenance.js`](../frontend/src/api/maintenance.js) | `/database`, `/*_thumbnails`, `/storage_info` |
+| [`deleteApi.js`](../frontend/src/api/deleteApi.js) | `/delete/*` |
+| [`analysis.js`](../frontend/src/api/analysis.js) | Gemini/Claude/OpenVINO analyze calls, `/ai_analysis*`, COCO class helpers |
+| [`compute.js`](../frontend/src/api/compute.js) | `/compute/*`, `/services/status` |
+| [`tasks.js`](../frontend/src/api/tasks.js) | `/tasks` CRUD, metrics, logs, `estimate_files`, `getTaskMaxErrors()` |
+| [`tuning.js`](../frontend/src/api/tuning.js) | `/tuning/sessions/*` |
 
 ### Components (`frontend/src/components/`)
 
@@ -118,14 +147,20 @@ Imported by both the main backend and the compute-service.
 | [`HourViewer.jsx`](../frontend/src/components/HourViewer.jsx) | Hour viewer orchestrator: owns state and data loading, composes the `hour/` subcomponents. See the Hour viewer parts table below |
 | [`HeatmapGrid.jsx`](../frontend/src/components/HeatmapGrid.jsx) | CSS grid of heatmap cells. Skeleton loading state |
 | [`HeatmapCell.jsx`](../frontend/src/components/HeatmapCell.jsx) | Single heatmap cell: intensity colour, photo/video count badges, thumbnail strip, AI icons, tooltip. At `level='hour'` also fetches `/distribution` and shows a uniformity badge (yellow/red) |
-| [`GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) | Gemini AI analysis modal: scene description, objects, token/cost/time stats |
-| [`ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) | Claude AI analysis modal (same structure as Gemini) |
-| [`OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) | OpenVINO "Run" modal: confidence slider, per-photo object tags with emoji, ms/photo timing |
+| [`GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) | Gemini AI analysis modal: prompt + token/cost stats. Built on `aiModal/BaseAiModal` |
+| [`ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) | Claude AI analysis modal (same structure as Gemini). Built on `aiModal/BaseAiModal` |
+| [`OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) | OpenVINO "Run" modal: confidence slider, per-photo object tags with emoji, ms/photo timing. Built on `aiModal/BaseAiModal` |
+| [`aiModal/BaseAiModal.jsx`](../frontend/src/components/aiModal/BaseAiModal.jsx) | Shared AI-modal shell: backdrop + Escape, header, run row, "В задачи" task submission. New AI provider modals start here |
+| [`aiModal/StructuredAiResult.jsx`](../frontend/src/components/aiModal/StructuredAiResult.jsx) | `AiStatsRow` (tokens/cost/time) + `StructuredResponse` (scene/images/raw) — shared by Gemini and Claude modals |
 | [`DeleteConfirmModal.jsx`](../frontend/src/components/DeleteConfirmModal.jsx) | Delete confirmation modal: file list with relative paths (strips `camera.path` prefix), paired video preview |
 | [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal — thin shell: backdrop, tab bar, renders the active tab. The 6 tabs live in `tools/` (see table below) |
 | [`CellSelBar.jsx`](../frontend/src/components/CellSelBar.jsx) | Heatmap cell-selection toolbar: bulk select, delete (hour level), and AI analysis across selected day/hour cells. Rendered by `App.jsx` in selection mode |
 | [`navUtils.js`](../frontend/src/components/navUtils.js) | Heatmap navigation helpers: `LEVELS`, `GRID_COLS`, `dateRangeForPeriod`, `computeIntensity`, `formatBytes`, nav-state persistence |
 | [`useHeatmapKeyboard.js`](../frontend/src/components/useHeatmapKeyboard.js) | Custom hook — arrow-key navigation + selection/delete shortcuts for the heatmap grid. Inactive while HourViewer is open |
+| [`useCellSelection.js`](../frontend/src/components/useCellSelection.js) | Custom hook — heatmap cell-selection state + actions: bulk hour delete, batch AI analysis, send-to-task. Feeds CellSelBar |
+| [`useTaskNavigation.js`](../frontend/src/components/useTaskNavigation.js) | Custom hook — Tasks screen → heatmap/hour navigation, owns TaskResultsModal state |
+| [`useRangeDelete.js`](../frontend/src/components/useRangeDelete.js) | Custom hook — date-range delete preview → confirm flow, drives DeleteConfirmModal |
+| [`KeyboardHints.jsx`](../frontend/src/components/KeyboardHints.jsx) | Footer strip of keyboard shortcuts under the heatmap |
 | [`Header.jsx`](../frontend/src/components/Header.jsx) | Top bar: total GB / photo count / video count |
 | [`CameraSelector.jsx`](../frontend/src/components/CameraSelector.jsx) | Horizontal pill buttons for camera selection |
 | [`DrilldownBreadcrumb.jsx`](../frontend/src/components/DrilldownBreadcrumb.jsx) | Navigation breadcrumb: All Years / 2024 / Nov / 16 |
@@ -133,9 +168,9 @@ Imported by both the main backend and the compute-service.
 | [`ScanButton.jsx`](../frontend/src/components/ScanButton.jsx) | Scan button, spinner, data refresh on completion |
 | [`ToolsButton.jsx`](../frontend/src/components/ToolsButton.jsx) | Button that opens ToolsModal |
 | [`TasksScreen.jsx`](../frontend/src/components/TasksScreen.jsx) | Tasks screen — polls `/tasks` every 3 s, shows system metrics bar + task card list, hosts NewTaskModal |
-| [`TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx) | Model tuning screen (whole feature in one file): session sidebar + 3-step panel (upload, ground truth, golden-section benchmark, results charts). See [`docs/tuning.md`](tuning.md) |
+| [`TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx) | Model tuning orchestrator: session sidebar + step switching. Steps live in `tuning/` (table below). See [`docs/tuning.md`](tuning.md) |
 | [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card: type icon, status badge, progress bar, speed/ETA, thumbnail, pause/resume/cancel buttons. Logs button (console icon) for `video_convert`/`file_organizer` types; dry-run amber tag |
-| [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a task. Six types: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert` (input\_pattern, output\_suffix, output\_ext, codec, CRF, preset, date filter), `file_organizer` (source\_type, input\_pattern, output\_folder, date\_regex). Both new types have a dry-run toggle |
+| [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a task: type selector, camera/dates, AI scheduling, estimates, param assembly (`handleAdd`). Six types: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert`, `file_organizer`. VC/FO param panels live in `newTask/` (table below) |
 | [`TaskLogsModal.jsx`](../frontend/src/components/TaskLogsModal.jsx) | Log viewer modal for `video_convert` and `file_organizer` tasks. Polls `GET /tasks/{id}/logs` every 2 s while task is active; colour-codes DRY/ERROR/Skip lines. Header has a fullscreen toggle (⛶/⊡) that expands the modal to 98 vw × 96 vh |
 
 ### Tools modal tabs (`frontend/src/components/tools/`)
@@ -154,6 +189,26 @@ Imported by both the main backend and the compute-service.
 | [`ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx) | Claude API key, model |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
 | [`MaintenanceTab.jsx`](../frontend/src/components/tools/MaintenanceTab.jsx) | Clear database, clear all thumbnails, storage info. Date-range picker (auto-filled from camera's range) — all cleanup operations filter to the selected range |
+
+### New Task modal parts (`frontend/src/components/newTask/`)
+
+| File | Role |
+|---|---|
+| [`newTaskHelpers.js`](../frontend/src/components/newTask/newTaskHelpers.js) | Date input helpers, `isAiType`/`isDbType`, `readGlobalSettings()`, `TASK_TYPES` (type-selector cards), VC codec/preset lists |
+| [`VideoConvertPanel.jsx`](../frontend/src/components/newTask/VideoConvertPanel.jsx) | `video_convert` params: pattern, suffix, codec, CRF, preset |
+| [`FileOrganizerPanel.jsx`](../frontend/src/components/newTask/FileOrganizerPanel.jsx) | `file_organizer` params: source, pattern, output folder, date regex |
+| [`MtimeFilterSection.jsx`](../frontend/src/components/newTask/MtimeFilterSection.jsx) | Shared mtime date filter + live file-count estimate |
+| [`DryRunSection.jsx`](../frontend/src/components/newTask/DryRunSection.jsx) | Shared dry-run toggle |
+
+### Tuning screen parts (`frontend/src/components/tuning/`)
+
+| File | Role |
+|---|---|
+| [`tuningShared.jsx`](../frontend/src/components/tuning/tuningShared.jsx) | Model/status constants, inline styles `S`, tiny components (`Err`, `Tag`, `ProgressBar`) |
+| [`NewSessionForm.jsx`](../frontend/src/components/tuning/NewSessionForm.jsx) | Upload images + create session |
+| [`GroundTruthStep.jsx`](../frontend/src/components/tuning/GroundTruthStep.jsx) | Step 1: autolabel + manual object tags per image |
+| [`BenchmarkStep.jsx`](../frontend/src/components/tuning/BenchmarkStep.jsx) | Step 2: golden-section search config + progress |
+| [`ResultsStep.jsx`](../frontend/src/components/tuning/ResultsStep.jsx) | Step 3: recommendation, F1/speed charts, per-model table, search trace |
 
 ### Hour viewer parts (`frontend/src/components/hour/`)
 
@@ -180,17 +235,13 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 |---|---|
 | [`normalMode.js`](../frontend/src/components/viewModes/normalMode.js) | Normal (basic thumbnail) |
 | [`motionDiffMode.js`](../frontend/src/components/viewModes/motionDiffMode.js) | Motion Diff (per-pixel delta from page mean) |
-| [`diffZoomMode.js`](../frontend/src/components/viewModes/diffZoomMode.js) | Diff Zoom (crop to motion area) |
 | [`erosionMode.js`](../frontend/src/components/viewModes/erosionMode.js) | Erosion (morphological erosion) |
-| [`neonMaskMode.js`](../frontend/src/components/viewModes/neonMaskMode.js) | Neon Mask (MOG2 mask in colour) |
-| [`mhiMode.js`](../frontend/src/components/viewModes/mhiMode.js) | MHI — Motion History Image |
-| [`boundingBoxesMode.js`](../frontend/src/components/viewModes/boundingBoxesMode.js) | Bounding Boxes (motion-based rectangles, not YOLO) |
 | [`openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) | OpenVINO Detection — `isAiMode`, calls `/openvino_thumbnail` with model+confidence+classes params |
-| [`openvinoBboxMode.js`](../frontend/src/components/viewModes/openvinoBboxMode.js) | OpenVINO Boxes — same URL as openvinoMode but without `isAiMode`, reads confidence from `openvino_confidence` key |
-| [`motionStackingMode.js`](../frontend/src/components/viewModes/motionStackingMode.js) | Motion Stacking (accumulated motion heatmap) |
 | [`geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) | Gemini AI (icon overlay from analysis results) |
 | [`claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) | Claude AI (icon overlay from analysis results) |
 | [`index.js`](../frontend/src/components/viewModes/index.js) | Mode registry — `VIEW_MODES`; `getEnabledViewModes()` hides `needsCompute` modes (OpenVINO) when the compute-service is off |
+
+> The backend also serves thumbnail styles with **no frontend mode**: `/diff_zoom_thumbnail` and `/motion_thumbnail` (neon_mask, mhi, bounding_boxes, motion_stacking). Backend-only — adding a UI mode for them means creating a `viewModes/*.js` file and registering it in `index.js`.
 
 ### Styles
 
