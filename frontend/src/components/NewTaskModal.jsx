@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getStatsTotal, getCameraDateRange, getFileEstimate } from '../api.js'
+import { getStatsTotal, getCameraDateRange, getFileEstimate, getClassesList } from '../api.js'
 import {
   toLocalInput, nowLocalInput, monthStartInput, isAiType, isDbType,
   readGlobalSettings, VIDEO_MODE_LABELS, TASK_TYPES,
@@ -152,6 +152,7 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
       } else if (type === 'openvino') {
         params.model_name = settings.ovModel
         params.confidence = settings.ovConf / 100
+        params.classes    = getClassesList()
       } else if (type === 'gemini') {
         params.model   = settings.geminiModel
         params.api_key = geminiApiKey
