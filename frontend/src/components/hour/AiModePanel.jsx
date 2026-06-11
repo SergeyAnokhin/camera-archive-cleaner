@@ -58,7 +58,7 @@ export default function AiModePanel({ provider, description, files, selectedIds,
 
   return (
     <div className="hv-mode-settings hv-ai-panel">
-      {/* Row 1: label · model name (read-only) · run button */}
+      {/* Label · model name (read-only) */}
       <span className="hv-mode-settings-label" title={description}>
         <i className={`mdi ${cfg.icon}`} /> {cfg.label}
       </span>
@@ -66,6 +66,41 @@ export default function AiModePanel({ provider, description, files, selectedIds,
         <i className="mdi mdi-cog-outline" style={{ marginRight: 4, opacity: 0.6 }} />
         {model}
       </span>
+
+      {/* Confidence display (openvino) */}
+      {provider === 'openvino' && (
+        <span className="hv-ai-confidence-inline">
+          <i className="mdi mdi-tune-variant" />
+          <span className="hv-ai-confidence-pct">{confidence}%</span>
+        </span>
+      )}
+
+      {/* Stats/analyzed/emojis */}
+      {hasStats && (
+        <span className="hv-ai-info-group">
+          {analyzedCount > 0 && (
+            <span className="hv-ai-panel-info">
+              <i className="mdi mdi-check-circle-outline" style={{color:'#86efac'}} />
+              {analyzedCount}/{photoFiles.length}
+            </span>
+          )}
+          {(stats.lastMinute > 0 || stats.last24h > 0) && (
+            <span className="hv-ai-stats">
+              <i className="mdi mdi-chart-timeline-variant" />
+              {stats.lastMinute > 0 && <span>{stats.lastMinute}/min</span>}
+              <span>{stats.last24h}/24h</span>
+            </span>
+          )}
+          {pageIcons.length > 0 && pageIcons.map((ic, i) => (
+            <span key={i} className="hv-ai-page-emoji" title={ic.label}>{ic.emoji}</span>
+          ))}
+        </span>
+      )}
+
+      {/* Spacer to push run button to the far right */}
+      <div className="hv-ai-spacer" />
+
+      {/* Run button */}
       <button className="hv-ai-run-btn" onClick={onRun}>
         <i className="mdi mdi-play" />
         {selectedIds.size > 0
@@ -73,38 +108,6 @@ export default function AiModePanel({ provider, description, files, selectedIds,
           : `Analyze page (${photoFiles.length})`
         }
       </button>
-
-      {/* Row 2: confidence display (openvino) + stats/analyzed/emojis */}
-      {(provider === 'openvino' || hasStats) && (
-        <div className="hv-ai-row2">
-          {provider === 'openvino' && (
-            <span className="hv-ai-confidence-inline">
-              <i className="mdi mdi-tune-variant" />
-              <span className="hv-ai-confidence-pct">{confidence}%</span>
-            </span>
-          )}
-          {hasStats && (
-            <span className="hv-ai-info-group">
-              {analyzedCount > 0 && (
-                <span className="hv-ai-panel-info">
-                  <i className="mdi mdi-check-circle-outline" style={{color:'#86efac'}} />
-                  {analyzedCount}/{photoFiles.length}
-                </span>
-              )}
-              {(stats.lastMinute > 0 || stats.last24h > 0) && (
-                <span className="hv-ai-stats">
-                  <i className="mdi mdi-chart-timeline-variant" />
-                  {stats.lastMinute > 0 && <span>{stats.lastMinute}/min</span>}
-                  <span>{stats.last24h}/24h</span>
-                </span>
-              )}
-              {pageIcons.length > 0 && pageIcons.map((ic, i) => (
-                <span key={i} className="hv-ai-page-emoji" title={ic.label}>{ic.emoji}</span>
-              ))}
-            </span>
-          )}
-        </div>
-      )}
 
       {sceneEntry?.scene_description && (
         <div className="hv-ai-scene" title={sceneEntry.scene_description}>

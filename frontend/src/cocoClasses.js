@@ -3,7 +3,7 @@
 // only looks for the selected objects). `ru` is the Russian label shown in the
 // UI. `emoji` is the authoritative emoji for each class — used by aiHelpers.js.
 export const COCO_CLASSES = [
-  { id: 0,  en: 'person',         ru: 'человек',              emoji: '👤' },
+  { id: 0,  en: 'person',         ru: 'человек',              emoji: '🚶' },
   { id: 1,  en: 'bicycle',        ru: 'велосипед',            emoji: '🚲' },
   { id: 2,  en: 'car',            ru: 'машина',               emoji: '🚗' },
   { id: 3,  en: 'motorcycle',     ru: 'мотоцикл',             emoji: '🏍️' },

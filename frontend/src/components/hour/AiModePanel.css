@@ -1,28 +1,30 @@
-/* AiModePanel — compact 2-row AI controls. Extends .hv-mode-settings (HourViewer.css).
-   Row 1: [label] [model-select flex:1] [run-btn]
-   Row 2: [threshold slider (openvino)] [stats / emojis] */
+/* AiModePanel — compact single-row AI controls. Extends .hv-mode-settings (HourViewer.css). */
 
 .hv-ai-panel {
   flex-wrap: wrap;
   row-gap: 5px;
-  column-gap: 6px;
+  column-gap: 12px; /* Slightly larger gap between elements on the same row */
 }
 
-/* label stays on row 1, doesn't grow */
+/* label stays inline, doesn't grow */
 .hv-ai-panel > .hv-mode-settings-label { flex-shrink: 0; }
 
 /* model label (read-only, replaces the old model select) */
 .hv-ai-model-label {
   font-size: calc(var(--font-base) * 0.82);
   color: var(--text-muted);
-  flex: 1 1 80px;
-  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: flex;
   align-items: center;
   cursor: default;
+  flex-shrink: 0;
+}
+
+/* spacer to push run button to the right */
+.hv-ai-spacer {
+  flex: 1;
 }
 
 /* run button stays compact, does not grow */
@@ -44,40 +46,23 @@
 }
 .hv-ai-run-btn:hover { background: rgba(14, 165, 233, 0.25); border-color: var(--accent); }
 
-/* Row 2 wrapper — full width, flex, threshold left + info right */
-.hv-ai-row2 {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-/* Threshold inline (OpenVINO): icon · pct · slider */
+/* Threshold inline (OpenVINO): icon · pct */
 .hv-ai-confidence-inline {
   display: flex;
   align-items: center;
   gap: 5px;
-  flex: 1 1 120px;
-  min-width: 0;
   color: var(--text-dim);
   font-size: calc(var(--font-base) * 0.8);
+  flex-shrink: 0;
 }
 .hv-ai-confidence-inline .mdi { color: var(--accent); flex-shrink: 0; }
 .hv-ai-confidence-pct { flex-shrink: 0; white-space: nowrap; }
-.hv-ai-confidence-slider {
-  flex: 1;
-  min-width: 40px;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
 
 /* Info group: analyzed + stats + emojis inline */
 .hv-ai-info-group {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 8px;
   flex-shrink: 0;
 }
 
