@@ -2,50 +2,59 @@
 # camera-cleaner/optional: "true" are always reported as Healthy,
 # regardless of how many replicas are running.
 #
+# Uses the resource.customizations (pre-2.2) format because kubectl merge-patch
+# rejects keys containing '/' (newer key format resource.customizations.health.apps/Deployment
+# triggers a validation error).  Both formats are supported in all ArgoCD 2.x versions.
+#
 # Apply once to the cluster:
 #   kubectl patch configmap argocd-cm -n argocd \
 #     --type=merge --patch-file deploy/argocd/argocd-cm-patch.yaml
-#
-# After applying, restart the ArgoCD application controller to pick it up:
 #   kubectl rollout restart deployment argocd-application-controller -n argocd
+#
+# WARNING: --type=merge replaces the whole resource.customizations string if it
+# already exists.  If you have other customisations there, merge them manually
+# before applying, or use `kubectl edit configmap argocd-cm -n argocd` instead.
 data:
-  resource.customizations.health.apps/Deployment: |
-    hs = {}
-    -- Deployments labelled camera-cleaner/optional: "true" are non-critical.
-    -- Return Healthy immediately so the app never shows as Degraded when the
-    -- compute node is unavailable or the pod is simply not yet scheduled.
-    if obj.metadata.labels ~= nil and obj.metadata.labels["camera-cleaner/optional"] == "true" then
-      hs.status = "Healthy"
-      hs.message = "optional service (compute node may be offline)"
-      return hs
-    end
-    -- Standard Deployment health logic (mirrors ArgoCD built-in behaviour).
-    if obj.spec.replicas ~= nil and obj.spec.replicas == 0 then
-      hs.status = "Healthy"
-      hs.message = "scaled to zero"
-      return hs
-    end
-    if obj.status == nil then
-      hs.status = "Progressing"
-      hs.message = "waiting for status"
-      return hs
-    end
-    if obj.status.conditions ~= nil then
-      for _, c in ipairs(obj.status.conditions) do
-        if c.type == "Progressing" and c.reason == "ProgressDeadlineExceeded" then
-          hs.status = "Degraded"
-          hs.message = c.message
+  resource.customizations: |
+    apps/Deployment:
+      health.lua: |
+        hs = {}
+        -- Optional deployments: matched by name or by label camera-cleaner/optional: "true".
+        -- Name-based check handles the case where the label hasn't been deployed yet.
+        local is_optional = obj.metadata.name == "camera-cleaner-compute"
+          or (obj.metadata.labels ~= nil and obj.metadata.labels["camera-cleaner/optional"] == "true")
+        if is_optional then
+          hs.status = "Healthy"
+          hs.message = "optional service (compute node may be offline)"
           return hs
         end
-      end
-    end
-    if obj.status.updatedReplicas ~= nil
-      and obj.spec.replicas ~= nil
-      and obj.status.updatedReplicas == obj.spec.replicas
-      and obj.status.readyReplicas == obj.spec.replicas then
-      hs.status = "Healthy"
-      return hs
-    end
-    hs.status = "Progressing"
-    hs.message = "waiting for rollout"
-    return hs
+        -- Standard Deployment health logic (mirrors ArgoCD built-in behaviour).
+        if obj.spec.replicas ~= nil and obj.spec.replicas == 0 then
+          hs.status = "Healthy"
+          hs.message = "scaled to zero"
+          return hs
+        end
+        if obj.status == nil then
+          hs.status = "Progressing"
+          hs.message = "waiting for status"
+          return hs
+        end
+        if obj.status.conditions ~= nil then
+          for _, c in ipairs(obj.status.conditions) do
+            if c.type == "Progressing" and c.reason == "ProgressDeadlineExceeded" then
+              hs.status = "Degraded"
+              hs.message = c.message
+              return hs
+            end
+          end
+        end
+        if obj.status.updatedReplicas ~= nil
+          and obj.spec.replicas ~= nil
+          and obj.status.updatedReplicas == obj.spec.replicas
+          and obj.status.readyReplicas == obj.spec.replicas then
+          hs.status = "Healthy"
+          return hs
+        end
+        hs.status = "Progressing"
+        hs.message = "waiting for rollout"
+        return hs
