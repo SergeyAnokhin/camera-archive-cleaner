@@ -358,6 +358,13 @@
   border: 1px solid rgba(252, 165, 165, 0.25);
 }
 
+/* ── Collapsible uniformity section ── */
+.u-advanced-details { width: 100%; }
+.u-advanced-details > summary { list-style: none; }
+.u-advanced-details > summary::-webkit-details-marker { display: none; }
+.u-chevron { transition: transform 0.15s; font-size: calc(var(--font-base) * 0.9); }
+.u-advanced-details[open] .u-chevron { transform: rotate(90deg); }
+
 /* ── Uniformity thresholds compact grid ── */
 .u-grid {
   display: grid;

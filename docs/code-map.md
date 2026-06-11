@@ -96,7 +96,7 @@ Optional stateless service for heavy compute. Full architecture: [`compute-servi
 | File | Role |
 |---|---|
 | [`app.py`](../compute-service/app.py) | FastAPI app on :8001 — `/health`, `/detect`, `/video/thumbnail`, `/video/convert`. Also `/logging/config` (GET/PUT), `/logging/tail` — same live log-level API as the backend. `_RingBufferHandler` + `_SilentFilter` (drops `/health`/`/metrics`/`/logging` from access log) |
-| [`detection.py`](../compute-service/detection.py) | YOLO model loading (lazy) + object detection. Prefers `models/<name>_openvino_model/` over `.pt` |
+| [`detection.py`](../compute-service/detection.py) | YOLO model loading (lazy) + object detection. Returns canonical English COCO class names. Prefers `models/<name>_openvino_model/` over `.pt` |
 | [`video.py`](../compute-service/video.py) | Video thumbnail generation (first/last frame, 2×2 grid, max-change GIF) + `convert_video()` — runs ffmpeg (H.265/H.264, up to 2 h timeout) |
 | [`config.py`](../compute-service/config.py) | `CAMERA_ROOT` env var (default `/camera`); `to_absolute(relative_path)` converts relative paths received from the backend to absolute. Set `CAMERA_ROOT=\\192.168.1.91\Camera` for local Windows dev. |
 | [`export_models.py`](../compute-service/export_models.py) | **Build-time only** — exports yolov8n/s/m to OpenVINO IR; called by `Dockerfile RUN`, never at runtime |
@@ -108,7 +108,6 @@ Imported by both the main backend and the compute-service.
 | File | Role |
 |---|---|
 | [`contract.py`](../shared/contract.py) | Pydantic API models: `DetectRequest/Response`, `VideoThumbnailRequest`, `VideoConvertRequest/Response` (src_path, dst_path, codec, crf, preset); `VIDEO_THUMB_MODES` |
-| [`coco_names.py`](../shared/coco_names.py) | `COCO_TO_RUSSIAN` map (23 entries used by compute-service to translate YOLO outputs) |
 
 ---
 
@@ -120,7 +119,7 @@ Imported by both the main backend and the compute-service.
 |---|---|
 | [`App.jsx`](../frontend/src/App.jsx) | Root component: camera + drill-down navigation state, layout, screen switching. Cell selection / task navigation / range delete live in hooks (`useCellSelection`, `useTaskNavigation`, `useRangeDelete` in `components/`) |
 | [`api.js`](../frontend/src/api.js) | Barrel re-export of `src/api/` domain modules — import from here; **add new endpoints to the matching `api/*.js` module** (see table below) |
-| [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI display utilities: `resolveAiIcons(str)` → `[{emoji,label}]` — builds emoji lookup from `COCO_CLASSES` (both `en` and `ru` keys) |
+| [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI display utilities: `resolveAiIcons(str)` → `[{emoji,label}]` — builds lookup from `COCO_CLASSES` (both `en`/`ru` keys), always returns Russian display labels |
 | [`cocoClasses.js`](../frontend/src/cocoClasses.js) | The 80 COCO classes (`{id, en, ru, emoji}`) in class-ID order + `DETECTION_CLASSES_DEFAULT`. Source for the Detection-tab class checklist; IDs flow to YOLO's `classes=` param |
 | [`prompts.js`](../frontend/src/prompts.js) | Single source of truth for all AI prompt templates: `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude), `GEMINI_FREEFORM_PROMPT`, `CELL_ANALYSIS_PROMPT(n)` (heatmap batch). `{n}` = image count |
 | [`main.jsx`](../frontend/src/main.jsx) | React entry point. Mounts `<App />` |
@@ -154,7 +153,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`aiModal/BaseAiModal.jsx`](../frontend/src/components/aiModal/BaseAiModal.jsx) | Shared AI-modal shell: backdrop + Escape, header, run row, "To tasks" submission, no-key deep-link button. New AI provider modals start here |
 | [`aiModal/StructuredAiResult.jsx`](../frontend/src/components/aiModal/StructuredAiResult.jsx) | `AiStatsRow` (tokens/cost/time) + `StructuredResponse` (scene/images/raw) — shared by Gemini and Claude modals |
 | [`DeleteConfirmModal.jsx`](../frontend/src/components/DeleteConfirmModal.jsx) | Delete confirmation modal: file list with relative paths (strips `camera.path` prefix), paired video preview |
-| [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal — thin shell: backdrop, tab bar, renders the active tab. The 8 tabs live in `tools/` (see table below) |
+| [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal — thin shell: backdrop, tab bar, renders the active tab. 5 tabs: General, View, AI, Compute, Service. `TAB_ALIASES` maps old tab IDs for deep-link compatibility |
 | [`CellSelBar.jsx`](../frontend/src/components/CellSelBar.jsx) | Heatmap cell-selection toolbar: bulk select, delete (hour level), and AI analysis across selected day/hour cells. Rendered by `App.jsx` in selection mode |
 | [`navUtils.js`](../frontend/src/components/navUtils.js) | Heatmap navigation helpers: `LEVELS`, `GRID_COLS`, `dateRangeForPeriod`, `computeIntensity`, `formatBytes`, nav-state persistence |
 | [`useHeatmapKeyboard.js`](../frontend/src/components/useHeatmapKeyboard.js) | Custom hook — arrow-key navigation + selection/delete shortcuts for the heatmap grid. Inactive while HourViewer is open |
@@ -185,13 +184,10 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`settingsIO.js`](../frontend/src/components/tools/settingsIO.js) | `exportSettingsYaml()`, `applyImportedSettings()`, `initFontSize()`/`applyFontSize()` |
 | [`SliderSetting.jsx`](../frontend/src/components/tools/SliderSetting.jsx) | Reusable labelled range-slider row used across tabs |
 | [`GeneralTab.jsx`](../frontend/src/components/tools/GeneralTab.jsx) | Font size (2-col layout), YAML export/import |
-| [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | View tab: previews per cell, thumb width, hover zoom, diff threshold, page size, burst gap, video preview, uniformity (2-col layout for sliders) |
-| [`DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx) | YOLO model selector (`openvino_model`), OpenVINO confidence slider, detected-classes checklist (80 COCO objects → `detection_classes`) |
-| [`AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) | Combined AI tab: Google Gemini (API key, model, prompt) + Claude Anthropic (API key, model) with provider section headers |
-| [`TasksTab.jsx`](../frontend/src/components/tools/TasksTab.jsx) | Task settings: ETA window, log tail lines |
+| [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | View tab: previews per cell, thumb width, hover zoom, diff threshold, page size, burst gap, video preview, uniformity (collapsible, with Low/Medium/High presets) |
+| [`AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) | Combined AI tab: 3 sections — Detection (YOLO model, confidence, classes checklist), Google Gemini (API key, model, prompt), Claude Anthropic (API key, model) |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
-| [`LoggingTab.jsx`](../frontend/src/components/tools/LoggingTab.jsx) | Dynamic log-level control for backend and compute (TRACE/DEBUG/INFO/WARNING/ERROR). Buffer size sliders, live log viewer with auto-refresh. Calls `/logging/*` and `/logging/compute/*` |
-| [`MaintenanceTab.jsx`](../frontend/src/components/tools/MaintenanceTab.jsx) | Clear database, clear all thumbnails, storage info. Date-range picker (auto-filled from camera's range) — all cleanup operations filter to the selected range |
+| [`ServiceTab.jsx`](../frontend/src/components/tools/ServiceTab.jsx) | Combined service tab: Tasks settings (ETA window, log tail lines), Logging (log level, buffer, live viewer), Maintenance (DB/thumbnail cleanup) |
 
 ### New Task modal parts (`frontend/src/components/newTask/`)
 
@@ -242,7 +238,7 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 | [`openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) | Object detection (local) — `isAiMode`, calls `/openvino_thumbnail` with model+confidence+classes params |
 | [`geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) | AI description (Gemini) — icon overlay from analysis results |
 | [`claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) | AI description (Claude) — icon overlay from analysis results |
-| [`index.js`](../frontend/src/components/viewModes/index.js) | Mode registry — `VIEW_MODES`; `getEnabledViewModes()` hides `needsCompute` modes (OpenVINO) when the compute-service is off |
+| [`index.js`](../frontend/src/components/viewModes/index.js) | Mode registry — `VIEW_MODES`; `getEnabledViewModes()` filters `needsCompute` modes for keyboard cycling; `getViewModesWithStatus()` returns all modes with `disabled`/`disabledHint` for the dropdown |
 
 > The backend also serves thumbnail styles with **no frontend mode**: `/diff_zoom_thumbnail` and `/motion_thumbnail` (neon_mask, mhi, bounding_boxes, motion_stacking). Backend-only — adding a UI mode for them means creating a `viewModes/*.js` file and registering it in `index.js`.
 

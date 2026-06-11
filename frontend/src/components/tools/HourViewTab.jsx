@@ -107,6 +107,27 @@ export default function HourViewTab() {
     document.dispatchEvent(new CustomEvent('uniformity-method-change'))
   }
 
+  const U_PRESETS = {
+    low:    { af: [55, 80], se: [70, 90], bc: [55, 80], combined: [65, 85] },
+    medium: { af: [40, 65], se: [55, 80], bc: [40, 65], combined: [50, 72] },
+    high:   { af: [25, 45], se: [35, 55], bc: [25, 45], combined: [30, 50] },
+  }
+
+  function applyUniformityPreset(preset) {
+    const values = U_PRESETS[preset]
+    const next = {}
+    for (const { key } of U_METRICS) {
+      const [w, a] = values[key]
+      next[key] = { warn: w, alert: a }
+      localStorage.setItem(`uniformity_${key}_warn`, w)
+      localStorage.setItem(`uniformity_${key}_alert`, a)
+    }
+    setUniformityThresholds(next)
+    setUniformityMethod('combined')
+    localStorage.setItem(UNIFORMITY_METHOD_KEY, 'combined')
+    document.dispatchEvent(new CustomEvent('uniformity-method-change'))
+  }
+
   return (
     <div className="modal-2col">
       {/* Row 1 */}
@@ -182,41 +203,58 @@ export default function HourViewTab() {
       </div>
 
       <div className="modal-section col-span-2">
-        <div className="modal-section-title">Recording uniformity</div>
-        <div className="u-grid">
-          <div className="u-grid-head">
-            <span />
-            <span><i className="mdi mdi-alert-outline" style={{color:'#fbbf24'}} /> yellow</span>
-            <span><i className="mdi mdi-alert-circle-outline" style={{color:'#f87171'}} /> red</span>
+        <details className="u-advanced-details">
+          <summary className="modal-section-title" style={{ cursor: 'pointer', userSelect: 'none' }}>
+            <i className="mdi mdi-chevron-right u-chevron" /> Advanced: recording uniformity thresholds
+          </summary>
+
+          <div style={{ display: 'flex', gap: 6, margin: '10px 0 8px' }}>
+            <button className="modal-btn neutral" onClick={() => applyUniformityPreset('low')}>
+              Low sensitivity
+            </button>
+            <button className="modal-btn neutral" onClick={() => applyUniformityPreset('medium')}>
+              Medium
+            </button>
+            <button className="modal-btn neutral" onClick={() => applyUniformityPreset('high')}>
+              High sensitivity
+            </button>
           </div>
-          {U_METRICS.map(({ key, label, desc }) => (
-            <div key={key} className="u-grid-row" title={desc}>
-              <span className="u-metric-label">{label}</span>
-              <div className="u-slider-cell">
-                <input type="range" min={5} max={95} step={5} className="u-slider"
-                  value={uniformityThresholds[key].warn}
-                  onChange={e => handleUniformityThreshold(key, 'warn', Number(e.target.value))} />
-                <span className="u-val">{uniformityThresholds[key].warn}</span>
-              </div>
-              <div className="u-slider-cell">
-                <input type="range" min={5} max={95} step={5} className="u-slider"
-                  value={uniformityThresholds[key].alert}
-                  onChange={e => handleUniformityThreshold(key, 'alert', Number(e.target.value))} />
-                <span className="u-val">{uniformityThresholds[key].alert}</span>
-              </div>
+
+          <div className="u-grid">
+            <div className="u-grid-head">
+              <span />
+              <span><i className="mdi mdi-alert-outline" style={{color:'#fbbf24'}} /> yellow</span>
+              <span><i className="mdi mdi-alert-circle-outline" style={{color:'#f87171'}} /> red</span>
             </div>
-          ))}
-        </div>
-        <div className="u-method-row">
-          <span className="u-method-label">Method for day cells:</span>
-          <select className="u-method-select" value={uniformityMethod} onChange={handleUniformityMethodChange}>
-            <option value="combined">∑ Combined</option>
-            <option value="active">AF — active minutes</option>
-            <option value="entropy">SE — entropy</option>
-            <option value="bc">BC — 5-min blocks</option>
-          </select>
-        </div>
-        <div className="modal-setting-hint">0 = single event · 100 = recording all hour. Yellow — possibly wind, red — rain / constant false triggers.</div>
+            {U_METRICS.map(({ key, label, desc }) => (
+              <div key={key} className="u-grid-row" title={desc}>
+                <span className="u-metric-label">{label}</span>
+                <div className="u-slider-cell">
+                  <input type="range" min={5} max={95} step={5} className="u-slider"
+                    value={uniformityThresholds[key].warn}
+                    onChange={e => handleUniformityThreshold(key, 'warn', Number(e.target.value))} />
+                  <span className="u-val">{uniformityThresholds[key].warn}</span>
+                </div>
+                <div className="u-slider-cell">
+                  <input type="range" min={5} max={95} step={5} className="u-slider"
+                    value={uniformityThresholds[key].alert}
+                    onChange={e => handleUniformityThreshold(key, 'alert', Number(e.target.value))} />
+                  <span className="u-val">{uniformityThresholds[key].alert}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="u-method-row">
+            <span className="u-method-label">Method for day cells:</span>
+            <select className="u-method-select" value={uniformityMethod} onChange={handleUniformityMethodChange}>
+              <option value="combined">∑ Combined</option>
+              <option value="active">AF — active minutes</option>
+              <option value="entropy">SE — entropy</option>
+              <option value="bc">BC — 5-min blocks</option>
+            </select>
+          </div>
+          <div className="modal-setting-hint">0 = single event · 100 = recording all hour. Yellow — possibly wind, red — rain / constant false triggers.</div>
+        </details>
       </div>
     </div>
   )

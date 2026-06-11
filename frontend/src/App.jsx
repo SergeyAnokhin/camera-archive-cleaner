@@ -231,14 +231,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--gap-sm)' }}>
           <CameraSelector cameras={cameras} selectedId={cameraId} onSelect={id => { setCameraId(id); setDrillStack([]); setSelectedHour(null) }} />
           <div style={{ display: 'flex', gap: 'var(--gap-sm)' }}>
-            <button
-              className="modal-btn neutral"
-              style={{ fontSize: 'calc(var(--font-base) * 0.88)', borderColor: showTuning ? 'var(--accent)' : undefined, color: showTuning ? 'var(--accent)' : undefined }}
-              onClick={() => { setShowTuning(v => !v); setShowTasks(false) }}
-            >
-              <i className="mdi mdi-tune-variant" />
-              Tuning
-            </button>
+
             <button
               className="modal-btn neutral"
               style={{ fontSize: 'calc(var(--font-base) * 0.88)', borderColor: showTasks ? 'var(--accent)' : undefined, color: showTasks ? 'var(--accent)' : undefined }}
@@ -317,7 +310,7 @@ export default function App() {
         {showTuning ? (
           <TuningScreen />
         ) : showTasks ? (
-          <TasksScreen cameras={cameras} onNavigate={taskNav.handleNavigateFromTask} />
+          <TasksScreen cameras={cameras} onNavigate={taskNav.handleNavigateFromTask} onShowTuning={() => { setShowTuning(true); setShowTasks(false) }} />
         ) : selectedHour ? (
           <HourViewer
             cameraId={cameraId}

@@ -2,28 +2,28 @@ import { useState, useEffect } from 'react'
 import './ToolsModal.css'
 import GeneralTab from './tools/GeneralTab.jsx'
 import HourViewTab from './tools/HourViewTab.jsx'
-import DetectionTab from './tools/DetectionTab.jsx'
 import AiTab from './tools/AiTab.jsx'
-import TasksTab from './tools/TasksTab.jsx'
 import ComputeTab from './tools/ComputeTab.jsx'
-import MaintenanceTab from './tools/MaintenanceTab.jsx'
-import LoggingTab from './tools/LoggingTab.jsx'
+import ServiceTab from './tools/ServiceTab.jsx'
 
 const TABS = [
-  { id: 'general',     label: 'General' },
-  { id: 'view',        label: 'View' },
-  { id: 'detection',   label: 'Detection' },
-  { id: 'ai',          label: 'AI' },
-  { id: 'tasks',       label: 'Tasks' },
-  { id: 'compute',     label: 'Compute' },
-  { id: 'logging',     label: 'Logging' },
-  { id: 'maintenance', label: 'Maintenance' },
+  { id: 'general', label: 'General' },
+  { id: 'view',    label: 'View' },
+  { id: 'ai',      label: 'AI' },
+  { id: 'compute', label: 'Compute' },
+  { id: 'service', label: 'Service' },
 ]
 
+// Legacy tab IDs that map to new ones (for open-tools deep links)
+const TAB_ALIASES = { detection: 'ai', tasks: 'service', logging: 'service', maintenance: 'service' }
+
+function resolveTab(id) {
+  if (TABS.some(t => t.id === id)) return id
+  return TAB_ALIASES[id] || 'general'
+}
+
 export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, cameraId, cameras }) {
-  const [activeTab, setActiveTab] = useState(
-    () => TABS.some(t => t.id === initialTab) ? initialTab : 'general'
-  )
+  const [activeTab, setActiveTab] = useState(() => resolveTab(initialTab))
 
   function handleBackdropClick(e) {
     if (e.target === e.currentTarget) onClose()
@@ -56,15 +56,12 @@ export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, cam
         </div>
 
         <div className="modal-tab-content">
-          {activeTab === 'general'     && <GeneralTab />}
-          {activeTab === 'view'        && <HourViewTab />}
-          {activeTab === 'detection'   && <DetectionTab />}
-          {activeTab === 'ai'          && <AiTab />}
-          {activeTab === 'tasks'       && <TasksTab />}
-          {activeTab === 'compute'     && <ComputeTab />}
-          {activeTab === 'logging'     && <LoggingTab />}
-          {activeTab === 'maintenance' && (
-            <MaintenanceTab
+          {activeTab === 'general' && <GeneralTab />}
+          {activeTab === 'view'    && <HourViewTab />}
+          {activeTab === 'ai'      && <AiTab />}
+          {activeTab === 'compute' && <ComputeTab />}
+          {activeTab === 'service' && (
+            <ServiceTab
               onDatabaseCleared={onDatabaseCleared}
               cameraId={cameraId}
               cameras={cameras}

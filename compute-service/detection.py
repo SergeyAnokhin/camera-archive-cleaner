@@ -5,7 +5,7 @@ import logging
 import time
 from pathlib import Path
 
-from shared.coco_names import COCO_TO_RUSSIAN
+
 
 logger = logging.getLogger("compute")
 
@@ -34,8 +34,8 @@ def detect(image_path: str, model: str, confidence: float,
            draw: bool, classes: list[int] | None = None):
     """Run detection on one image.
 
-    Returns (objects_ru, annotated_jpeg_b64_or_None, elapsed_ms).
-    `objects_ru` lists every detected class (Russian where mapped, English otherwise).
+    Returns (objects, annotated_jpeg_b64_or_None, elapsed_ms).
+    `objects` lists every detected class using canonical English COCO names.
     `classes` restricts YOLO inference to the given COCO class IDs (None = all).
     """
     from PIL import Image as PILImage
@@ -56,17 +56,16 @@ def detect(image_path: str, model: str, confidence: float,
     n_boxes = len(results[0].boxes)
     logger.debug("  [2] YOLO inference     %.1f ms  boxes=%d", (time.time() - t_infer) * 1000, n_boxes)
 
-    # --- stage 3: post-process boxes → Russian names ---
+    # --- stage 3: collect unique class names (canonical English) ---
     t_post = time.time()
     seen: set[str] = set()
-    objects_ru: list[str] = []
+    objects: list[str] = []
     for cls_id in results[0].boxes.cls.tolist():
         en = yolo.names[int(cls_id)]
-        ru = COCO_TO_RUSSIAN.get(en, en)
-        if ru not in seen:
-            seen.add(ru)
-            objects_ru.append(ru)
-    logger.debug("  [3] name mapping       %.1f ms  unique_classes=%d", (time.time() - t_post) * 1000, len(objects_ru))
+        if en not in seen:
+            seen.add(en)
+            objects.append(en)
+    logger.debug("  [3] name collect       %.1f ms  unique_classes=%d", (time.time() - t_post) * 1000, len(objects))
 
     # --- stage 4: draw + encode (only when draw=True) ---
     jpeg_b64 = None
@@ -87,4 +86,4 @@ def detect(image_path: str, model: str, confidence: float,
 
     elapsed_ms = int((time.time() - t0) * 1000)
     logger.debug("  [total detect]         %d ms", elapsed_ms)
-    return objects_ru, jpeg_b64, elapsed_ms
+    return objects, jpeg_b64, elapsed_ms

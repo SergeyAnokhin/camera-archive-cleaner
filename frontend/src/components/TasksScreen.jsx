@@ -66,7 +66,7 @@ function MetricsChips({ metrics }) {
   )
 }
 
-export default function TasksScreen({ cameras, onNavigate }) {
+export default function TasksScreen({ cameras, onNavigate, onShowTuning }) {
   const [tasks, setTasks]               = useState([])
   const [globalPaused, setGlobalPaused] = useState(false)
   const [metrics, setMetrics]           = useState(null)
@@ -168,6 +168,11 @@ export default function TasksScreen({ cameras, onNavigate }) {
         <MetricsChips metrics={metrics} />
 
         <div className="ts__toolbar-actions">
+          {onShowTuning && (
+            <button className="modal-btn neutral" onClick={onShowTuning}>
+              <i className="mdi mdi-tune-variant" /> Tuning
+            </button>
+          )}
           {hasDone && (
             <button className="modal-btn neutral ts__clear-btn" onClick={clearDone}>
               <i className="mdi mdi-broom" />

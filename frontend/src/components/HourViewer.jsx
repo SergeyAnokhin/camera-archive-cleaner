@@ -5,7 +5,7 @@ import DeleteConfirmModal from './DeleteConfirmModal.jsx'
 import GeminiAnalysisModal from './GeminiAnalysisModal.jsx'
 import ClaudeAnalysisModal from './ClaudeAnalysisModal.jsx'
 import OpenVinoAnalysisModal from './OpenVinoAnalysisModal.jsx'
-import { VIEW_MODES, DEFAULT_VIEW_MODE_KEY, getEnabledViewModes } from './viewModes/index.js'
+import { VIEW_MODES, DEFAULT_VIEW_MODE_KEY, getEnabledViewModes, getViewModesWithStatus } from './viewModes/index.js'
 import PhotoCard from './hour/PhotoCard.jsx'
 import VideoCard from './hour/VideoCard.jsx'
 import SelectionBar from './hour/SelectionBar.jsx'
@@ -219,7 +219,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     lightboxOpen: lightboxIndex !== null,
   })
 
-  const enabledModes = getEnabledViewModes()
+  const allModesWithStatus = getViewModesWithStatus()
+  const enabledModes = allModesWithStatus.filter(m => !m.disabled)
   const activeMode = enabledModes.find(m => m.key === viewMode) ?? enabledModes[0]
   const activeModeParams = modeParams[viewMode] ?? {}
 
@@ -253,7 +254,11 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         )}
 
         <select className="hv-view-mode-select" value={viewMode} onChange={handleViewModeChange} title={activeMode?.description}>
-          {enabledModes.map(m => <option key={m.key} value={m.key} title={m.description}>{m.label}</option>)}
+          {allModesWithStatus.map(m => (
+            <option key={m.key} value={m.key} disabled={m.disabled}
+              title={m.disabled ? m.disabledHint : m.description}
+            >{m.label}{m.disabled ? ' ⛔' : ''}</option>
+          ))}
         </select>
 
         {!selectionMode && total > 0 && (
