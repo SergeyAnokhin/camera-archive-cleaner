@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getTaskLogs } from '../api.js'
+import { LOG_TAIL_KEY, LOG_TAIL_DEFAULT } from './tools/settingsConfig.js'
 import './TaskLogsModal.css'
 
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'pausing'])
@@ -14,6 +15,10 @@ export default function TaskLogsModal({ task, onClose }) {
   const isActive = ACTIVE_STATUSES.has(status)
   const params   = task.params || {}
   const isDryRun = params.dry_run
+
+  const tailLimit = Number(localStorage.getItem(LOG_TAIL_KEY)) || LOG_TAIL_DEFAULT
+  const visibleLines = lines.length > tailLimit ? lines.slice(-tailLimit) : lines
+  const truncated = lines.length - visibleLines.length
 
   async function fetchLogs() {
     try {
@@ -74,11 +79,16 @@ export default function TaskLogsModal({ task, onClose }) {
               {isActive ? 'Ожидание первых записей…' : 'Лог пуст'}
             </div>
           ) : (
-            lines.map((line, i) => (
-              <div key={i} className={`tlm-line${line.includes('[DRY]') ? ' tlm-line--dry' : line.includes('ERROR') ? ' tlm-line--error' : line.includes('Skip') ? ' tlm-line--skip' : ''}`}>
-                {line}
-              </div>
-            ))
+            <>
+              {truncated > 0 && (
+                <div className="tlm-truncated">…скрыто {truncated} строк (показаны последние {tailLimit})</div>
+              )}
+              {visibleLines.map((line, i) => (
+                <div key={i} className={`tlm-line${line.includes('[DRY]') ? ' tlm-line--dry' : line.includes('ERROR') ? ' tlm-line--error' : line.includes('Skip') ? ' tlm-line--skip' : ''}`}>
+                  {line}
+                </div>
+              ))}
+            </>
           )}
           <div ref={bottomRef} />
         </div>

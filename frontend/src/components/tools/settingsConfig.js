@@ -124,6 +124,11 @@ export const BURST_GAP_DEFAULT = 30
 export const BURST_GAP_MIN     = 5
 export const BURST_GAP_MAX     = 300
 
+export const LOG_TAIL_KEY     = 'log_tail_lines'
+export const LOG_TAIL_DEFAULT = 10
+export const LOG_TAIL_MIN     = 5
+export const LOG_TAIL_MAX     = 300
+
 // Compute-service routing — local cache of the server-side config.
 // Source of truth is the backend (compute_config.json); these keys let the
 // frontend read the mode synchronously (e.g. to hide heavy view modes).

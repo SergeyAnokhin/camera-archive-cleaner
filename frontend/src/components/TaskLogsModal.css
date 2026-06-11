@@ -130,6 +130,14 @@
 .tlm-line--error { color: #ef4444; }
 .tlm-line--skip  { color: var(--text-dim); }
 
+.tlm-truncated {
+  color: #6b7280;
+  font-style: italic;
+  padding: 2px 0 8px;
+  border-bottom: 1px solid #1f2937;
+  margin-bottom: 6px;
+}
+
 .tlm-footer {
   display: flex;
   align-items: center;

@@ -6,6 +6,7 @@ import {
   FONT_KEY, FONT_MIN, FONT_MAX, FONT_DEFAULT,
   PREVIEWS_PER_CELL_KEY, PREVIEWS_PER_CELL_MIN, PREVIEWS_PER_CELL_MAX, PREVIEWS_PER_CELL_DEFAULT,
   ETA_WINDOW_KEY, ETA_WINDOW_MIN, ETA_WINDOW_MAX, ETA_WINDOW_DEFAULT,
+  LOG_TAIL_KEY, LOG_TAIL_MIN, LOG_TAIL_MAX, LOG_TAIL_DEFAULT,
 } from './settingsConfig.js'
 
 export default function GeneralTab() {
@@ -16,6 +17,9 @@ export default function GeneralTab() {
   })
   const [etaWindow, setEtaWindow] = useState(() =>
     Number(localStorage.getItem(ETA_WINDOW_KEY)) || ETA_WINDOW_DEFAULT
+  )
+  const [logTailLines, setLogTailLines] = useState(() =>
+    Number(localStorage.getItem(LOG_TAIL_KEY)) || LOG_TAIL_DEFAULT
   )
   const [importResult, setImportResult] = useState(null)
   const importRef = useRef(null)
@@ -41,6 +45,12 @@ export default function GeneralTab() {
     localStorage.setItem(ETA_WINDOW_KEY, v)
   }
 
+  function handleLogTailChange(e) {
+    const v = Number(e.target.value)
+    setLogTailLines(v)
+    localStorage.setItem(LOG_TAIL_KEY, v)
+  }
+
   function handleImportFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -56,6 +66,7 @@ export default function GeneralTab() {
         const ppc = localStorage.getItem(PREVIEWS_PER_CELL_KEY)
         setPreviewsPerCell(ppc !== null ? Number(ppc) : PREVIEWS_PER_CELL_DEFAULT)
         setEtaWindow(Number(localStorage.getItem(ETA_WINDOW_KEY)) || ETA_WINDOW_DEFAULT)
+        setLogTailLines(Number(localStorage.getItem(LOG_TAIL_KEY)) || LOG_TAIL_DEFAULT)
       } catch (err) {
         setImportResult({ ok: false, text: `Parse error: ${err.message}` })
       }
@@ -89,6 +100,15 @@ export default function GeneralTab() {
         minLabel={String(ETA_WINDOW_MIN)} maxLabel={String(ETA_WINDOW_MAX)}
         valueLabel={`${etaWindow} мин`}
         hint="Скорость обработки и ETA рассчитываются по последним N минутам, а не с начала задачи."
+      />
+
+      <SliderSetting
+        title="Строк в логе задачи"
+        min={LOG_TAIL_MIN} max={LOG_TAIL_MAX} step={5}
+        value={logTailLines} onChange={handleLogTailChange}
+        minLabel={String(LOG_TAIL_MIN)} maxLabel={String(LOG_TAIL_MAX)}
+        valueLabel={`${logTailLines} строк`}
+        hint="Сколько последних строк показывать в окне «Посмотреть логи». Уменьшите, если браузер подвисает при открытии."
       />
 
       {/* Export / Import */}
