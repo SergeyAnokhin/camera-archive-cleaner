@@ -115,13 +115,9 @@ After creating or updating a doc, add/update its entry in the `README.md` Docume
 Documentation table in [`README.md`](README.md) as the index; before touching any
 feature area, find the relevant doc there and read it first.
 
-The requirements brief (ТЗ) below has been **rewritten to match the shipped
-system**: it is now an implementation-agnostic specification of current behaviour
-(API, data model, view modes, AI, compute-service, UI), written so the project
-could be rebuilt on a different stack. `docs/` remains the authoritative,
-code-level source of truth; the ТЗ is the higher-level functional spec. Where
-they ever disagree, trust `docs/` and the code:
-
-- [Часть 1 из 3](technical-specifications/part1.md)
-- [Часть 2 из 3](technical-specifications/part2.md)
-- [Часть 3 из 3](technical-specifications/part3.md)
+The `technical-specifications/` directory contains a high-level functional spec
+written for external handoff / rebuilding from scratch. **Do not read it during
+normal development work** — it is not code-level and costs tokens without
+adding information beyond `docs/`. Open it only when explicitly asked to work
+with the spec itself (e.g. "update the spec", "read the technical
+specification"). For all code tasks, `docs/` is the source of truth.
