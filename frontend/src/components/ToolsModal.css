@@ -14,12 +14,43 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.10);
-  width: 740px;
+  width: 960px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 48px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* ── Two-column settings grid ── */
+.modal-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: start;
+}
+
+.modal-2col > .modal-section:nth-child(odd):not(.col-span-2) {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.modal-section.col-span-2 {
+  grid-column: 1 / -1;
+}
+
+/* ── AI tab provider headers ── */
+.modal-ai-provider-header {
+  padding: 10px 20px 8px;
+  font-size: calc(var(--font-base) * 0.78);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--accent);
+  background: rgba(14, 165, 233, 0.05);
+  border-bottom: 1px solid rgba(14, 165, 233, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
 }
 
 /* ── Tabs ── */

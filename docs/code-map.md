@@ -183,11 +183,11 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js) | All Tools constants: localStorage keys, defaults, ranges, model/option lists, pricing tables |
 | [`settingsIO.js`](../frontend/src/components/tools/settingsIO.js) | `exportSettingsYaml()`, `applyImportedSettings()`, `initFontSize()`/`applyFontSize()` |
 | [`SliderSetting.jsx`](../frontend/src/components/tools/SliderSetting.jsx) | Reusable labelled range-slider row used across tabs |
-| [`GeneralTab.jsx`](../frontend/src/components/tools/GeneralTab.jsx) | Font size, previews per cell, YAML export/import |
-| [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | Page size, thumb width, hover zoom, diff threshold, video preview, uniformity thresholds |
+| [`GeneralTab.jsx`](../frontend/src/components/tools/GeneralTab.jsx) | Font size (2-col layout), YAML export/import |
+| [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | View tab: previews per cell, thumb width, hover zoom, diff threshold, page size, burst gap, video preview, uniformity (2-col layout for sliders) |
 | [`DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx) | YOLO model selector (`openvino_model`), OpenVINO confidence slider, detected-classes checklist (80 COCO objects → `detection_classes`) |
-| [`GoogleAiTab.jsx`](../frontend/src/components/tools/GoogleAiTab.jsx) | Gemini API key, model, structured prompt template |
-| [`ClaudeAiTab.jsx`](../frontend/src/components/tools/ClaudeAiTab.jsx) | Claude API key, model |
+| [`AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) | Combined AI tab: Google Gemini (API key, model, prompt) + Claude Anthropic (API key, model) with provider section headers |
+| [`TasksTab.jsx`](../frontend/src/components/tools/TasksTab.jsx) | Task settings: ETA window, log tail lines |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
 | [`LoggingTab.jsx`](../frontend/src/components/tools/LoggingTab.jsx) | Dynamic log-level control for backend and compute (TRACE/DEBUG/INFO/WARNING/ERROR). Buffer size sliders, live log viewer with auto-refresh. Calls `/logging/*` and `/logging/compute/*` |
 | [`MaintenanceTab.jsx`](../frontend/src/components/tools/MaintenanceTab.jsx) | Clear database, clear all thumbnails, storage info. Date-range picker (auto-filled from camera's range) — all cleanup operations filter to the selected range |

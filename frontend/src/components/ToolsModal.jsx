@@ -3,18 +3,18 @@ import './ToolsModal.css'
 import GeneralTab from './tools/GeneralTab.jsx'
 import HourViewTab from './tools/HourViewTab.jsx'
 import DetectionTab from './tools/DetectionTab.jsx'
-import GoogleAiTab from './tools/GoogleAiTab.jsx'
-import ClaudeAiTab from './tools/ClaudeAiTab.jsx'
+import AiTab from './tools/AiTab.jsx'
+import TasksTab from './tools/TasksTab.jsx'
 import ComputeTab from './tools/ComputeTab.jsx'
 import MaintenanceTab from './tools/MaintenanceTab.jsx'
 import LoggingTab from './tools/LoggingTab.jsx'
 
 const TABS = [
   { id: 'general',     label: 'General' },
-  { id: 'hour_view',   label: 'Hour view' },
+  { id: 'view',        label: 'View' },
   { id: 'detection',   label: 'Detection' },
-  { id: 'google_ai',   label: 'Google AI' },
-  { id: 'claude_ai',   label: 'Claude AI' },
+  { id: 'ai',          label: 'AI' },
+  { id: 'tasks',       label: 'Tasks' },
   { id: 'compute',     label: 'Compute' },
   { id: 'logging',     label: 'Logging' },
   { id: 'maintenance', label: 'Maintenance' },
@@ -55,10 +55,10 @@ export default function ToolsModal({ onClose, onDatabaseCleared, cameraId, camer
 
         <div className="modal-tab-content">
           {activeTab === 'general'     && <GeneralTab />}
-          {activeTab === 'hour_view'   && <HourViewTab />}
+          {activeTab === 'view'        && <HourViewTab />}
           {activeTab === 'detection'   && <DetectionTab />}
-          {activeTab === 'google_ai'   && <GoogleAiTab />}
-          {activeTab === 'claude_ai'   && <ClaudeAiTab />}
+          {activeTab === 'ai'          && <AiTab />}
+          {activeTab === 'tasks'       && <TasksTab />}
           {activeTab === 'compute'     && <ComputeTab />}
           {activeTab === 'logging'     && <LoggingTab />}
           {activeTab === 'maintenance' && (

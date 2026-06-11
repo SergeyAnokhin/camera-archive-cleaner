@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import SliderSetting from './SliderSetting.jsx'
 import {
+  PREVIEWS_PER_CELL_KEY, PREVIEWS_PER_CELL_MIN, PREVIEWS_PER_CELL_MAX, PREVIEWS_PER_CELL_DEFAULT,
   PAGE_SIZE_KEY, PAGE_SIZE_MIN, PAGE_SIZE_MAX, PAGE_SIZE_DEFAULT,
   ZOOM_KEY, ZOOM_MIN, ZOOM_MAX, ZOOM_STEP, ZOOM_DEFAULT,
   THUMB_WIDTH_KEY, THUMB_WIDTH_MIN, THUMB_WIDTH_MAX, THUMB_WIDTH_DEFAULT,
@@ -11,13 +12,20 @@ import {
 } from './settingsConfig.js'
 
 export default function HourViewTab() {
+  const [previewsPerCell, setPreviewsPerCell] = useState(() => {
+    const v = localStorage.getItem(PREVIEWS_PER_CELL_KEY)
+    return v !== null ? Number(v) : PREVIEWS_PER_CELL_DEFAULT
+  })
   const [pageSize, setPageSize] = useState(() => Number(localStorage.getItem(PAGE_SIZE_KEY)) || PAGE_SIZE_DEFAULT)
-  const [hoverZoom, setHoverZoom] = useState(() => Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT)
   const [thumbWidth, setThumbWidth] = useState(() => Number(localStorage.getItem(THUMB_WIDTH_KEY)) || THUMB_WIDTH_DEFAULT)
+  const [hoverZoom, setHoverZoom] = useState(() => Number(localStorage.getItem(ZOOM_KEY)) || ZOOM_DEFAULT)
   const [diffThreshold, setDiffThreshold] = useState(() => {
     const v = localStorage.getItem(DIFF_THRESHOLD_KEY)
     return v !== null ? Number(v) : DIFF_THRESHOLD_DEFAULT
   })
+  const [burstGap, setBurstGap] = useState(
+    () => Number(localStorage.getItem(BURST_GAP_KEY)) || BURST_GAP_DEFAULT
+  )
   const [videoPreviewMode, setVideoPreviewMode] = useState(
     () => localStorage.getItem(VIDEO_PREVIEW_KEY) || VIDEO_PREVIEW_DEFAULT
   )
@@ -35,9 +43,13 @@ export default function HourViewTab() {
   const [uniformityMethod, setUniformityMethod] = useState(
     () => localStorage.getItem(UNIFORMITY_METHOD_KEY) || UNIFORMITY_METHOD_DEFAULT
   )
-  const [burstGap, setBurstGap] = useState(
-    () => Number(localStorage.getItem(BURST_GAP_KEY)) || BURST_GAP_DEFAULT
-  )
+
+  function handlePreviewsPerCellChange(e) {
+    const v = Number(e.target.value)
+    setPreviewsPerCell(v)
+    localStorage.setItem(PREVIEWS_PER_CELL_KEY, v)
+    document.dispatchEvent(new CustomEvent('previews-per-cell-change', { detail: v }))
+  }
 
   function handlePageSizeChange(e) {
     const raw = Number(e.target.value)
@@ -68,6 +80,14 @@ export default function HourViewTab() {
     document.dispatchEvent(new CustomEvent('diff-threshold-change', { detail: v }))
   }
 
+  function handleBurstGapChange(e) {
+    const raw = Number(e.target.value)
+    const v = Math.max(BURST_GAP_MIN, Math.min(BURST_GAP_MAX, raw || BURST_GAP_DEFAULT))
+    setBurstGap(v)
+    localStorage.setItem(BURST_GAP_KEY, v)
+    document.dispatchEvent(new CustomEvent('burst-gap-change', { detail: v }))
+  }
+
   function handleVideoPreviewModeChange(e) {
     const v = e.target.value
     setVideoPreviewMode(v)
@@ -80,14 +100,6 @@ export default function HourViewTab() {
     localStorage.setItem(`uniformity_${metric}_${type}`, v)
   }
 
-  function handleBurstGapChange(e) {
-    const raw = Number(e.target.value)
-    const v = Math.max(BURST_GAP_MIN, Math.min(BURST_GAP_MAX, raw || BURST_GAP_DEFAULT))
-    setBurstGap(v)
-    localStorage.setItem(BURST_GAP_KEY, v)
-    document.dispatchEvent(new CustomEvent('burst-gap-change', { detail: v }))
-  }
-
   function handleUniformityMethodChange(e) {
     const v = e.target.value
     setUniformityMethod(v)
@@ -96,17 +108,16 @@ export default function HourViewTab() {
   }
 
   return (
-    <>
-      {/* Photos per page */}
-      <div className="modal-section">
-        <div className="modal-section-title">Photos per page</div>
-        <div className="font-slider-row">
-          <input type="number" min={PAGE_SIZE_MIN} max={PAGE_SIZE_MAX} step="10"
-            value={pageSize} onChange={handlePageSizeChange} className="modal-number-input" />
-          <span className="font-size-value" style={{ marginLeft: 0 }}>per page</span>
-        </div>
-        <div className="modal-setting-hint">Number of items per page when browsing a specific hour ({PAGE_SIZE_MIN}–{PAGE_SIZE_MAX}).</div>
-      </div>
+    <div className="modal-2col">
+      {/* Row 1 */}
+      <SliderSetting
+        title="Preview thumbnails per cell"
+        min={PREVIEWS_PER_CELL_MIN} max={PREVIEWS_PER_CELL_MAX} step={1}
+        value={previewsPerCell} onChange={handlePreviewsPerCellChange}
+        minLabel="0" maxLabel={String(PREVIEWS_PER_CELL_MAX)}
+        valueLabel={previewsPerCell}
+        hint="Thumbnails shown inside each heatmap cell (year/month/day). Set 0 to disable."
+      />
 
       <SliderSetting
         title="Thumbnail width"
@@ -116,6 +127,7 @@ export default function HourViewTab() {
         hint="Minimum column width of photo cards."
       />
 
+      {/* Row 2 */}
       <SliderSetting
         title="Hover zoom"
         min={ZOOM_MIN} max={ZOOM_MAX} step={ZOOM_STEP}
@@ -130,10 +142,20 @@ export default function HourViewTab() {
         min={DIFF_THRESHOLD_MIN} max={DIFF_THRESHOLD_MAX} step={1}
         value={diffThreshold} onChange={handleDiffThresholdChange}
         valueLabel={diffThreshold}
-        hint="Pixels with a channel delta below this value are darkened in Motion diff mode. Higher = only significant changes shown."
+        hint="Pixels with a channel delta below this value are darkened in Motion diff mode."
       />
 
-      {/* Burst gap */}
+      {/* Row 3 */}
+      <div className="modal-section">
+        <div className="modal-section-title">Photos per page</div>
+        <div className="font-slider-row">
+          <input type="number" min={PAGE_SIZE_MIN} max={PAGE_SIZE_MAX} step="10"
+            value={pageSize} onChange={handlePageSizeChange} className="modal-number-input" />
+          <span className="font-size-value" style={{ marginLeft: 0 }}>per page</span>
+        </div>
+        <div className="modal-setting-hint">Number of items per page when browsing a specific hour ({PAGE_SIZE_MIN}–{PAGE_SIZE_MAX}).</div>
+      </div>
+
       <div className="modal-section">
         <div className="modal-section-title">Burst separator gap</div>
         <div className="font-slider-row">
@@ -142,12 +164,12 @@ export default function HourViewTab() {
           <span className="font-size-value" style={{ marginLeft: 0 }}>seconds</span>
         </div>
         <div className="modal-setting-hint">
-          A blue left border marks frames where the gap to the previous frame exceeds this threshold — indicating a new camera burst ({BURST_GAP_MIN}–{BURST_GAP_MAX} s).
+          A blue left border marks frames where the gap to the previous frame exceeds this threshold ({BURST_GAP_MIN}–{BURST_GAP_MAX} s).
         </div>
       </div>
 
-      {/* Video preview mode */}
-      <div className="modal-section">
+      {/* Full-width rows */}
+      <div className="modal-section col-span-2">
         <div className="modal-section-title">Превью видео</div>
         <select className="modal-select" value={videoPreviewMode} onChange={handleVideoPreviewModeChange}>
           {VIDEO_PREVIEW_OPTIONS.map(o => (
@@ -159,8 +181,7 @@ export default function HourViewTab() {
         </div>
       </div>
 
-      {/* Uniformity analysis */}
-      <div className="modal-section">
+      <div className="modal-section col-span-2">
         <div className="modal-section-title">Равномерность записи</div>
         <div className="u-grid">
           <div className="u-grid-head">
@@ -195,8 +216,8 @@ export default function HourViewTab() {
             <option value="bc">BC — блоки 5 мин</option>
           </select>
         </div>
-        <div className="modal-setting-hint">0 = одно событие · 100 = запись весь час. Жёлтый — возможен ветер, красный — дождь/постоянные ложные срабатывания. На экране превьюшек видны все три метода.</div>
+        <div className="modal-setting-hint">0 = одно событие · 100 = запись весь час. Жёлтый — возможен ветер, красный — дождь/постоянные ложные срабатывания.</div>
       </div>
-    </>
+    </div>
   )
 }
