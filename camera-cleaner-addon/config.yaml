@@ -16,5 +16,5 @@ options:
 schema:
   camera_root: str
   compute_remote_url: str
-image: ghcr.io/sergeyAnokhin/camera-cleaner-addon
+image: ghcr.io/sergeyanokhin/camera-cleaner-addon
 startup: application
