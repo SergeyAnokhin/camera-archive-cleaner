@@ -5,12 +5,14 @@ serves the cached JPEG/GIF to the browser. These helpers replace the cache
 logic that used to live in yolo_detect.py and video_thumbnails.py.
 """
 import hashlib
+import os
 from pathlib import Path
 
-OV_THUMB_DIR = Path(__file__).parent / "openvino_thumbnails_cache"
+_data_dir = Path(os.getenv('DATA_DIR', str(Path(__file__).parent)))
+OV_THUMB_DIR = _data_dir / "openvino_thumbnails_cache"
 OV_THUMB_VERSION = "v5"  # bumped: removed excluded-objects from cache key
 
-VID_THUMB_DIR = Path(__file__).parent / "video_thumbnails_cache"
+VID_THUMB_DIR = _data_dir / "video_thumbnails_cache"
 
 
 def ov_cache_path(file_id: int, model: str, confidence: float,

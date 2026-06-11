@@ -11,11 +11,12 @@ remote_url (single string) is kept for backward compatibility — it equals remo
 """
 import json
 import logging
+import os
 from pathlib import Path
 
 logger = logging.getLogger("api")
 
-_CONFIG_PATH = Path(__file__).parent / "compute_config.json"
+_CONFIG_PATH = Path(os.getenv('DATA_DIR', str(Path(__file__).parent))) / "compute_config.json"
 _KUBERNETES_URL = "http://camera-cleaner-compute:8001"
 _DEFAULT = {"mode": "kubernetes", "remote_url": "", "remote_urls": []}
 VALID_MODES = ("off", "kubernetes", "local", "remote")

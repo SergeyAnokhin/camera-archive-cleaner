@@ -1,0 +1,20 @@
+name: Camera Snapshots Cleaner
+description: Browse, review, and clean camera snapshot archives from a network share.
+version: "1.0.0"
+slug: camera_snapshots_cleaner
+arch:
+  - amd64
+  - aarch64
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:cctv
+map:
+  - media:rw
+options:
+  camera_root: /media
+  compute_remote_url: ""
+schema:
+  camera_root: str
+  compute_remote_url: str
+image: ghcr.io/sergeyAnokhin/camera-cleaner-addon
+startup: application

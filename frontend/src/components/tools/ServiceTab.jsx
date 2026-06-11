@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import SliderSetting from './SliderSetting.jsx'
+import { BASE } from '../../api/http.js'
 import {
   ETA_WINDOW_KEY, ETA_WINDOW_MIN, ETA_WINDOW_MAX, ETA_WINDOW_DEFAULT,
   LOG_TAIL_KEY, LOG_TAIL_MIN, LOG_TAIL_MAX, LOG_TAIL_DEFAULT,
@@ -111,12 +112,12 @@ function LoggingSection() {
   const autoScrollRef = useRef(true)
 
   useEffect(() => {
-    fetch('/api/logging/config')
+    fetch(BASE + '/logging/config')
       .then(r => r.json())
       .then(d => { setBackendLevel(d.level || 'INFO'); setBackendMaxLines(d.file_max_lines || 500) })
       .catch(() => {})
 
-    fetch('/api/logging/compute/config')
+    fetch(BASE + '/logging/compute/config')
       .then(r => r.json())
       .then(d => {
         if (d.error) return
@@ -129,7 +130,7 @@ function LoggingSection() {
   const fetchLogs = useCallback(async () => {
     setLoading(true)
     setLogError(null)
-    const endpoint = logSource === 'compute' ? '/api/logging/compute/tail' : '/api/logging/tail'
+    const endpoint = logSource === 'compute' ? BASE + '/logging/compute/tail' : BASE + '/logging/tail'
     try {
       const r = await fetch(`${endpoint}?n=${logN}`)
       const d = await r.json()
@@ -159,7 +160,7 @@ function LoggingSection() {
   }, [logLines])
 
   function applyBackendConfig(level, maxLines) {
-    fetch('/api/logging/config', {
+    fetch(BASE + '/logging/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ level, file_max_lines: maxLines }),
@@ -167,7 +168,7 @@ function LoggingSection() {
   }
 
   function applyComputeConfig(level, maxLines) {
-    fetch('/api/logging/compute/config', {
+    fetch(BASE + '/logging/compute/config', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ level, file_max_lines: maxLines }),

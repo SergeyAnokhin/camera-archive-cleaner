@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { BASE } from '../api/http.js'
 
 function fmtMem(bytes) {
   if (bytes == null) return '—'
@@ -66,7 +67,7 @@ export default function ServiceStatus() {
     let cancelled = false
     async function poll() {
       try {
-        const res = await fetch('/api/services/status')
+        const res = await fetch(BASE + '/services/status')
         if (!cancelled) {
           if (res.ok) {
             const data = await res.json()

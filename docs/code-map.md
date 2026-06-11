@@ -14,8 +14,8 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`api_helpers.py`](../backend/api_helpers.py) | Shared router helpers: `fmt_range()` (log date ranges), `row_to_dict()` (stats-row → dict) |
 | [`ai_pricing.py`](../backend/ai_pricing.py) | Per-million-token USD pricing tables for Gemini and Claude models |
 | [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `convert_video`, `health`). Strips `CAMERA_ROOT` prefix from all paths before sending (so compute can apply its own root). Raises `ComputeDisabled` / `ComputeUnavailable`. Timeouts: detect 120 s, thumbnail 120 s, convert 7200 s |
-| [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` |
-| [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
+| [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` (path respects `DATA_DIR` env var) |
+| [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. Directories placed under `DATA_DIR` env var. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
 | [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks and dispatches to `task_executors/` by type (registry `EXECUTORS`). Owns global pause and stuck-task reset; per-type logic lives in the executors (see table below) |
 | [`database.py`](../backend/database.py) | SQLite: table schema + migrations, all SQL queries. Tables: `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks`, `tuning_sessions`, `cameras`. |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed |
@@ -24,7 +24,7 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`thumbnails.py`](../backend/thumbnails.py) | Basic 256×256 JPEG thumbnails (Pillow). Cache in `thumbnails_cache/` |
 | [`diff_thumbnails.py`](../backend/diff_thumbnails.py) | Motion Diff thumbnails: per-pixel delta from page mean (numpy). Cache in `diff_thumbnails_cache/` |
 | [`erosion_thumbnails.py`](../backend/erosion_thumbnails.py) | Erosion thumbnails: MOG2 + morphological erosion. Cache in `erosion_thumbnails_cache/` |
-| `snapshots.db` | SQLite database (auto-created on startup) |
+| `snapshots.db` | SQLite database (auto-created on startup). Path = `DATA_DIR/snapshots.db`; `DATA_DIR` env var defaults to `backend/` for local and K8s, set to `/data` for HA add-on |
 
 
 ### Task executors (`backend/task_executors/`)
@@ -182,6 +182,8 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`settingsIO.js`](../frontend/src/components/tools/settingsIO.js) | `exportSettingsYaml()`, `applyImportedSettings()`, `initFontSize()`/`applyFontSize()` |
 | [`SliderSetting.jsx`](../frontend/src/components/tools/SliderSetting.jsx) | Reusable labelled range-slider row used across tabs |
 | [`GeneralTab.jsx`](../frontend/src/components/tools/GeneralTab.jsx) | Font size (2-col layout), YAML export/import |
+| [`CamerasTab.jsx`](../frontend/src/components/tools/CamerasTab.jsx) | Full camera CRUD: add/edit/delete rows, inline path validation via `/cameras/check-path`, saves via `PUT /cameras/config` |
+| [`TasksTab.jsx`](../frontend/src/components/tools/TasksTab.jsx) | Task settings: ETA window (minutes) and log tail lines |
 | [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | View tab: previews per cell, thumb width, hover zoom, diff threshold, page size, burst gap, video preview, uniformity (collapsible, with Low/Medium/High presets) |
 | [`AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) | Combined AI tab: 3 sections — Detection (YOLO model, confidence, classes checklist), Google Gemini (API key, model, prompt), Claude Anthropic (API key, model) |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
@@ -258,7 +260,7 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 
 | File | Role |
 |---|---|
-| [`vite.config.js`](../frontend/vite.config.js) | Vite: proxies `/api/*` → `http://localhost:8000` |
+| [`vite.config.js`](../frontend/vite.config.js) | Vite: `base: './'` (relative assets — required for HA ingress); dev proxy `/api/*` → `http://localhost:8000` |
 | [`package.json`](../frontend/package.json) | Dependencies: React, Recharts, Vite |
 | [`index.html`](../frontend/index.html) | HTML entry point; loads MDI icons from CDN |
 
@@ -278,3 +280,20 @@ Containerisation + GitOps deploy. Full architecture and rationale: [`deployment.
 | [`deploy/helm/camera-cleaner/`](../deploy/helm/camera-cleaner/) | Helm chart: 3 Deployments+Services, state PVC (subPath mounts), SMB PV/PVC, cameras ConfigMap, Traefik Ingress + StripPrefix middleware. Tags in `values.yaml` are rewritten by CI |
 | [`deploy/argocd/application.yaml`](../deploy/argocd/application.yaml) | ArgoCD Application — auto-sync from `deploy/helm/camera-cleaner` |
 | [`.github/workflows/build.yml`](../.github/workflows/build.yml) | CI: build+push 3 images to GHCR by git SHA, `yq`-bump tags in `values.yaml`, commit back |
+
+### Home Assistant add-on
+
+Third deployment target: HA OS / Supervised, exposed via HA ingress (no host port). Full docs: [`home-assistant-addon.md`](home-assistant-addon.md).
+
+| File | Role |
+|---|---|
+| [`repository.yaml`](../repository.yaml) | HA add-on repository manifest (required by HA store) |
+| [`camera-cleaner-addon/config.yaml`](../camera-cleaner-addon/config.yaml) | Add-on manifest: arch, ingress port 8099, `map: media:rw`, options `camera_root` + `compute_remote_url` |
+| [`camera-cleaner-addon/build.yaml`](../camera-cleaner-addon/build.yaml) | Per-arch base images (`ghcr.io/home-assistant/{arch}-base-debian:bookworm`) |
+| [`camera-cleaner-addon/Dockerfile`](../camera-cleaner-addon/Dockerfile) | Multi-stage: Node.js frontend build → HA Debian base with Python 3 + nginx + s6-overlay services. Build context = repo root: `docker build -f camera-cleaner-addon/Dockerfile .` |
+| [`camera-cleaner-addon/rootfs/etc/cont-init.d/01-setup.sh`](../camera-cleaner-addon/rootfs/etc/cont-init.d/01-setup.sh) | s6 init: seeds `/data/compute_config.json` from options on first run |
+| [`camera-cleaner-addon/rootfs/etc/services.d/backend/run`](../camera-cleaner-addon/rootfs/etc/services.d/backend/run) | s6 service: reads `camera_root` option → `CAMERA_ROOT`, sets `DATA_DIR=/data`, starts uvicorn on 127.0.0.1:8000 |
+| [`camera-cleaner-addon/rootfs/etc/services.d/nginx/run`](../camera-cleaner-addon/rootfs/etc/services.d/nginx/run) | s6 service: starts nginx on port 8099 |
+| [`camera-cleaner-addon/rootfs/etc/nginx/nginx.conf`](../camera-cleaner-addon/rootfs/etc/nginx/nginx.conf) | nginx: `allow 172.30.32.2; deny all` (ingress-only); serves SPA; `location /api/` proxies to uvicorn, stripping the prefix |
+| [`camera-cleaner-addon/DOCS.md`](../camera-cleaner-addon/DOCS.md) | User-facing add-on documentation shown in HA store |
+| [`.github/workflows/addon-build.yml`](../.github/workflows/addon-build.yml) | CI: multi-arch (amd64+aarch64) image build and push to `ghcr.io` on `addon/v*` tag |

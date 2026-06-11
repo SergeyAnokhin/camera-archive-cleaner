@@ -1,5 +1,5 @@
 // Shared HTTP helpers for the api/ domain modules.
-export const BASE = '/api'
+export const BASE = 'api'
 
 export async function get(path) {
   const res = await fetch(BASE + path)

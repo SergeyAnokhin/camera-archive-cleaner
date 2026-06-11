@@ -1,8 +1,10 @@
 import json
+import os
 import sqlite3
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent / "snapshots.db"
+_data_dir = Path(os.getenv('DATA_DIR', str(Path(__file__).parent)))
+DB_PATH = _data_dir / "snapshots.db"
 
 
 def get_connection() -> sqlite3.Connection:
