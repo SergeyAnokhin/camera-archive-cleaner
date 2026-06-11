@@ -18,12 +18,13 @@ function fmtDuration(ms) {
   return r > 0 ? `${m} мин ${r} с` : `${m} мин`
 }
 
-export default function TaskResultsModal({ task, results, stats, onClose, onNavigateToHour }) {
+export default function TaskResultsModal({ task, results, stats, totalCount, onClose, onNavigateToHour }) {
   const params  = task.params || {}
   const model   = params.model_name || params.model || ''
   const label   = TYPE_LABEL[task.type] || task.type
   const isRunning = ['running', 'pausing', 'paused', 'queued'].includes(task.status)
   const withObjects = results.filter(r => r.objects && r.objects.trim())
+  const isTruncated = totalCount != null && totalCount > results.length
 
   const hasTokenStats = stats && (stats.input_tokens > 0 || stats.output_tokens > 0)
 
@@ -65,7 +66,7 @@ export default function TaskResultsModal({ task, results, stats, onClose, onNavi
           <div className="gai-run-row">
             <div className="gai-run-info">
               <i className="mdi mdi-image-multiple-outline" />
-              <span>{results.length} фото</span>
+              <span>{isTruncated ? `${totalCount.toLocaleString()} фото` : `${results.length} фото`}</span>
               {model && <span className="gai-run-model">{model}</span>}
               {isRunning && (
                 <span style={{ fontSize: 'calc(var(--font-base) * 0.8)', color: '#60a5fa' }}>
@@ -108,7 +109,14 @@ export default function TaskResultsModal({ task, results, stats, onClose, onNavi
 
           {results.length > 0 && (
             <div className="gai-section">
-              <div className="gai-response-label">Результаты по фото</div>
+              <div className="gai-response-label">
+                Результаты по фото
+                {isTruncated && (
+                  <span style={{ marginLeft: 8, fontWeight: 'normal', color: 'var(--text-dim)', fontSize: 'calc(var(--font-base) * 0.85)' }}>
+                    (последние {results.length.toLocaleString()} из {totalCount.toLocaleString()})
+                  </span>
+                )}
+              </div>
               <div className="gai-images-list">
                 {results.map((r, idx) => {
                   const icons = resolveAiIcons(r.objects || '')

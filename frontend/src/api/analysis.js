@@ -44,8 +44,8 @@ export function openvinoAnalyzeRange({ cameraId, dateFrom, dateTo, modelName, co
   return postJson('/openvino_analyze_range', { camera_id: cameraId, date_from: dateFrom, date_to: dateTo, model_name: modelName, confidence, classes, video_thumb_mode: videoThumbMode || null })
 }
 
-export function getAiAnalysisInRange(cameraId, dateFrom, dateTo, provider = 'openvino') {
-  return get('/ai_analysis_in_range' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo, provider }))
+export function getAiAnalysisInRange(cameraId, dateFrom, dateTo, provider = 'openvino', limit = 200) {
+  return get('/ai_analysis_in_range' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo, provider, limit }))
 }
 
 export function getAiObjectsSummary(cameraId, dateFrom, dateTo) {

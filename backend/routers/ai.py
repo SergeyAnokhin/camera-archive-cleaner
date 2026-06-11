@@ -102,41 +102,62 @@ def get_ai_analysis_in_range(
     date_from: str = Query(...),
     date_to: str = Query(...),
     provider: str = Query(default="openvino"),
+    limit: int = Query(default=200, ge=1, le=5000),
 ):
     with get_connection() as conn:
         if provider == "openvino":
-            rows = conn.execute("""
-                SELECT od.file_id, f.timestamp, od.objects, od.model,
-                       0 AS input_tokens, 0 AS output_tokens, 0.0 AS cost_usd, od.elapsed_ms
+            stats_row = conn.execute("""
+                SELECT COUNT(*) AS total, SUM(0) AS input_tokens, SUM(0) AS output_tokens,
+                       SUM(0.0) AS cost_usd, SUM(od.elapsed_ms) AS elapsed_ms
                 FROM object_detection od
                 JOIN files f ON od.file_id = f.id
                 WHERE f.camera_id = ? AND f.timestamp >= ? AND f.timestamp <= ?
                   AND f.file_type = 'photo'
-                ORDER BY f.timestamp
-            """, (camera_id, date_from, date_to)).fetchall()
-        else:
+            """, (camera_id, date_from, date_to)).fetchone()
             rows = conn.execute("""
-                SELECT aa.file_id, f.timestamp, aa.objects, aa.model,
-                       aa.input_tokens, aa.output_tokens, aa.cost_usd, aa.elapsed_ms
+                SELECT od.file_id, f.timestamp, od.objects, od.model
+                FROM object_detection od
+                JOIN files f ON od.file_id = f.id
+                WHERE f.camera_id = ? AND f.timestamp >= ? AND f.timestamp <= ?
+                  AND f.file_type = 'photo'
+                ORDER BY f.timestamp DESC
+                LIMIT ?
+            """, (camera_id, date_from, date_to, limit)).fetchall()
+        else:
+            stats_row = conn.execute("""
+                SELECT COUNT(*) AS total,
+                       SUM(aa.input_tokens) AS input_tokens, SUM(aa.output_tokens) AS output_tokens,
+                       SUM(aa.cost_usd) AS cost_usd, SUM(aa.elapsed_ms) AS elapsed_ms
                 FROM ai_analysis aa
                 JOIN files f ON aa.file_id = f.id
                 WHERE f.camera_id = ? AND f.timestamp >= ? AND f.timestamp <= ?
                   AND aa.provider = ? AND f.file_type = 'photo'
-                ORDER BY f.timestamp
-            """, (camera_id, date_from, date_to, provider)).fetchall()
-    results = [
-        {"file_id": r["file_id"], "timestamp": r["timestamp"],
-         "objects": r["objects"], "model": r["model"]}
-        for r in rows
-    ]
+            """, (camera_id, date_from, date_to, provider)).fetchone()
+            rows = conn.execute("""
+                SELECT aa.file_id, f.timestamp, aa.objects, aa.model
+                FROM ai_analysis aa
+                JOIN files f ON aa.file_id = f.id
+                WHERE f.camera_id = ? AND f.timestamp >= ? AND f.timestamp <= ?
+                  AND aa.provider = ? AND f.file_type = 'photo'
+                ORDER BY f.timestamp DESC
+                LIMIT ?
+            """, (camera_id, date_from, date_to, provider, limit)).fetchall()
+    total_count = stats_row["total"] or 0
+    # Re-sort the limited slice back to ascending order for display
+    results = sorted(
+        [{"file_id": r["file_id"], "timestamp": r["timestamp"],
+          "objects": r["objects"], "model": r["model"]}
+         for r in rows],
+        key=lambda x: x["timestamp"],
+    )
     stats = {
-        "input_tokens":  sum(r["input_tokens"]  or 0 for r in rows),
-        "output_tokens": sum(r["output_tokens"] or 0 for r in rows),
-        "cost_usd":      sum(r["cost_usd"]      or 0.0 for r in rows),
-        "elapsed_ms":    sum(r["elapsed_ms"]    or 0 for r in rows),
-        "analyzed_count": len(rows),
+        "input_tokens":   int(stats_row["input_tokens"]  or 0),
+        "output_tokens":  int(stats_row["output_tokens"] or 0),
+        "cost_usd":       float(stats_row["cost_usd"]    or 0.0),
+        "elapsed_ms":     int(stats_row["elapsed_ms"]    or 0),
+        "analyzed_count": total_count,
     }
-    return {"results": results, "stats": stats}
+    return {"results": results, "stats": stats, "total_count": total_count}
 
 
 @router.get("/ai_objects_summary", summary="Unique AI-detected objects for a date range")

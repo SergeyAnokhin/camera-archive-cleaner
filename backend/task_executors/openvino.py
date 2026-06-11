@@ -16,6 +16,10 @@ from task_executors.video_thumbnails import pregen_video_thumbs_sync
 
 logger = logging.getLogger("api")
 
+# Same default as DETECTION_CLASSES_DEFAULT in cocoClasses.js
+# Used when no classes are baked into the task params (old tasks)
+_CLASSES_DEFAULT = [0, 14, 15, 16, 24, 26]  # person, bird, cat, dog, backpack, handbag
+
 
 def _detect_and_save(file_id: int, file_path: str, model_name: str, confidence: float,
                      classes=None, classes_tuple=None) -> None:
@@ -34,7 +38,7 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
     date_to = params["date_to"]
     model_name = params.get("model_name", "yolov8n")
     confidence = params.get("confidence", 0.25)
-    classes = params.get("classes", None)
+    classes = params.get("classes") or _CLASSES_DEFAULT
     video_thumb_mode = params.get("video_thumb_mode")
     classes_tuple = tuple(sorted(classes)) if classes else None
     reprocess_existing = params.get("reprocess_existing", False)

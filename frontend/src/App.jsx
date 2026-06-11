@@ -364,6 +364,7 @@ export default function App() {
           task={taskNav.taskResultsModal.task}
           results={taskNav.taskResultsModal.results}
           stats={taskNav.taskResultsModal.stats}
+          totalCount={taskNav.taskResultsModal.totalCount}
           onClose={() => taskNav.setTaskResultsModal(null)}
           onNavigateToHour={taskNav.handleNavigateToHour}
         />

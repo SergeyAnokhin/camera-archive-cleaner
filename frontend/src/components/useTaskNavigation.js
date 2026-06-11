@@ -12,7 +12,7 @@ export function useTaskNavigation({ setCameraId, setDrillStack, setSelectedHour,
     if (!camId || !params.date_from || !params.date_to) return
     try {
       const data = await getAiAnalysisInRange(camId, params.date_from, params.date_to, task.type)
-      setTaskResultsModal({ task, results: data.results ?? [], stats: data.stats ?? null })
+      setTaskResultsModal({ task, results: data.results ?? [], stats: data.stats ?? null, totalCount: data.total_count ?? null })
     } catch {
       // fallback: navigate to heatmap
       navigateToTaskPeriod(task)
