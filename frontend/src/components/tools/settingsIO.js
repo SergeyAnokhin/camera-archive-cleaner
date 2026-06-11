@@ -28,7 +28,7 @@ function tryParseJSON(s) {
   try { return s ? JSON.parse(s) : null } catch { return null }
 }
 
-function collectSettings() {
+export function collectSettings() {
   const motionModes = {}
   for (const m of MOTION_MODE_KEYS) {
     motionModes[m] = tryParseJSON(localStorage.getItem('mode_params_' + m)) || { threshold: DIFF_THRESHOLD_DEFAULT }

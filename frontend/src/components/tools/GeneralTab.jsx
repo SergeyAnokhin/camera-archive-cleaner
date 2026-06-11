@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react'
 import * as yaml from 'js-yaml'
 import SliderSetting from './SliderSetting.jsx'
-import { exportSettingsYaml, applyImportedSettings, applyFontSize } from './settingsIO.js'
+import { exportSettingsYaml, applyImportedSettings, applyFontSize, collectSettings } from './settingsIO.js'
+import { saveSettings } from '../../api.js'
 import {
   FONT_KEY, FONT_MIN, FONT_MAX, FONT_DEFAULT,
 } from './settingsConfig.js'
@@ -30,6 +31,9 @@ export default function GeneralTab() {
         const n = applyImportedSettings(data)
         setImportResult({ ok: true, text: `Imported ${n} settings.` })
         setFontSize(Number(localStorage.getItem(FONT_KEY)) || FONT_DEFAULT)
+        // Sync imported settings to the server
+        const settings = collectSettings()
+        saveSettings(settings).catch(err => console.error("Failed to sync settings to server:", err))
       } catch (err) {
         setImportResult({ ok: false, text: `Parse error: ${err.message}` })
       }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { getCameras, getStatsTotal, getStatsGrouped } from './api.js'
+import { getCameras, getStatsTotal, getStatsGrouped, getSettings, saveSettings } from './api.js'
 import DeleteConfirmModal from './components/DeleteConfirmModal.jsx'
 import Header from './components/Header.jsx'
 import CameraSelector from './components/CameraSelector.jsx'
@@ -13,7 +13,8 @@ import TasksScreen from './components/TasksScreen.jsx'
 import TaskResultsModal from './components/TaskResultsModal.jsx'
 import TuningScreen from './components/TuningScreen.jsx'
 import KeyboardHints from './components/KeyboardHints.jsx'
-import { initFontSize } from './components/tools/settingsIO.js'
+import { initFontSize, collectSettings, applyImportedSettings } from './components/tools/settingsIO.js'
+import HelpModal from './components/HelpModal.jsx'
 import CellSelBar from './components/CellSelBar.jsx'
 import { useHeatmapKeyboard } from './components/useHeatmapKeyboard.js'
 import { useCellSelection } from './components/useCellSelection.js'
@@ -72,6 +73,29 @@ export default function App() {
   const [showTuning, setShowTuning] = useState(false)
   const [camerasLoaded, setCamerasLoaded] = useState(false)
   const [viewedRefreshKey, setViewedRefreshKey] = useState(0)
+  const [showHelp, setShowHelp]         = useState(false)
+
+  // Load settings from server on mount
+  useEffect(() => {
+    getSettings()
+      .then(serverSettings => {
+        if (serverSettings && Object.keys(serverSettings).length > 0) {
+          applyImportedSettings(serverSettings)
+        } else {
+          try {
+            const currentLocal = collectSettings()
+            saveSettings(currentLocal).catch(() => {})
+          } catch (e) {
+            console.error("Failed to sync initial settings to server:", e)
+          }
+        }
+      })
+      .catch(err => console.error("Failed to load settings from server:", err))
+  }, [])
+
+  const reloadCameras = useCallback(() => {
+    getCameras().then(setCameras).catch(() => {})
+  }, [])
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
 
@@ -234,13 +258,22 @@ export default function App() {
 
             <button
               className="modal-btn neutral"
+              style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}
+              onClick={() => setShowHelp(true)}
+              title="Руководство пользователя"
+            >
+              <i className="mdi mdi-help-circle-outline" />
+              Help
+            </button>
+            <button
+              className="modal-btn neutral"
               style={{ fontSize: 'calc(var(--font-base) * 0.88)', borderColor: showTasks ? 'var(--accent)' : undefined, color: showTasks ? 'var(--accent)' : undefined }}
               onClick={() => { setShowTasks(v => !v); setShowTuning(false) }}
             >
               <i className="mdi mdi-playlist-play" />
               Tasks
             </button>
-            <ToolsButton onDatabaseCleared={handleScanComplete} cameraId={cameraId} cameras={cameras} />
+            <ToolsButton onDatabaseCleared={handleScanComplete} onCamerasChanged={reloadCameras} cameraId={cameraId} cameras={cameras} />
             <ScanButton cameraId={cameraId} onScanComplete={handleScanComplete} />
           </div>
         </div>
@@ -394,6 +427,10 @@ export default function App() {
           error={rangeDelete.error}
           camera={cameras.find(c => c.id === cameraId)}
         />
+      )}
+
+      {showHelp && (
+        <HelpModal onClose={() => setShowHelp(false)} />
       )}
     </div>
   )

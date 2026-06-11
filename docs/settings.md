@@ -1,8 +1,12 @@
-# Settings & localStorage
+# Settings & Server Synchronization
 
-All user settings are stored in the **browser's localStorage**. Nothing is written to the server or any file on disk. Settings persist across page reloads and browser restarts, but are tied to the browser profile — clearing browser data will reset them.
+All user UI preferences, thresholds, and view configuration are synchronized with the server's `backend/settings.json` file. The browser's `localStorage` acts as a local cache for immediate access.
 
-To inspect or clear them manually: browser DevTools → Application → Local Storage → `http://localhost:5173`.
+> [!IMPORTANT]
+> **API Keys Security**: To protect credentials, the Gemini and Claude API keys (`gemini_api_key` and `claude_api_key`) are kept **strictly on the frontend** in the browser's `localStorage`. They are never uploaded or saved to the server.
+
+To inspect or clear the cached settings manually: browser DevTools → Application → Local Storage → `http://localhost:5173`.
+
 
 ---
 

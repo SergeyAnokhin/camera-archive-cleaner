@@ -12,9 +12,9 @@ For a flat per-file listing see [`code-map.md`](code-map.md). This doc is the *g
 |---|---|---|---|
 | **HTTP layer** | `main.py`, `routers/*`, `api_helpers.py` | every other subsystem | fastapi, uvicorn |
 | **Logging** | `logging_setup.py` | — (configures root logger on import) | — |
-| **Config & scan** | `config.py`, `scanner.py`, `cameras.yaml` | Indexing/DB | pyyaml, env `CAMERA_ROOT` |
-| **Indexing / DB** | `database.py`, `snapshots.db` | — (owns all SQL) | sqlite3 (stdlib) |
-| **Thumbnail pipeline** | `thumbnails.py`, `diff_thumbnails.py`, `diff_zoom_thumbnails.py`, `erosion_thumbnails.py`, `motion_thumbnails.py` | Indexing/DB (cache paths) | Pillow, numpy, opencv |
+| **Config & scan** | `config.py`, `scanner.py` | Indexing/DB | env `CAMERA_ROOT` |
+| **Indexing / DB** | `database.py`, `snapshots.db` (incl. `cameras` table) | — (owns all SQL) | sqlite3 (stdlib) |
+| **Thumbnail pipeline** | `thumbnails.py`, `diff_thumbnails.py`, `erosion_thumbnails.py` | Indexing/DB (cache paths) | Pillow, numpy, opencv |
 | **Compute delegation** | `compute_client.py`, `compute_config.py`, `compute_cache.py`, `ai_providers/openvino.py`, `routers/compute.py` | Indexing/DB, compute-service | httpx |
 | **Cloud AI** | `ai_providers/gemini.py`, `ai_providers/claude.py`, `ai_providers/common.py`, `ai_pricing.py` | Indexing/DB | google-genai, anthropic, Pillow |
 | **Task queue** | `task_runner.py`, `task_executors/*`, `routers/tasks.py` | Indexing/DB, Compute delegation | asyncio (stdlib) |
@@ -31,7 +31,7 @@ The exception is [`routers/delete.py`](../backend/routers/delete.py), which runs
 - `backend/compute_client.py` — strips `CAMERA_ROOT` from `camera.path`
 - `frontend/src/components/DeleteConfirmModal.jsx` — displays `camera.path`
 
-**When changing `cameras.yaml` schema** — the file is the single source of truth. CI auto-injects it into `values.yaml` `camerasConfig`. Do **not** edit `camerasConfig` directly. `config.py` consumes the yaml; `CAMERA_ROOT` env var (set in Helm from `camera.smb.mountPath`) is prepended at runtime.
+**When changing camera configuration** — the camera configuration is stored in the database (`snapshots.db`) and managed via the UI. On first startup, it can be migrated from `cameras.yaml` if it exists. At runtime, the `CAMERA_ROOT` env var is prepended to the camera relative path to get the absolute media path.
 
 ---
 
@@ -73,8 +73,8 @@ Current runtime config is **not** environment-driven — relevant before contain
 
 | Config | Where it lives | Containerisation note |
 |---|---|---|
-| Camera IDs & paths | `backend/cameras.yaml` | Mount as a volume or template from env |
-| Camera media (snapshots/videos) | UNC / local paths inside `cameras.yaml` | Must be reachable from the container (volume mount / SMB) |
+| Camera IDs & paths | SQLite DB (`backend/snapshots.db`, `cameras` table) | Persisted in the DB; CRUD via UI (Tools → Cameras) |
+| Camera media (snapshots/videos) | Paths inside the DB | Must be reachable from the container (volume mount / SMB) |
 | DB & all caches | `backend/*.db`, `backend/*_cache/` | Put on a persistent volume |
 | OpenVINO models | `compute-service/models/` | Lives with the compute-service |
 | Log level | hard-coded `logging.root.setLevel(...)` in `logging_setup.py` | No env override yet |

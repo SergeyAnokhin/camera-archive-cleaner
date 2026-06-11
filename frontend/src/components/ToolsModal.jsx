@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react'
 import './ToolsModal.css'
 import GeneralTab from './tools/GeneralTab.jsx'
+import CamerasTab from './tools/CamerasTab.jsx'
 import HourViewTab from './tools/HourViewTab.jsx'
 import AiTab from './tools/AiTab.jsx'
 import ComputeTab from './tools/ComputeTab.jsx'
 import ServiceTab from './tools/ServiceTab.jsx'
+import { collectSettings } from './tools/settingsIO.js'
+import { saveSettings } from '../api.js'
 
 const TABS = [
   { id: 'general', label: 'General' },
+  { id: 'cameras', label: 'Cameras' },
   { id: 'view',    label: 'View' },
   { id: 'ai',      label: 'AI' },
   { id: 'compute', label: 'Compute' },
@@ -22,7 +26,7 @@ function resolveTab(id) {
   return TAB_ALIASES[id] || 'general'
 }
 
-export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, cameraId, cameras }) {
+export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, onCamerasChanged, cameraId, cameras }) {
   const [activeTab, setActiveTab] = useState(() => resolveTab(initialTab))
 
   function handleBackdropClick(e) {
@@ -34,6 +38,18 @@ export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, cam
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  // Auto-sync settings to server when ToolsModal closes
+  useEffect(() => {
+    return () => {
+      try {
+        const settings = collectSettings()
+        saveSettings(settings).catch(err => console.error("Failed to sync settings to server:", err))
+      } catch (e) {
+        console.error("Failed to collect settings for server sync:", e)
+      }
+    }
+  }, [])
 
   return (
     <div className="modal-backdrop" onClick={handleBackdropClick}>
@@ -57,6 +73,7 @@ export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, cam
 
         <div className="modal-tab-content">
           {activeTab === 'general' && <GeneralTab />}
+          {activeTab === 'cameras' && <CamerasTab onSaveSuccess={onCamerasChanged} />}
           {activeTab === 'view'    && <HourViewTab />}
           {activeTab === 'ai'      && <AiTab />}
           {activeTab === 'compute' && <ComputeTab />}
@@ -72,3 +89,4 @@ export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, cam
     </div>
   )
 }
+

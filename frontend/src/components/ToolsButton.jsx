@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import ToolsModal from './ToolsModal.jsx'
 import './ToolsButton.css'
 
-export default function ToolsButton({ onDatabaseCleared, cameraId, cameras }) {
+export default function ToolsButton({ onDatabaseCleared, onCamerasChanged, cameraId, cameras }) {
   const [open, setOpen] = useState(false)
   const [initialTab, setInitialTab] = useState(null)
 
@@ -27,6 +27,7 @@ export default function ToolsButton({ onDatabaseCleared, cameraId, cameras }) {
           initialTab={initialTab}
           onClose={() => setOpen(false)}
           onDatabaseCleared={() => { setOpen(false); onDatabaseCleared() }}
+          onCamerasChanged={onCamerasChanged}
           cameraId={cameraId}
           cameras={cameras}
         />

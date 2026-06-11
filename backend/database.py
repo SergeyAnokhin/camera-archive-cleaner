@@ -13,8 +13,46 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+def init_cameras_table(conn: sqlite3.Connection) -> None:
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS cameras (
+            id   TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            path TEXT NOT NULL
+        );
+    """)
+
+
+def migrate_cameras_from_yaml(conn: sqlite3.Connection) -> None:
+    # Check if table already has cameras
+    row = conn.execute("SELECT COUNT(*) AS count FROM cameras").fetchone()
+    if row and row["count"] > 0:
+        return
+    # Table is empty, read cameras.yaml if it exists
+    yaml_path = Path(__file__).parent / "cameras.yaml"
+    if yaml_path.exists():
+        try:
+            import yaml
+            with open(yaml_path, encoding="utf-8") as f:
+                data = yaml.safe_load(f)
+            cameras = data.get("cameras", [])
+            for cam in cameras:
+                conn.execute(
+                    "INSERT OR IGNORE INTO cameras (id, name, path) VALUES (?, ?, ?)",
+                    (cam["id"], cam["name"], cam["path"])
+                )
+            conn.commit()
+            import logging
+            logging.getLogger("api").info("📷 Migrated %d cameras from cameras.yaml to database", len(cameras))
+        except Exception as e:
+            import logging
+            logging.getLogger("api").warning("⚠️ Failed to migrate cameras.yaml to database: %s", e)
+
+
 def init_db() -> None:
     with get_connection() as conn:
+        init_cameras_table(conn)
+        migrate_cameras_from_yaml(conn)
         init_ai_analysis_table(conn)
         init_object_detection_table(conn)
         init_video_previews_table(conn)

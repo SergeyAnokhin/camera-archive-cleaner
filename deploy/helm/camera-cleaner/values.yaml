@@ -37,8 +37,6 @@ backend:
     - openvino_thumbnails_cache
     - video_thumbnails_cache
     - diff_thumbnails_cache
-    - diff_zoom_thumbnails_cache
-    - motion_thumbnails_cache
     - erosion_thumbnails_cache
 compute:
   replicas: 1

@@ -33,7 +33,7 @@ from fastapi.responses import JSONResponse
 
 from database import init_db
 import task_runner
-from routers import ai, catalog, compute, delete, logging_api, maintenance, media, stats, tasks, thumbnails_api, tuning
+from routers import ai, catalog, compute, delete, logging_api, maintenance, media, stats, tasks, thumbnails_api, tuning, settings
 
 logger = logging.getLogger("api")
 
@@ -78,3 +78,5 @@ app.include_router(compute.router)
 app.include_router(tasks.router)
 app.include_router(tuning.router)
 app.include_router(logging_api.router)
+app.include_router(settings.router)
+

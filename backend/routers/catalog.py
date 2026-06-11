@@ -3,6 +3,7 @@ import logging
 import time
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from config import load_cameras
 from database import get_connection
@@ -10,6 +11,62 @@ from scanner import scan_camera
 
 router = APIRouter()
 logger = logging.getLogger("api")
+
+
+class CameraConfigItem(BaseModel):
+    id: str
+    name: str
+    path: str
+
+
+class CheckPathRequest(BaseModel):
+    path: str
+
+
+@router.get("/cameras/config", summary="Get raw camera configurations (relative paths)")
+def get_cameras_config():
+    with get_connection() as conn:
+        rows = conn.execute("SELECT id, name, path FROM cameras").fetchall()
+    return [{"id": r["id"], "name": r["name"], "path": r["path"]} for r in rows]
+
+
+@router.put("/cameras/config", summary="Overwrite camera configurations in the database")
+def put_cameras_config(req: list[CameraConfigItem]):
+    seen_ids = set()
+    for item in req:
+        cid = item.id.strip()
+        if not cid:
+            raise HTTPException(status_code=400, detail="Camera ID cannot be empty")
+        if cid in seen_ids:
+            raise HTTPException(status_code=400, detail=f"Duplicate camera ID: '{cid}'")
+        seen_ids.add(cid)
+        if not item.name.strip():
+            raise HTTPException(status_code=400, detail="Camera Name cannot be empty")
+        if not item.path.strip():
+            raise HTTPException(status_code=400, detail="Camera Path cannot be empty")
+    
+    with get_connection() as conn:
+        conn.execute("DELETE FROM cameras")
+        for item in req:
+            conn.execute(
+                "INSERT INTO cameras (id, name, path) VALUES (?, ?, ?)",
+                (item.id.strip(), item.name.strip(), item.path.strip())
+            )
+    logger.info("📷 Cameras configuration updated: %s", [c.id for c in req])
+    return {"ok": True}
+
+
+@router.post("/cameras/check-path", summary="Check if camera relative path exists under CAMERA_ROOT")
+def check_camera_path(req: CheckPathRequest):
+    from config import CAMERA_ROOT
+    abs_path = CAMERA_ROOT / req.path
+    exists = abs_path.exists() and abs_path.is_dir()
+    return {
+        "exists": exists,
+        "absolute_path": str(abs_path),
+        "is_dir": abs_path.is_dir() if exists else False
+    }
+
 
 
 @router.get("/cameras", summary="List all configured cameras")

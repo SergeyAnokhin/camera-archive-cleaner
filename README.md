@@ -13,7 +13,7 @@ npm install          # root — installs concurrently (once)
 cd backend && pip install -r requirements.txt
 cd compute-service && pip install -r requirements.txt
 cd frontend && npm install
-# Edit backend/cameras.yaml — set camera IDs, names, and paths
+# Edit backend/cameras.yaml (or add later via UI) — set camera IDs, names, and paths
 ```
 
 **Start frontend + backend + compute-service (one command):**
@@ -51,13 +51,12 @@ Swagger UI at **`http://localhost:8000/docs`**
 ## Architecture
 
 ```
-cameras.yaml
+snapshots.db (cameras table)
     │
     ▼
 config.py ──► scanner.py ──► database.py  (SQLite: snapshots.db)
                                   ▲
-   thumbnail pipeline ────────────┤   thumbnails / diff / diff_zoom /
-                                  │   erosion / motion
+   thumbnail pipeline ────────────┤   thumbnails / diff / erosion
    ai_providers/ ─────────────────┤   gemini · claude
    compute_client.py ─────────────┘   ──HTTP──► compute-service (:8001)
    task_runner.py (asyncio bg loop)  │              YOLO detection · video
@@ -82,6 +81,7 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 | File | Description |
 |------|-------------|
 | [`docs/code-map.md`](docs/code-map.md) | Code map — all backend and frontend files, what each file does |
+| [`docs/user-guide.md`](docs/user-guide.md) | Руководство пользователя — типовой сценарий, быстрые клавиши, метрики |
 | [`docs/recipes.md`](docs/recipes.md) | Change recipes — which files to touch for cross-cutting tasks (add a view mode, AI provider, endpoint) |
 | [`docs/subsystems.md`](docs/subsystems.md) | Backend grouped into subsystems: dependencies and seams |
 | [`docs/compute-service.md`](docs/compute-service.md) | Optional compute-service: stateless detection + video backend, routing (off/local/remote), path remapping |
@@ -96,8 +96,13 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 
 ---
 
-## cameras.yaml format
+## Camera configuration
 
+Cameras are configured and stored in the SQLite database (`snapshots.db`). You can manage them directly via the UI in **Tools → Cameras**.
+
+On the first start, if the database configuration is empty, the application will automatically migrate cameras from `backend/cameras.yaml` if it exists.
+
+The `cameras.yaml` format (used for migration or initial setup):
 ```yaml
 cameras:
   - id: "foscam_fi9805w"

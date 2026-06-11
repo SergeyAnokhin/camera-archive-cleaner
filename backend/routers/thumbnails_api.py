@@ -34,7 +34,7 @@ def _parse_page_ids(page_ids: str) -> list[int]:
 
 
 def _page_thumbnail_response(file_id: int, kind: str, build) -> FileResponse:
-    """Shared flow for the page-context motion thumbnails (diff / diff_zoom / erosion / motion).
+    """Shared flow for the page-context motion thumbnails (diff / erosion).
 
     Validates the file is a photo, ensures the base thumbnail exists, then runs
     `build(conn)` to get or create the mode-specific thumbnail.

@@ -17,14 +17,16 @@ class Camera:
     path: str  # absolute path = CAMERA_ROOT / cameras.yaml relative path
 
 
-def load_cameras(path: Path = CONFIG_PATH) -> list[Camera]:
-    with open(path, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+def load_cameras(path=None) -> list[Camera]:
+    from database import get_connection
+    camera_root = CAMERA_ROOT
+    with get_connection() as conn:
+        rows = conn.execute("SELECT id, name, path FROM cameras").fetchall()
     return [
         Camera(
-            id=cam["id"],
-            name=cam["name"],
-            path=str(CAMERA_ROOT / cam["path"]),
+            id=row["id"],
+            name=row["name"],
+            path=str(camera_root / row["path"]),
         )
-        for cam in data["cameras"]
+        for row in rows
     ]

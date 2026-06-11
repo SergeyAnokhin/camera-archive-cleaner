@@ -11,11 +11,6 @@ from diff_thumbnails import DIFF_THUMB_DIR
 from erosion_thumbnails import EROSION_THUMB_DIR
 from compute_cache import OV_THUMB_DIR, VID_THUMB_DIR
 
-# Legacy cache dirs — modes removed but dirs may still exist from previous runs
-_BACKEND = Path(__file__).parent.parent
-MOTION_THUMB_DIR   = _BACKEND / "motion_thumbnails_cache"
-DIFF_ZOOM_THUMB_DIR = _BACKEND / "diff_zoom_thumbnails_cache"
-
 router = APIRouter()
 logger = logging.getLogger("api")
 
@@ -231,17 +226,13 @@ def clear_all_thumbnails(camera_id: Optional[str] = Query(default=None),
                 conn.execute(f"DELETE FROM video_previews WHERE file_id IN ({ph})", file_ids)
 
         diff_files    = _clear_dir_by_ids_suffix(DIFF_THUMB_DIR,      file_ids)
-        dzoom_files   = _clear_dir_by_ids_suffix(DIFF_ZOOM_THUMB_DIR,  file_ids)
         erosion_files = _clear_dir_by_ids_suffix(EROSION_THUMB_DIR,    file_ids)
-        motion_files  = _clear_dir_by_ids_suffix(MOTION_THUMB_DIR,     file_ids)
         vid_files     = _clear_dir_by_ids_prefix(VID_THUMB_DIR,        file_ids)
         ov_files      = 0
     else:
         basic_files, _    = _clear_dir_all(THUMB_DIR)
         diff_files, _     = _clear_dir_all(DIFF_THUMB_DIR)
-        dzoom_files, _    = _clear_dir_all(DIFF_ZOOM_THUMB_DIR)
         erosion_files, _  = _clear_dir_all(EROSION_THUMB_DIR)
-        motion_files, _   = _clear_dir_all(MOTION_THUMB_DIR)
         ov_files, _       = _clear_dir_all(OV_THUMB_DIR)
         vid_files, _      = _clear_dir_all(VID_THUMB_DIR)
 
@@ -250,15 +241,13 @@ def clear_all_thumbnails(camera_id: Optional[str] = Query(default=None),
             conn.execute("DELETE FROM object_detection")
             conn.execute("DELETE FROM video_previews")
 
-    total_files = basic_files + diff_files + dzoom_files + erosion_files + motion_files + ov_files + vid_files
+    total_files = basic_files + diff_files + erosion_files + ov_files + vid_files
     logger.info("   └─ все миниатюры очищены → %d файлов", total_files)
     return {
         "types": {
             "basic":    {"deleted_files": basic_files},
             "diff":     {"deleted_files": diff_files},
-            "diff_zoom":{"deleted_files": dzoom_files},
             "erosion":  {"deleted_files": erosion_files},
-            "motion":   {"deleted_files": motion_files},
             "openvino": {"deleted_files": ov_files},
             "video":    {"deleted_files": vid_files},
         },
@@ -271,7 +260,7 @@ def clear_all_thumbnails(camera_id: Optional[str] = Query(default=None),
 def get_storage_info():
     db_size = DB_PATH.stat().st_size if DB_PATH.exists() else 0
 
-    thumb_dirs = [THUMB_DIR, DIFF_THUMB_DIR, DIFF_ZOOM_THUMB_DIR, EROSION_THUMB_DIR, MOTION_THUMB_DIR, OV_THUMB_DIR, VID_THUMB_DIR]
+    thumb_dirs = [THUMB_DIR, DIFF_THUMB_DIR, EROSION_THUMB_DIR, OV_THUMB_DIR, VID_THUMB_DIR]
     thumb_size = 0
     for d in thumb_dirs:
         if d.exists():

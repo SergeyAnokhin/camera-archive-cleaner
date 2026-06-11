@@ -1,0 +1,10 @@
+{
+  "font-base": "16",
+  "hour_page_size": "60",
+  "google_ai": {
+    "model": "gemini-test"
+  },
+  "claude_ai": {
+    "model": "claude-test"
+  }
+}

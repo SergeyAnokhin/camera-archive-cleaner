@@ -17,16 +17,15 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` |
 | [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
 | [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks and dispatches to `task_executors/` by type (registry `EXECUTORS`). Owns global pause and stuck-task reset; per-type logic lives in the executors (see table below) |
-| [`database.py`](../backend/database.py) | SQLite: table schema + migrations, all SQL queries. Tables: `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks` (has `log_tail TEXT` for video_convert/file_organizer logs), `tuning_sessions`. `append_task_log()` stores last 300 log lines per task |
-| [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed (used by `file_organizer` task) |
-| [`config.py`](../backend/config.py) | Parses `cameras.yaml` → `Camera(id, name, path)`. `path` = `CAMERA_ROOT` env var + relative path from yaml. **When changing `Camera` fields, also update:** `routers/catalog.py` (serialises to JSON), `scanner.py` (reads `camera.path`), `compute_client.py` (strips root), `DeleteConfirmModal.jsx` (displays `camera.path`). |
-| [`thumbnails.py`](../backend/thumbnails.py) | Basic 256×256 JPEG thumbnails (Pillow). Cache in `thumbnails_cache/`. Used by `/thumbnail/{id}` |
+| [`database.py`](../backend/database.py) | SQLite: table schema + migrations, all SQL queries. Tables: `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks`, `tuning_sessions`, `cameras`. |
+| [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed |
+| [`config.py`](../backend/config.py) | Defines `Camera(id, name, path)` and `load_cameras()` which queries the database and appends `CAMERA_ROOT`. |
+| [`settings_manager.py`](../backend/settings_manager.py) | Persists user settings (without credentials) to `settings.json` on the server |
+| [`thumbnails.py`](../backend/thumbnails.py) | Basic 256×256 JPEG thumbnails (Pillow). Cache in `thumbnails_cache/` |
 | [`diff_thumbnails.py`](../backend/diff_thumbnails.py) | Motion Diff thumbnails: per-pixel delta from page mean (numpy). Cache in `diff_thumbnails_cache/` |
 | [`erosion_thumbnails.py`](../backend/erosion_thumbnails.py) | Erosion thumbnails: MOG2 + morphological erosion. Cache in `erosion_thumbnails_cache/` |
-| [`motion_thumbnails.py`](../backend/motion_thumbnails.py) | Thumbnails for 4 motion modes: neon_mask, mhi, bounding_boxes, motion_stacking. Cache in `motion_thumbnails_cache/` |
-| [`diff_zoom_thumbnails.py`](../backend/diff_zoom_thumbnails.py) | Diff Zoom thumbnails: crop to most active 1/9 tile. Cache in `diff_zoom_thumbnails_cache/` |
-| `cameras.yaml` | **Single source of truth** for camera config. Stores relative paths (e.g. `FoscamHut`); `CAMERA_ROOT` is prepended at runtime. CI auto-injects this file into `deploy/helm/.../values.yaml` `camerasConfig` on every push — **do not edit `camerasConfig` directly**. |
 | `snapshots.db` | SQLite database (auto-created on startup) |
+
 
 ### Task executors (`backend/task_executors/`)
 
@@ -47,17 +46,18 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 
 | File | Endpoints |
 |---|---|
-| [`catalog.py`](../backend/routers/catalog.py) | `/cameras`, `/scan` |
+| [`catalog.py`](../backend/routers/catalog.py) | `/cameras` (load from DB), `/cameras/config` (GET/PUT CRUD), `/cameras/check-path` (POST check), `/scan` |
 | [`stats.py`](../backend/routers/stats.py) | `/stats`, `/files`, `/distribution`, `/previews` |
-| [`thumbnails_api.py`](../backend/routers/thumbnails_api.py) | `/thumbnail`, `/diff_thumbnail`, `/diff_zoom_thumbnail`, `/erosion_thumbnail`, `/motion_thumbnail`, `/openvino_thumbnail`, `/video_thumbnail`. The 4 page-context diff endpoints share `_parse_page_ids()` + `_page_thumbnail_response()` helpers |
+| [`thumbnails_api.py`](../backend/routers/thumbnails_api.py) | `/thumbnail`, `/diff_thumbnail`, `/erosion_thumbnail`, `/openvino_thumbnail`, `/video_thumbnail`. |
 | [`media.py`](../backend/routers/media.py) | `/media/{file_id}` — serves the original photo/video file with the correct MIME type |
-| [`delete.py`](../backend/routers/delete.py) | `/delete/preview`, `/delete/confirm`, `/delete/preview_range`, `/delete/by_range`. Runs its own inline SQL (not via `database.py`) |
-| [`maintenance.py`](../backend/routers/maintenance.py) | `/database`, per-type `/*_thumbnails`, `/all_thumbnails`, `/storage_info` |
-| [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze`, `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`. Thin layer — request models + delegation; provider logic lives in `ai_providers/` |
-| [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status` — routing config for the compute-service |
-| [`tasks.py`](../backend/routers/tasks.py) | `/tasks` CRUD + `/tasks/metrics` + `GET /tasks/{id}/logs` — task queue REST endpoints. `log_tail` is excluded from the list response; fetch separately via `/logs` |
-| [`tuning.py`](../backend/routers/tuning.py) | `/tuning/sessions/*` — model tuning: image upload, autolabel, ground truth, background golden-section confidence search. See [`docs/tuning.md`](tuning.md) |
-| [`logging_api.py`](../backend/routers/logging_api.py) | `/logging/config` (GET/PUT), `/logging/tail` — live log level + buffer control. `/logging/compute/*` — proxied equivalents for the compute-service |
+| [`delete.py`](../backend/routers/delete.py) | `/delete/preview`, `/delete/confirm`, `/delete/preview_range`, `/delete/by_range`. |
+| [`maintenance.py`](../backend/routers/maintenance.py) | `/database`, per-type `/*_thumbnails` (except deleted), `/all_thumbnails`, `/storage_info` |
+| [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze`, `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`. |
+| [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status` |
+| [`tasks.py`](../backend/routers/tasks.py) | `/tasks` CRUD + `/tasks/metrics` + `GET /tasks/{id}/logs` |
+| [`tuning.py`](../backend/routers/tuning.py) | `/tuning/sessions/*` — model tuning |
+| [`logging_api.py`](../backend/routers/logging_api.py) | `/logging/config` (GET/PUT), `/logging/tail` |
+| [`settings.py`](../backend/routers/settings.py) | `/settings` (GET/PUT settings synchronization) |
 
 ### AI providers (`backend/ai_providers/`)
 
@@ -73,16 +73,14 @@ Provider-specific image-analysis logic, called by `routers/ai.py`.
 ### Backend dependency graph
 
 ```
-cameras.yaml
+snapshots.db (cameras)
     │
     ▼
 config.py ──► scanner.py ──► database.py
-                                  ▲
+                              ▲
 thumbnails.py ───────────────────┤
 diff_thumbnails.py ──────────────┤  (all called from routers/)
-erosion_thumbnails.py ───────────┤
-motion_thumbnails.py ────────────┤
-diff_zoom_thumbnails.py ─────────┘
+erosion_thumbnails.py ───────────┘
 
 routers/ ──► compute_client.py ──HTTP──► compute-service (:8001)
 ```
@@ -240,7 +238,6 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 | [`claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) | AI description (Claude) — icon overlay from analysis results |
 | [`index.js`](../frontend/src/components/viewModes/index.js) | Mode registry — `VIEW_MODES`; `getEnabledViewModes()` filters `needsCompute` modes for keyboard cycling; `getViewModesWithStatus()` returns all modes with `disabled`/`disabledHint` for the dropdown |
 
-> The backend also serves thumbnail styles with **no frontend mode**: `/diff_zoom_thumbnail` and `/motion_thumbnail` (neon_mask, mhi, bounding_boxes, motion_stacking). Backend-only — adding a UI mode for them means creating a `viewModes/*.js` file and registering it in `index.js`.
 
 ### Styles
 
