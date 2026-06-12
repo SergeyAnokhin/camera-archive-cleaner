@@ -109,7 +109,27 @@ After creating or updating a doc, add/update its entry in the `README.md` Docume
 
 ---
 
-## 6. Project description
+## 6. Testing (mandatory after every change)
+
+**At the end of every refactoring or code change, run the tests. This is not optional.**
+
+```powershell
+npm test              # all three suites (backend, compute, frontend), from repo root
+npm run test:backend  # or a targeted suite when the change is local to one service
+npm run test:compute
+npm run test:frontend
+```
+
+Rules:
+- Run the full `npm test` after any refactoring; a targeted suite is enough for a small change confined to one service — but when in doubt, run everything.
+- Tests cover documented rules (see [`docs/testing.md`](docs/testing.md) — each test file references the doc that defines the behavior it pins). If you change such behavior intentionally, update the doc, the test, and the code together.
+- When adding or changing **complex calculations or non-trivial logic** that is described in `docs/`, add a test pinning the documented rule. Do not add tests for trivial code.
+- Keep test output minimal: pytest runs with `-q --tb=short`, vitest with `--reporter=dot`. On success only the totals are printed; on failure — the test name, location, and error. Don't override this with verbose flags.
+- A task is **not complete** while any test fails.
+
+---
+
+## 7. Project description
 
 **Current architecture is in `docs/` — that is the source of truth.** Use the
 Documentation table in [`README.md`](README.md) as the index; before touching any

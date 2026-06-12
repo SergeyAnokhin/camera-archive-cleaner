@@ -25,6 +25,8 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`diff_thumbnails.py`](../backend/diff_thumbnails.py) | Motion Diff thumbnails: per-pixel delta from page mean (numpy). Cache in `diff_thumbnails_cache/` |
 | [`erosion_thumbnails.py`](../backend/erosion_thumbnails.py) | Erosion thumbnails: MOG2 + morphological erosion. Cache in `erosion_thumbnails_cache/` |
 | `snapshots.db` | SQLite database (auto-created on startup). Path = `DATA_DIR/snapshots.db`; `DATA_DIR` env var defaults to `backend/` for local and K8s, set to `/data` for HA add-on |
+| [`pytest.ini`](../backend/pytest.ini) | Pytest config: `tests/` dir, quiet output (`-q --tb=short`) |
+| [`tests/`](../backend/tests/) | Unit tests for documented complex logic (timestamp parsing, ±5 s video matching, golden-section search, AI JSON/cost, path contract, SpeedTracker). See [`testing.md`](testing.md) |
 
 
 ### Task executors (`backend/task_executors/`)
@@ -98,6 +100,7 @@ Optional stateless service for heavy compute. Full architecture: [`compute-servi
 | [`video.py`](../compute-service/video.py) | Video thumbnail generation (first/last frame, 2×2 grid, max-change GIF) + `convert_video()` — runs ffmpeg (H.265/H.264, up to 2 h timeout) |
 | [`config.py`](../compute-service/config.py) | `CAMERA_ROOT` env var (default `/camera`); `to_absolute(relative_path)` converts relative paths received from the backend to absolute. Set `CAMERA_ROOT=\\192.168.1.91\Camera` for local Windows dev. |
 | [`export_models.py`](../compute-service/export_models.py) | **Build-time only** — exports yolov8n/s/m to OpenVINO IR; called by `Dockerfile RUN`, never at runtime |
+| [`pytest.ini`](../compute-service/pytest.ini) + [`tests/`](../compute-service/tests/) | Unit tests: `to_absolute` path contract, thumbnail letterboxing. See [`testing.md`](testing.md) |
 
 ## Shared block (`shared/`)
 
@@ -121,6 +124,7 @@ Imported by both the main backend and the compute-service.
 | [`cocoClasses.js`](../frontend/src/cocoClasses.js) | The 80 COCO classes (`{id, en, ru, emoji}`) in class-ID order + `DETECTION_CLASSES_DEFAULT`. Source for the Detection-tab class checklist; IDs flow to YOLO's `classes=` param |
 | [`prompts.js`](../frontend/src/prompts.js) | Single source of truth for all AI prompt templates: `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude), `GEMINI_FREEFORM_PROMPT`, `CELL_ANALYSIS_PROMPT(n)` (heatmap batch). `{n}` = image count |
 | [`main.jsx`](../frontend/src/main.jsx) | React entry point. Mounts `<App />` |
+| [`test-setup.js`](../frontend/src/test-setup.js) | Vitest setup: in-memory `localStorage` stub (no jsdom). Tests are co-located `*.test.js` files (`components/navUtils.test.js`, `components/hour/hourUtils.test.js`). See [`testing.md`](testing.md) |
 
 ### API client (`frontend/src/api/`)
 
@@ -261,6 +265,7 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 | File | Role |
 |---|---|
 | [`vite.config.js`](../frontend/vite.config.js) | Vite: `base: './'` (relative assets — required for HA ingress); dev proxy `/api/*` → `http://localhost:8000` |
+| [`vitest.config.js`](../frontend/vitest.config.js) | Vitest: node environment, `src/**/*.test.js`, localStorage stub via `src/test-setup.js` |
 | [`package.json`](../frontend/package.json) | Dependencies: React, Recharts, Vite |
 | [`index.html`](../frontend/index.html) | HTML entry point; loads MDI icons from CDN |
 

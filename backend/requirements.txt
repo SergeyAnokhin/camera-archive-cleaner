@@ -9,3 +9,4 @@ google-genai
 anthropic
 python-multipart
 psutil
+pytest

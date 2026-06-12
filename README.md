@@ -91,6 +91,7 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 | [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis: Gemini, Claude & OpenVINO integration, DB schema, prompt format, icon display |
 | [`docs/tuning.md`](docs/tuning.md) | Model tuning screen: upload images, ground truth, per-model golden-section confidence search, results charts |
 | [`docs/visualization-modes.md`](docs/visualization-modes.md) | All 6 view modes: Normal, Motion highlight, Motion (noise-filtered), AI description (Gemini/Claude), Object detection (local) |
+| [`docs/testing.md`](docs/testing.md) | Unit tests: what rule each test pins, how to run (`npm test`), how to add new ones |
 | [`docs/logging.md`](docs/logging.md) | Log levels, format, colours, how to configure |
 | [`docs/deployment.md`](docs/deployment.md) | k3s deployment: Docker images, Helm chart, ArgoCD GitOps, SMB camera share, node pinning |
 

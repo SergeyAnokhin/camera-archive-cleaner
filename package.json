@@ -1,6 +1,10 @@
 {
   "scripts": {
-    "start": "concurrently --names \"MAIN,COMPUTE,FRONT\" --prefix-colors \"cyan,yellow,magenta\" \"chcp 65001>nul&set PYTHONIOENCODING=utf-8&cd backend&uvicorn main:app --reload --port 8000\" \"chcp 65001>nul&set PYTHONIOENCODING=utf-8&cd compute-service&uvicorn app:app --reload --port 8001\" \"cd frontend && npm run dev\""
+    "start": "concurrently --names \"MAIN,COMPUTE,FRONT\" --prefix-colors \"cyan,yellow,magenta\" \"chcp 65001>nul&set PYTHONIOENCODING=utf-8&cd backend&uvicorn main:app --reload --port 8000\" \"chcp 65001>nul&set PYTHONIOENCODING=utf-8&cd compute-service&uvicorn app:app --reload --port 8001\" \"cd frontend && npm run dev\"",
+    "test": "npm run test:backend && npm run test:compute && npm run test:frontend",
+    "test:backend": "cd backend && python -m pytest",
+    "test:compute": "cd compute-service && python -m pytest",
+    "test:frontend": "cd frontend && npm test --silent"
   },
   "devDependencies": {
     "concurrently": "^9.0.0"
