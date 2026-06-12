@@ -1,6 +1,6 @@
 name: Camera Snapshots Cleaner
 description: Browse, review, and clean camera snapshot archives from a network share.
-version: "1.0.1"
+version: "1.1.0"
 slug: camera_snapshots_cleaner
 arch:
   - amd64

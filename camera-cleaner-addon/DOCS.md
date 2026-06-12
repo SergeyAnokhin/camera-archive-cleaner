@@ -11,6 +11,8 @@ Browse, review, and clean up camera snapshot archives stored on a network share.
 - Local object detection via remote compute service (optional)
 - Task queue for background scanning and batch analysis
 - Full camera management via UI (no config file editing)
+- Google OAuth integration: download snapshots from Gmail, upload to Google Drive
+- Mobile-friendly responsive UI
 
 ## Setup
 
@@ -41,6 +43,16 @@ cameras:
     name: Front Door
     path: Foscam/FI9805W_C4D6553DECE1
 ```
+
+## Google Integration (optional)
+
+To enable Gmail download or Google Drive upload tasks:
+
+1. Go to **Tools → Google** and click **Connect Google Account**.
+2. Complete the OAuth flow in the browser (you will be redirected back to the add-on).
+3. Once authorized, create tasks of type **Gmail Download** or **Google Drive Upload** in the Tasks screen.
+
+The OAuth token is stored in `/data/google_oauth.json` and persists across restarts.
 
 ## Notes
 
