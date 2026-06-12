@@ -125,8 +125,26 @@ Persistent task queue for long-running compute jobs. Tasks survive server restar
 **`params` shape by type:**
 - `video_thumbnails`: `{camera_id, date_from, date_to, thumb_mode}` — `thumb_mode` matches `/video_thumbnail` modes
 - `openvino`: `{camera_id, date_from, date_to, model_name, confidence}`
+- `gmail_download`: `{camera_id, label_id, label_name?, output_folder?, date_from?, date_to?}` — see [`google-integration.md`](google-integration.md)
+- `gdrive_upload`: `{camera_id, file_type, drive_folder, date_from?, date_to?}` — see [`google-integration.md`](google-integration.md)
 
 **Compute-service `/metrics`** (new endpoint): returns `{cpu_percent, memory_total, memory_used, memory_percent}`. Requires `psutil` in the compute-service.
+
+---
+
+## Google integration
+
+OAuth connection + Gmail labels for the `gmail_download` / `gdrive_upload` task
+types. Full flow: [`google-integration.md`](google-integration.md).
+
+| Method | Path | Body / Params | Description |
+|---|---|---|---|
+| `GET` | `/google/auth/status` | — | `{client_id_set, connected, email}` |
+| `PUT` | `/google/auth/credentials` | `{client_id, client_secret}` | Save the OAuth client (Google Cloud Console, type "Web application") |
+| `GET` | `/google/auth/url` | `redirect_uri` | Consent URL for the popup |
+| `GET` | `/google/oauth/callback` | `code`, `state` | OAuth redirect target — exchanges the code, returns a small HTML page |
+| `POST` | `/google/auth/disconnect` | — | Drop tokens (client credentials kept) |
+| `GET` | `/google/gmail/labels` | — | `{labels: [{id, name}]}` (400 if not connected) |
 
 ---
 

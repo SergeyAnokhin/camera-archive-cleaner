@@ -5,7 +5,10 @@ Each module exposes `run(task_id, params, resume_from)` (the AI one also takes
 """
 import functools
 
-from task_executors import ai, file_organizer, openvino, video_convert, video_thumbnails
+from task_executors import (
+    ai, file_organizer, gdrive_upload, gmail_download, openvino,
+    video_convert, video_thumbnails,
+)
 
 # task type → async executor(task_id, params, resume_from)
 EXECUTORS = {
@@ -15,4 +18,6 @@ EXECUTORS = {
     "claude": functools.partial(ai.run, provider="claude"),
     "video_convert": video_convert.run,
     "file_organizer": file_organizer.run,
+    "gmail_download": gmail_download.run,
+    "gdrive_upload": gdrive_upload.run,
 }

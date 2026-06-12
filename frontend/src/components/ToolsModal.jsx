@@ -5,6 +5,7 @@ import CamerasTab from './tools/CamerasTab.jsx'
 import HourViewTab from './tools/HourViewTab.jsx'
 import AiTab from './tools/AiTab.jsx'
 import ComputeTab from './tools/ComputeTab.jsx'
+import GoogleTab from './tools/GoogleTab.jsx'
 import ServiceTab from './tools/ServiceTab.jsx'
 import { collectSettings } from './tools/settingsIO.js'
 import { saveSettings } from '../api.js'
@@ -15,6 +16,7 @@ const TABS = [
   { id: 'view',    label: 'View' },
   { id: 'ai',      label: 'AI' },
   { id: 'compute', label: 'Compute' },
+  { id: 'google',  label: 'Google' },
   { id: 'service', label: 'Service' },
 ]
 
@@ -77,6 +79,7 @@ export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, onC
           {activeTab === 'view'    && <HourViewTab />}
           {activeTab === 'ai'      && <AiTab />}
           {activeTab === 'compute' && <ComputeTab />}
+          {activeTab === 'google'  && <GoogleTab />}
           {activeTab === 'service' && (
             <ServiceTab
               onDatabaseCleared={onDatabaseCleared}

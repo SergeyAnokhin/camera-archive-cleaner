@@ -21,6 +21,8 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed |
 | [`config.py`](../backend/config.py) | Defines `Camera(id, name, path)` and `load_cameras()` which queries the database and appends `CAMERA_ROOT`. |
 | [`settings_manager.py`](../backend/settings_manager.py) | Persists user settings (without credentials) to `settings.json` on the server |
+| [`google_oauth.py`](../backend/google_oauth.py) | Google OAuth 2.0: client credentials + tokens in `DATA_DIR/google_oauth.json`, consent URL, code exchange, access-token refresh. See [`google-integration.md`](google-integration.md) |
+| [`google_api.py`](../backend/google_api.py) | Sync REST client for Gmail + Drive (httpx): labels, message/attachment fetch, folder find-or-create, resumable upload. Pure helpers `extract_attachments()` / `split_drive_path()` |
 | [`thumbnails.py`](../backend/thumbnails.py) | Basic 256×256 JPEG thumbnails (Pillow). Cache in `thumbnails_cache/` |
 | [`diff_thumbnails.py`](../backend/diff_thumbnails.py) | Motion Diff thumbnails: per-pixel delta from page mean (numpy). Cache in `diff_thumbnails_cache/` |
 | [`erosion_thumbnails.py`](../backend/erosion_thumbnails.py) | Erosion thumbnails: MOG2 + morphological erosion. Cache in `erosion_thumbnails_cache/` |
@@ -41,6 +43,8 @@ One module per task type; each exposes `async run(task_id, params, resume_from)`
 | [`ai.py`](../backend/task_executors/ai.py) | `gemini` / `claude` — per-photo cloud AI analysis with optional delays |
 | [`video_convert.py`](../backend/task_executors/video_convert.py) | `video_convert` — ffmpeg re-encode via compute-service, dry-run support |
 | [`file_organizer.py`](../backend/task_executors/file_organizer.py) | `file_organizer` — move files into YYYY/MM/DD folders, dry-run support |
+| [`gmail_download.py`](../backend/task_executors/gmail_download.py) | `gmail_download` — save photo/video attachments from a Gmail label into the camera folder; skip-if-exists makes re-runs incremental |
+| [`gdrive_upload.py`](../backend/task_executors/gdrive_upload.py) | `gdrive_upload` — upload camera photos/videos (date range) to a Google Drive folder; skips names already in the folder |
 
 ### Backend routers (`backend/routers/`)
 
@@ -60,6 +64,7 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 | [`tuning.py`](../backend/routers/tuning.py) | `/tuning/sessions/*` — model tuning |
 | [`logging_api.py`](../backend/routers/logging_api.py) | `/logging/config` (GET/PUT), `/logging/tail` |
 | [`settings.py`](../backend/routers/settings.py) | `/settings` (GET/PUT settings synchronization) |
+| [`google.py`](../backend/routers/google.py) | `/google/auth/*` (status, credentials, url, disconnect), `/google/oauth/callback`, `/google/gmail/labels` |
 
 ### AI providers (`backend/ai_providers/`)
 
@@ -141,6 +146,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`compute.js`](../frontend/src/api/compute.js) | `/compute/*`, `/services/status` |
 | [`tasks.js`](../frontend/src/api/tasks.js) | `/tasks` CRUD, metrics, logs, `estimate_files`, `getTaskMaxErrors()` |
 | [`tuning.js`](../frontend/src/api/tuning.js) | `/tuning/sessions/*` |
+| [`google.js`](../frontend/src/api/google.js) | `/google/*` (auth status/credentials/url, disconnect, Gmail labels) + `googleRedirectUri()` |
 
 ### Components (`frontend/src/components/`)
 
@@ -174,7 +180,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`TasksScreen.jsx`](../frontend/src/components/TasksScreen.jsx) | Tasks screen — polls `/tasks` every 3 s, shows system metrics bar + task card list, hosts NewTaskModal |
 | [`TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx) | Model tuning orchestrator: session sidebar + step switching. Steps live in `tuning/` (table below). See [`docs/tuning.md`](tuning.md) |
 | [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card: type icon, status badge, progress bar, speed/ETA, thumbnail, pause/resume/cancel buttons. Logs button (console icon) for `video_convert`/`file_organizer` types; dry-run amber tag |
-| [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a task: type selector, camera/dates, AI scheduling, estimates, param assembly (`handleAdd`). Six types: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert`, `file_organizer`. VC/FO param panels live in `newTask/` (table below) |
+| [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a task: type selector, camera/dates, AI scheduling, estimates, param assembly (`handleAdd`). Eight types: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert`, `file_organizer`, `gmail_download`, `gdrive_upload`. Per-type param panels live in `newTask/` (table below) |
 | [`TaskLogsModal.jsx`](../frontend/src/components/TaskLogsModal.jsx) | Log viewer modal for `video_convert` and `file_organizer` tasks. Polls `GET /tasks/{id}/logs` every 2 s while task is active; colour-codes DRY/ERROR/Skip lines. Header has a fullscreen toggle (⛶/⊡) that expands the modal to 98 vw × 96 vh |
 
 ### Tools modal tabs (`frontend/src/components/tools/`)
@@ -192,6 +198,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | View tab: previews per cell, thumb width, hover zoom, diff threshold, page size, burst gap, video preview, uniformity (collapsible, with Low/Medium/High presets) |
 | [`AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) | Combined AI tab: 3 sections — Detection (YOLO model, confidence, classes checklist), Google Gemini (API key, model, prompt), Claude Anthropic (API key, model) |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
+| [`GoogleTab.jsx`](../frontend/src/components/tools/GoogleTab.jsx) | Google account: OAuth client setup (redirect URI display, client id/secret), connect/disconnect with status polling. See [`google-integration.md`](google-integration.md) |
 | [`ServiceTab.jsx`](../frontend/src/components/tools/ServiceTab.jsx) | Combined service tab: Tasks settings (ETA window, log tail lines), Logging (log level, buffer, live viewer), Maintenance (DB/thumbnail cleanup) |
 
 ### New Task modal parts (`frontend/src/components/newTask/`)
@@ -201,6 +208,8 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`newTaskHelpers.js`](../frontend/src/components/newTask/newTaskHelpers.js) | Date input helpers, `isAiType`/`isDbType`, `readGlobalSettings()`, `TASK_TYPES` (type-selector cards), VC codec/preset lists |
 | [`VideoConvertPanel.jsx`](../frontend/src/components/newTask/VideoConvertPanel.jsx) | `video_convert` params: pattern, suffix, codec, CRF, preset |
 | [`FileOrganizerPanel.jsx`](../frontend/src/components/newTask/FileOrganizerPanel.jsx) | `file_organizer` params: source, pattern, output folder, date regex |
+| [`GmailDownloadPanel.jsx`](../frontend/src/components/newTask/GmailDownloadPanel.jsx) | `gmail_download` params: Gmail label select, destination subfolder, email date filter |
+| [`GDriveUploadPanel.jsx`](../frontend/src/components/newTask/GDriveUploadPanel.jsx) | `gdrive_upload` params: file type toggle, Drive folder path, date range + estimate |
 | [`MtimeFilterSection.jsx`](../frontend/src/components/newTask/MtimeFilterSection.jsx) | Shared mtime date filter + live file-count estimate |
 | [`DryRunSection.jsx`](../frontend/src/components/newTask/DryRunSection.jsx) | Shared dry-run toggle |
 

@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react'
-import { getStatsTotal, getCameraDateRange, getFileEstimate, getClassesList } from '../api.js'
 import {
-  toLocalInput, nowLocalInput, monthStartInput, isAiType, isDbType,
+  getStatsTotal, getCameraDateRange, getFileEstimate, getClassesList,
+  getGoogleAuthStatus, getGmailLabels,
+} from '../api.js'
+import {
+  toLocalInput, nowLocalInput, monthStartInput, isAiType, isDbType, isGoogleType,
   readGlobalSettings, VIDEO_MODE_LABELS, TASK_TYPES,
 } from './newTask/newTaskHelpers.js'
 import VideoConvertPanel from './newTask/VideoConvertPanel.jsx'
 import FileOrganizerPanel from './newTask/FileOrganizerPanel.jsx'
+import GmailDownloadPanel from './newTask/GmailDownloadPanel.jsx'
+import GDriveUploadPanel from './newTask/GDriveUploadPanel.jsx'
 import './NewTaskModal.css'
 
 export default function NewTaskModal({ cameras, onAdd, onClose }) {
@@ -39,6 +44,19 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
   })
   const patchFo = p => setFo(v => ({ ...v, ...p }))
 
+  // gmail_download params (panel: newTask/GmailDownloadPanel.jsx)
+  const [gm, setGm] = useState({ labelId: '', dateFrom: '', dateTo: '', outputFolder: '' })
+  const patchGm = p => setGm(v => ({ ...v, ...p }))
+
+  // gdrive_upload params (panel: newTask/GDriveUploadPanel.jsx)
+  const [gd, setGd] = useState({ fileType: 'photo', driveFolder: 'CameraCleaner', dateFrom: '', dateTo: '' })
+  const patchGd = p => setGd(v => ({ ...v, ...p }))
+
+  // Google account state for the two google task types
+  const [googleStatus, setGoogleStatus] = useState(null) // {connected, email} | null
+  const [gmailLabels, setGmailLabels]   = useState(null)
+  const [gdEstimate, setGdEstimate]     = useState(null)
+
   // shared: whether vc/fo date fields were auto-filled from camera range
   const [vcFoDatesFromCamera, setVcFoDatesFromCamera] = useState(false)
 
@@ -66,9 +84,9 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
       .catch(() => setDatesFromCamera(false))
   }, [cameraId, type])
 
-  // Auto-fill date range for video_convert and file_organizer (from camera's indexed files)
+  // Auto-fill date range for video_convert, file_organizer and gdrive_upload (from camera's indexed files)
   useEffect(() => {
-    if (!cameraId || (type !== 'video_convert' && type !== 'file_organizer')) return
+    if (!cameraId || !['video_convert', 'file_organizer', 'gdrive_upload'].includes(type)) return
     getCameraDateRange(cameraId)
       .then(range => {
         if (range.date_from && range.date_to) {
@@ -76,6 +94,7 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
           const to   = toLocalInput(range.date_to)
           patchVc({ dateFrom: from, dateTo: to })
           patchFo({ dateFrom: from, dateTo: to })
+          patchGd({ dateFrom: from, dateTo: to })
           setVcFoDatesFromCamera(true)
         } else {
           setVcFoDatesFromCamera(false)
@@ -83,6 +102,25 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
       })
       .catch(() => setVcFoDatesFromCamera(false))
   }, [cameraId, type])
+
+  // Google account status + Gmail labels for the google task types
+  useEffect(() => {
+    if (!isGoogleType(type) || googleStatus !== null) return
+    getGoogleAuthStatus().then(setGoogleStatus).catch(() => setGoogleStatus({ connected: false }))
+  }, [type, googleStatus])
+
+  useEffect(() => {
+    if (type !== 'gmail_download' || !googleStatus?.connected || gmailLabels !== null) return
+    getGmailLabels().then(d => setGmailLabels(d.labels)).catch(() => setGmailLabels([]))
+  }, [type, googleStatus, gmailLabels])
+
+  // File-count estimate for gdrive_upload (from the files table)
+  useEffect(() => {
+    if (type !== 'gdrive_upload' || !cameraId || !gd.dateFrom || !gd.dateTo) { setGdEstimate(null); return }
+    getStatsTotal(cameraId, gd.dateFrom + ':00', gd.dateTo + ':00')
+      .then(d => setGdEstimate({ photos: d.photo_count ?? 0, videos: d.video_count ?? 0 }))
+      .catch(() => setGdEstimate(null))
+  }, [cameraId, type, gd.dateFrom, gd.dateTo])
 
   useEffect(() => {
     if (!cameraId || !dateFrom || !dateTo || !isDbType(type)) { setEstimate(null); return }
@@ -128,6 +166,13 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
     }
     if (type === 'file_organizer') {
       return `File Organizer · ${cam?.name || cameraId} · ${fo.inputPattern} → ${fo.outputFolder}/`
+    }
+    if (type === 'gmail_download') {
+      const labelName = gmailLabels?.find(l => l.id === gm.labelId)?.name || gm.labelId
+      return `Gmail Download · ${labelName} → ${cam?.name || cameraId}`
+    }
+    if (type === 'gdrive_upload') {
+      return `Drive Upload · ${cam?.name || cameraId} → ${gd.driveFolder}`
     }
     const typeName = { video_thumbnails: 'Video', openvino: 'YOLO', gemini: 'Gemini', claude: 'Claude' }[type] || type
     return `${typeName} · ${cam?.name || cameraId} · ${dateFrom.slice(0,10)} – ${dateTo.slice(0,10)}`
@@ -181,6 +226,17 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
         params.dry_run        = fo.dryRun
         if (fo.dateFrom) params.date_from = fo.dateFrom + ':00'
         if (fo.dateTo)   params.date_to   = fo.dateTo   + ':00'
+      } else if (type === 'gmail_download') {
+        params.label_id   = gm.labelId
+        params.label_name = gmailLabels?.find(l => l.id === gm.labelId)?.name || gm.labelId
+        if (gm.outputFolder.trim()) params.output_folder = gm.outputFolder.trim()
+        if (gm.dateFrom) params.date_from = gm.dateFrom + ':00'
+        if (gm.dateTo)   params.date_to   = gm.dateTo   + ':00'
+      } else if (type === 'gdrive_upload') {
+        params.file_type    = gd.fileType
+        params.drive_folder = gd.driveFolder.trim()
+        if (gd.dateFrom) params.date_from = gd.dateFrom + ':00'
+        if (gd.dateTo)   params.date_to   = gd.dateTo   + ':00'
       }
 
       await onAdd({ type, params, label: buildLabel() })
@@ -195,7 +251,13 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
     : null
 
   const noApiKey = (type === 'gemini' && !geminiApiKey) || (type === 'claude' && !claudeApiKey)
-  const isNewType = type === 'video_convert' || type === 'file_organizer'
+  const isNewType = type === 'video_convert' || type === 'file_organizer' || isGoogleType(type)
+  const googleNotConnected = isGoogleType(type) && googleStatus !== null && !googleStatus.connected
+  const googleIncomplete = isGoogleType(type) && (
+    !googleStatus?.connected
+    || (type === 'gmail_download' && !gm.labelId)
+    || (type === 'gdrive_upload' && !gd.driveFolder.trim())
+  )
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -381,13 +443,40 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
               countLoading={vcFoFileCountLoading} count={vcFoFileCount} />
           )}
 
+          {googleNotConnected && (
+            <div className="ntm__warn">
+              <i className="mdi mdi-alert-outline" />
+              Google account not connected.&nbsp;
+              <a href="#" style={{ color: 'inherit' }}
+                onClick={e => {
+                  e.preventDefault()
+                  window.dispatchEvent(new CustomEvent('open-tools', { detail: { tab: 'google' } }))
+                  onClose()
+                }}>
+                Open Tools → Google
+              </a>
+            </div>
+          )}
+
+          {type === 'gmail_download' && (
+            <GmailDownloadPanel gm={gm} patch={patchGm}
+              labels={gmailLabels} connected={!!googleStatus?.connected} />
+          )}
+
+          {type === 'gdrive_upload' && (
+            <GDriveUploadPanel gd={gd} patch={patchGd}
+              datesFromCamera={vcFoDatesFromCamera}
+              onDatesEdited={() => setVcFoDatesFromCamera(false)}
+              estimate={gdEstimate} />
+          )}
+
         </div>
 
         {/* ── Footer ───────────────────────────────────────────── */}
         <div className="ntm__footer">
           <button className="modal-btn neutral" onClick={onClose}>Cancel</button>
           <button className="modal-btn accent" onClick={handleAdd}
-            disabled={loading || !cameraId || (isDbType(type) && fileCount === 0) || (isAiType(type) && noApiKey)}>
+            disabled={loading || !cameraId || (isDbType(type) && fileCount === 0) || (isAiType(type) && noApiKey) || googleIncomplete}>
             {loading
               ? <><i className="mdi mdi-loading mdi-spin" /> Adding…</>
               : <><i className="mdi mdi-plus" /> Add to Queue</>

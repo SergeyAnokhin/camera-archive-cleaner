@@ -57,7 +57,8 @@ class CreateTaskRequest(BaseModel):
 
 
 ALLOWED_TASK_TYPES = {"video_thumbnails", "openvino", "gemini", "claude",
-                      "video_convert", "file_organizer"}
+                      "video_convert", "file_organizer",
+                      "gmail_download", "gdrive_upload"}
 
 
 @router.post("")

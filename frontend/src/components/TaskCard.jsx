@@ -8,6 +8,8 @@ const TYPE_CONFIG = {
   claude:           { icon: 'mdi-robot',               label: 'Claude AI Analysis' },
   video_convert:    { icon: 'mdi-video-check',          label: 'Video Convert' },
   file_organizer:   { icon: 'mdi-folder-move-outline', label: 'File Organizer' },
+  gmail_download:   { icon: 'mdi-email-download-outline', label: 'Gmail Download' },
+  gdrive_upload:    { icon: 'mdi-cloud-upload-outline',   label: 'Drive Upload' },
 }
 
 const STATUS_CONFIG = {
@@ -104,7 +106,7 @@ export default function TaskCard({
     : ''
 
   const thumbUrl = task.current_file_id
-    ? (task.type === 'openvino'
+    ? (task.type === 'openvino' || task.type === 'gdrive_upload'
         ? getThumbnailUrl(task.current_file_id)
         : getVideoThumbnailUrl(task.current_file_id, params.thumb_mode || 'four_frames'))
     : null
@@ -112,7 +114,7 @@ export default function TaskCard({
 
   const isAiTask     = task.type === 'gemini' || task.type === 'claude' || task.type === 'openvino'
   const canViewResults = isAiTask && onViewResults
-  const canViewLogs  = (task.type === 'video_convert' || task.type === 'file_organizer') && onViewLogs
+  const canViewLogs  = ['video_convert', 'file_organizer', 'gmail_download', 'gdrive_upload'].includes(task.type) && onViewLogs
   const isDryRun     = task.params?.dry_run
 
   const isFinished = ['completed', 'failed', 'cancelled'].includes(task.status)
@@ -208,6 +210,9 @@ export default function TaskCard({
           {params.input_pattern && <span className="tc__tag">{params.input_pattern}</span>}
           {params.codec && <span className="tc__tag">{params.codec}</span>}
           {params.output_folder && <span className="tc__tag"><i className="mdi mdi-folder-outline" /> {params.output_folder}</span>}
+          {params.label_name && <span className="tc__tag"><i className="mdi mdi-label-outline" /> {params.label_name}</span>}
+          {params.drive_folder && <span className="tc__tag"><i className="mdi mdi-cloud-outline" /> {params.drive_folder}</span>}
+          {params.file_type && <span className="tc__tag">{params.file_type}</span>}
           {params.delay_max_sec > 0 && (
             <span className="tc__tag"><i className="mdi mdi-timer-pause-outline" /> {params.delay_min_sec}–{params.delay_max_sec}s</span>
           )}

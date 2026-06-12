@@ -33,6 +33,7 @@ database is never touched.
 | [`test_ai_common.py`](../backend/tests/test_ai_common.py) | ``` fence stripping before JSON parse; cost = tokens/1M × price; structured `{scene, images}` saved one row per file | [`ai-analysis.md`](ai-analysis.md) |
 | [`test_compute_paths.py`](../backend/tests/test_compute_paths.py) | Backend strips `CAMERA_ROOT` prefix from paths sent to compute; foreign paths pass through | [`compute-service.md`](compute-service.md) |
 | [`test_task_common.py`](../backend/tests/test_task_common.py) | `SpeedTracker` sliding-window items/sec (old events evicted, min 10 s window); `parse_dt` always tz-aware UTC | [`code-map.md`](code-map.md) task executors |
+| [`test_google_api.py`](../backend/tests/test_google_api.py) | Gmail attachment extraction: nested MIME walk, image/video by MIME **or** extension (octet-stream `.jpg`), inline `body.data` parts; Drive path normalization | [`google-integration.md`](google-integration.md) |
 
 ## Compute-service (`compute-service/tests/`, pytest)
 
