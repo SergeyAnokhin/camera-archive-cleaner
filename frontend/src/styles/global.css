@@ -74,4 +74,6 @@ button {
   .app-main { padding: var(--gap-sm); }
   /* Keyboard hints are useless on touch screens */
   .kb-hints { display: none; }
+  /* Toolbar buttons collapse to icons */
+  .app-toolbar .btn-label { display: none; }
 }

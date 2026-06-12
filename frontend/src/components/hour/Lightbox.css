@@ -180,3 +180,16 @@
   font-size: inherit;
   font-family: inherit;
 }
+
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  .lb-hints { display: none; }            /* no keyboard on touch devices */
+  .lb-panel {
+    width: 100vw;
+    height: 100vh;
+    border: none;
+    border-radius: 0;
+  }
+  .lb-nav-btn { width: 40px; height: 40px; }
+  .lb-action-btn { padding: 8px 10px; }
+}

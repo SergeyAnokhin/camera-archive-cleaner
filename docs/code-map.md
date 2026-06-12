@@ -154,7 +154,8 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) | OpenVINO "Run" modal: confidence slider, per-photo object tags with emoji, ms/photo timing. Built on `aiModal/BaseAiModal` |
 | [`aiModal/BaseAiModal.jsx`](../frontend/src/components/aiModal/BaseAiModal.jsx) | Shared AI-modal shell: backdrop + Escape, header, run row, "To tasks" submission, no-key deep-link button. New AI provider modals start here |
 | [`aiModal/StructuredAiResult.jsx`](../frontend/src/components/aiModal/StructuredAiResult.jsx) | `AiStatsRow` (tokens/cost/time) + `StructuredResponse` (scene/images/raw) — shared by Gemini and Claude modals |
-| [`DeleteConfirmModal.jsx`](../frontend/src/components/DeleteConfirmModal.jsx) | Delete confirmation modal: file list with relative paths (strips `camera.path` prefix), paired video preview |
+| [`DeleteConfirmModal.jsx`](../frontend/src/components/DeleteConfirmModal.jsx) | Delete confirmation modal: file list with relative paths (`toRelative()` finds `camera.path` as a substring, falling back to the camera folder name — `file_path` may be indexed under a different `CAMERA_ROOT`), paired video preview |
+| [`HelpModal.jsx`](../frontend/src/components/HelpModal.jsx) | Help modal (toolbar Help button): cleanup workflow steps, hotkey list, uniformity-badge explanation |
 | [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal — thin shell: backdrop, tab bar, renders the active tab. 5 tabs: General, View, AI, Compute, Service. `TAB_ALIASES` maps old tab IDs for deep-link compatibility |
 | [`CellSelBar.jsx`](../frontend/src/components/CellSelBar.jsx) | Heatmap cell-selection toolbar: bulk select, delete (hour level), and AI analysis across selected day/hour cells. Rendered by `App.jsx` in selection mode |
 | [`navUtils.js`](../frontend/src/components/navUtils.js) | Heatmap navigation helpers: `LEVELS`, `GRID_COLS`, `dateRangeForPeriod`, `computeIntensity`, `formatBytes`, nav-state persistence |
@@ -169,7 +170,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`StatsBar.jsx`](../frontend/src/components/StatsBar.jsx) | Recharts bar chart below the heatmap (size per period) |
 | [`ScanButton.jsx`](../frontend/src/components/ScanButton.jsx) | Scan button, spinner, data refresh on completion |
 | [`ToolsButton.jsx`](../frontend/src/components/ToolsButton.jsx) | Button that opens ToolsModal. Also listens for `open-tools` CustomEvent (`detail: {tab}`) to open to a specific tab |
-| [`ServiceStatus.jsx`](../frontend/src/components/ServiceStatus.jsx) | Status chips in the header (Backend / Compute): up/down dot, CPU %, RAM usage. Polls `/api/services/status` every 1 s |
+| [`ServiceStatus.jsx`](../frontend/src/components/ServiceStatus.jsx) | Status chips in the header (Backend / Compute): up/down dot, CPU %, RAM usage. Polls `/api/services/status` every 5 s, paused while the tab is hidden |
 | [`TasksScreen.jsx`](../frontend/src/components/TasksScreen.jsx) | Tasks screen — polls `/tasks` every 3 s, shows system metrics bar + task card list, hosts NewTaskModal |
 | [`TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx) | Model tuning orchestrator: session sidebar + step switching. Steps live in `tuning/` (table below). See [`docs/tuning.md`](tuning.md) |
 | [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card: type icon, status badge, progress bar, speed/ETA, thumbnail, pause/resume/cancel buttons. Logs button (console icon) for `video_convert`/`file_organizer` types; dry-run amber tag |
@@ -221,6 +222,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 |---|---|
 | [`hourUtils.js`](../frontend/src/components/hour/hourUtils.js) | localStorage keys/defaults, formatters (`formatTime`, `formatBytes`), mode-param load/save, AI request rate tracking, `computeUniformity(buckets)` → AF/SE/BC metrics + per-metric levels |
 | [`PhotoCard.jsx`](../frontend/src/components/hour/PhotoCard.jsx) | Single photo card: thumbnail, fullscreen lightbox (with download button → `/media/{id}`), AI icons + description overlay |
+| [`Lightbox.jsx`](../frontend/src/components/hour/Lightbox.jsx) | Unified fullscreen photo/video lightbox: ←/→ + touch-swipe navigation, S/T downloads, video playback with VLC fallback |
 | [`VideoCard.jsx`](../frontend/src/components/hour/VideoCard.jsx) | Single video card. Default (`video_preview_mode = none`): camera icon + timestamp, no image. With a preview mode set: fetches `/video_thumbnail` and shows a JPEG or animated GIF. Opens VideoModal on click |
 | [`VideoModal.jsx`](../frontend/src/components/hour/VideoModal.jsx) | Fullscreen video player: Space = play/pause, ←/→ = skip ±1/5 duration, Escape = close, download, open externally, VLC fallback |
 | [`DistributionChart.jsx`](../frontend/src/components/hour/DistributionChart.jsx) | 60-bar per-minute distribution chart; click a bar to jump to its page. Shows AF/SE/BC uniformity badges (green/yellow/red) in the header |
@@ -250,7 +252,7 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 | File | What it styles | Key class prefixes |
 |---|---|---|
 | [`styles/variables.css`](../frontend/src/styles/variables.css) | CSS custom properties; ≤640px media query shrinks `--gap-*` for narrow screens | `--font-base`, `--accent`, `--bg-*`, `--heatmap-*` |
-| [`styles/global.css`](../frontend/src/styles/global.css) | Global reset, body, scrollbar, app shell layout + mobile rules (hides `.kb-hints` ≤640px) | `.app-main`, `.app-toolbar`, `.kb-hints` |
+| [`styles/global.css`](../frontend/src/styles/global.css) | Global reset, body, scrollbar, app shell layout + mobile rules (hides `.kb-hints` and `.btn-label` toolbar labels ≤640px) | `.app-main`, `.app-toolbar`, `.kb-hints`, `.btn-label` |
 | [`components/HourViewer.css`](../frontend/src/components/HourViewer.css) | HourViewer shell + shared base classes (loaded first so `hour/*.css` can override) | `.hv-root`, `.hv-header`, `.hv-grid`, `.hv-card` base, `.hv-lightbox` base, `.hv-mode-settings` base, `.hv-select-btn`, pagination |
 | `components/hour/*.css` | Co-located styles, one file per `hour/` component: `PhotoCard.css`, `VideoCard.css`, `VideoModal.css`, `DistributionChart.css`, `SelectionBar.css`, `AiModePanel.css`, `ModeSettingsPanel.css` | `.hv-card-photo`/`.hv-card-ai-*`, `.hv-card-video`/`.hv-video-*`, `.hv-video-modal-*`, `.hv-dist-*`, `.hv-sbar-*`, `.hv-ai-*`, `.hv-mode-param-*` |
 | [`components/ToolsModal.css`](../frontend/src/components/ToolsModal.css) | Tools modal — shared by the shell and all `tools/` tabs | `.modal-*` |
@@ -258,7 +260,7 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 | [`components/DeleteConfirmModal.css`](../frontend/src/components/DeleteConfirmModal.css) | Delete confirmation modal | `.dcm-*` |
 | Other `*.css` beside components | Styles scoped to that one component | — |
 
-> **Responsive:** the app adapts to narrow screens (phones / vertical windows) via `@media (max-width: 640px)` queries co-located in each component's CSS file (HeatmapGrid → 1–2 columns, Header/TasksScreen wrap, modals → single column). The breakpoint is 640px everywhere.
+> **Responsive:** the app adapts to narrow screens (phones / vertical windows) via `@media (max-width: 640px)` queries co-located in each component's CSS file (HeatmapGrid → 1–2 columns, Header/TasksScreen wrap, modals → single column). The breakpoint is 640px everywhere. Mobile specifics: header is non-sticky with service chips collapsed to dot+name and stat chips to icon+value (Header.css), toolbar buttons are icon-only (global.css hides `.btn-label`), all keyboard-hint strips are hidden (`.kb-hints`, `.hv-kb-hints`, `.lb-hints`), Lightbox is full-bleed with touch-swipe navigation, NewTaskModal type cards become compact rows. Keep mobile blocks at the *end* of each CSS file — equal-specificity base rules defined later in the file would override them.
 
 > **Search tip:** `.hv-*` classes are split per component. Photo card / AI overlays → `hour/PhotoCard.css`; video card → `hour/VideoCard.css`; video player → `hour/VideoModal.css`; `.hv-dist-*` → `hour/DistributionChart.css`; `.hv-sbar-*` → `hour/SelectionBar.css`; `.hv-ai-*` → `hour/AiModePanel.css`. Shared base classes (`.hv-card`, `.hv-lightbox`, `.hv-mode-settings`, header, grid, pagination) stay in `HourViewer.css`.
 

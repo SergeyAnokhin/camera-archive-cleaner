@@ -6,10 +6,24 @@ function cameraRoot(camera) {
   return p ? p.replace(/\/?$/, '/') : ''
 }
 
+// file_path may have been indexed under a different CAMERA_ROOT than the one
+// the backend currently reports in camera.path, so a prefix match can fail.
+// Fall back to locating the camera's folder name anywhere in the path.
+function toRelative(fp, root) {
+  if (!root) return fp
+  const idx = fp.indexOf(root)
+  if (idx >= 0) return fp.slice(idx + root.length)
+  const seg = root.split('/').filter(Boolean).pop()
+  if (seg) {
+    const i = fp.indexOf('/' + seg + '/')
+    if (i >= 0) return fp.slice(i + seg.length + 2)
+  }
+  return fp
+}
+
 function FileRow({ item, root }) {
   const fp = (item.file_path || '').replace(/\\/g, '/')
-  const rel = root && fp.startsWith(root) ? fp.slice(root.length) : fp
-  return <div className="dcm-file-row">{rel}</div>
+  return <div className="dcm-file-row">{toRelative(fp, root)}</div>
 }
 
 export default function DeleteConfirmModal({ preview, onConfirm, onCancel, busy, error, camera }) {

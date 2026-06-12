@@ -250,9 +250,23 @@
 
 /* ── Narrow screens ───────────────────────────────────────── */
 @media (max-width: 640px) {
-  .ntm__type-grid  { grid-template-columns: 1fr; }
+  .ntm__type-grid  { grid-template-columns: 1fr; gap: 6px; }
   .ntm__params-grid { grid-template-columns: 1fr; }
   .ntm__section { padding-left: 14px; padding-right: 14px; }
+  /* compact rows instead of tall cards — 6 of them have to fit a phone screen */
+  .ntm__type-card {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 12px;
+    row-gap: 0;
+    align-items: center;
+    padding: 8px 12px;
+  }
+  .ntm__type-icon {
+    grid-row: 1 / span 2;
+    font-size: 22px;
+    margin-bottom: 0;
+  }
 }
 
 /* ── Footer ───────────────────────────────────────────────── */

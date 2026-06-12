@@ -132,10 +132,10 @@ export default function AiTab() {
         </div>
         <div className="detection-emoji-grid">
           {COCO_CLASSES.map(c => (
-            <label key={c.id} className="detection-class-row" title={`${c.en} (id ${c.id})`}>
+            <label key={c.id} className="detection-class-row" title={`${c.ru} (id ${c.id})`}>
               <input type="checkbox" checked={classes.has(c.id)} onChange={() => toggleClass(c.id)} />
               <span className="detection-emoji-char">{c.emoji}</span>
-              <span className="detection-emoji-label">{c.ru}</span>
+              <span className="detection-emoji-label">{c.en}</span>
             </label>
           ))}
         </div>

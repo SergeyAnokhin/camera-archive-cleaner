@@ -1,4 +1,4 @@
-/* HourViewer shell styles. Subcomponent styles are co-located:
+﻿/* HourViewer shell styles. Subcomponent styles are co-located:
    hour/PhotoCard.css, hour/VideoCard.css, hour/VideoModal.css,
    hour/DistributionChart.css, hour/SelectionBar.css, hour/AiModePanel.css,
    hour/ModeSettingsPanel.css. Shared base classes (.hv-card, .hv-lightbox,
@@ -14,7 +14,7 @@
   padding: var(--gap-lg);
 }
 
-/* ── Header ── */
+/* â”€â”€ Header â”€â”€ */
 .hv-header {
   display: flex;
   align-items: center;
@@ -71,7 +71,7 @@
 }
 .hv-view-mode-select:focus { outline: none; border-color: var(--accent); }
 
-/* ── Mode settings panel (shared base — extended by ModeSettingsPanel / AiModePanel) ── */
+/* â”€â”€ Mode settings panel (shared base â€” extended by ModeSettingsPanel / AiModePanel) â”€â”€ */
 .hv-mode-settings {
   display: flex;
   align-items: center;
@@ -102,7 +102,7 @@
   user-select: none;
 }
 
-/* ── File grid ── */
+/* â”€â”€ File grid â”€â”€ */
 .hv-grid {
   display: grid;
   /* min() caps the column width at the container width so a large
@@ -112,7 +112,7 @@
   overflow: visible;
 }
 
-/* ── Cards (base — shared by PhotoCard / VideoCard) ── */
+/* â”€â”€ Cards (base â€” shared by PhotoCard / VideoCard) â”€â”€ */
 .hv-card {
   border-radius: var(--radius);
   border: var(--border);
@@ -144,7 +144,7 @@
   padding: 2px 4px;
 }
 
-/* ── Lightbox (shared base — extended by VideoModal) ── */
+/* â”€â”€ Lightbox (shared base â€” extended by VideoModal) â”€â”€ */
 .hv-lightbox {
   position: fixed;
   inset: 0;
@@ -186,7 +186,7 @@
   border-color: var(--accent);
 }
 
-/* ── Misc ── */
+/* â”€â”€ Misc â”€â”€ */
 .hv-empty {
   text-align: center;
   color: var(--text-muted);
@@ -215,7 +215,7 @@
   text-align: center;
 }
 
-/* ── Selection mode ── */
+/* â”€â”€ Selection mode â”€â”€ */
 .hv-select-btn {
   display: flex;
   align-items: center;
@@ -297,4 +297,17 @@
   padding: 10px 14px;
   color: #86efac;
   font-size: calc(var(--font-base) * 0.88);
+}
+
+/* Touch devices: no keyboard hints, comfortable touch targets */
+@media (max-width: 640px) {
+  .hv-kb-hints {
+    display: none;
+  }
+  .hv-view-mode-select,
+  .hv-select-btn,
+  .hv-back-btn,
+  .hv-page-btn {
+    min-height: 38px;
+  }
 }

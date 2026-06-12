@@ -14,6 +14,14 @@ function readFontBase() {
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--font-base')) || 15
 }
 
+// Adaptive size label: "0.0045 GB" → "4.6 MB"
+function formatGb(gb) {
+  if (gb >= 1) return `${gb >= 10 ? Math.round(gb) : gb.toFixed(1)} GB`
+  const mb = gb * 1024
+  if (mb >= 1) return `${mb >= 10 ? Math.round(mb) : mb.toFixed(1)} MB`
+  return `${Math.round(mb * 1024)} KB`
+}
+
 const customTooltipStyle = {
   background: '#1f2937',
   border: '1px solid #374151',
@@ -53,12 +61,12 @@ export default function StatsBar({ periods, level }) {
             tick={{ fill: '#64748b', fontSize: fontBase * 0.73 }}
             axisLine={false}
             tickLine={false}
-            unit=" GB"
-            width={48}
+            tickFormatter={formatGb}
+            width={56}
           />
           <Tooltip
             contentStyle={{ ...customTooltipStyle, fontSize: fontBase * 0.87 }}
-            formatter={(val, name) => name === 'gb' ? [`${val.toFixed(2)} GB`, 'Size'] : [val, name]}
+            formatter={(val, name) => name === 'gb' ? [formatGb(val), 'Size'] : [val, name]}
             labelStyle={{ color: '#f1f5f9', marginBottom: 4 }}
           />
           <Bar dataKey="gb" fill="#0ea5e9" radius={[3, 3, 0, 0]} maxBarSize={48} />

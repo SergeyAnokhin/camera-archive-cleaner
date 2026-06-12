@@ -18,7 +18,7 @@ export default function ScanButton({ cameraId, onScanComplete }) {
   return (
     <button className="scan-button" onClick={handleScan} disabled={scanning}>
       <i className={`mdi ${scanning ? 'mdi-loading mdi-spin' : 'mdi-database-refresh'}`} />
-      {scanning ? 'Scanning…' : 'Scan'}
+      <span className="btn-label">{scanning ? 'Scanning…' : 'Scan'}</span>
     </button>
   )
 }

@@ -66,6 +66,11 @@ export default function ServiceStatus() {
   useEffect(() => {
     let cancelled = false
     async function poll() {
+      // don't burn network/battery while the tab is in the background
+      if (document.hidden) {
+        if (!cancelled) setTimeout(poll, 5000)
+        return
+      }
       try {
         const res = await fetch(BASE + '/services/status')
         if (!cancelled) {
@@ -84,7 +89,7 @@ export default function ServiceStatus() {
           setStatus(null)
         }
       }
-      if (!cancelled) setTimeout(poll, 1000)
+      if (!cancelled) setTimeout(poll, 5000)
     }
     poll()
     return () => { cancelled = true }

@@ -260,10 +260,10 @@ export default function App() {
               className="modal-btn neutral"
               style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}
               onClick={() => setShowHelp(true)}
-              title="Руководство пользователя"
+              title="User guide"
             >
               <i className="mdi mdi-help-circle-outline" />
-              Help
+              <span className="btn-label">Help</span>
             </button>
             <button
               className="modal-btn neutral"
@@ -271,7 +271,7 @@ export default function App() {
               onClick={() => { setShowTasks(v => !v); setShowTuning(false) }}
             >
               <i className="mdi mdi-playlist-play" />
-              Tasks
+              <span className="btn-label">Tasks</span>
             </button>
             <ToolsButton onDatabaseCleared={handleScanComplete} onCamerasChanged={reloadCameras} cameraId={cameraId} cameras={cameras} />
             <ScanButton cameraId={cameraId} onScanComplete={handleScanComplete} />
@@ -316,6 +316,15 @@ export default function App() {
               />
             ) : (
               <div style={{ display: 'flex', gap: 'var(--gap-sm)', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <button
+                  className="modal-btn neutral"
+                  style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}
+                  onClick={() => sel.setSelMode(true)}
+                >
+                  <i className="mdi mdi-checkbox-multiple-marked-outline" />
+                  {currentLevel === 'hour' ? ' Select hours' : ' Select days'}
+                </button>
+                {/* destructive action goes last so it's not the first touch target */}
                 {currentLevel === 'hour' && drillStack.length > 0 && (
                   <DayDeleteBar
                     label={drillStack[drillStack.length - 1].label}
@@ -327,14 +336,6 @@ export default function App() {
                     loading={rangeDelete.previewLoading}
                   />
                 )}
-                <button
-                  className="modal-btn neutral"
-                  style={{ fontSize: 'calc(var(--font-base) * 0.88)' }}
-                  onClick={() => sel.setSelMode(true)}
-                >
-                  <i className="mdi mdi-checkbox-multiple-marked-outline" />
-                  {currentLevel === 'hour' ? ' Select hours' : ' Select days'}
-                </button>
               </div>
             )}
           </>

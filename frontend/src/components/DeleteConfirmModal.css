@@ -119,6 +119,15 @@
   border-bottom: none;
 }
 
+@media (max-width: 640px) {
+  /* wrap instead of truncating so the filename stays visible */
+  .dcm-file-row {
+    white-space: normal;
+    word-break: break-all;
+    font-size: calc(var(--font-base) * 0.8);
+  }
+}
+
 .dcm-error {
   color: #fca5a5;
   font-size: calc(var(--font-base) * 0.88);

@@ -40,23 +40,6 @@
   flex-wrap: wrap;
 }
 
-/* Narrow screens: let the header grow vertically instead of overflowing */
-@media (max-width: 640px) {
-  .header {
-    height: auto;
-    min-height: 48px;
-    flex-wrap: wrap;
-    padding: 6px var(--gap-md);
-    gap: 6px;
-  }
-  .header-right { gap: var(--gap-sm); }
-  .header-stats { gap: var(--gap-sm); }
-  .stat-chip {
-    font-size: calc(var(--font-base) * 0.85);
-    padding: 3px 9px;
-  }
-}
-
 .stat-chip {
   display: flex;
   align-items: center;
@@ -194,4 +177,26 @@
   min-width: 28px;
   text-align: right;
   flex-shrink: 0;
+}
+
+/* Narrow screens: compact single-line chips, header scrolls away with content.
+   Keep this block last — it must override the base rules above. */
+@media (max-width: 640px) {
+  .header {
+    position: static;          /* don't eat 15% of the screen while scrolling photos */
+    height: auto;
+    min-height: 48px;
+    flex-wrap: wrap;
+    padding: 6px var(--gap-md);
+    gap: 6px;
+  }
+  .header-right { gap: var(--gap-sm); }
+  .header-stats { gap: var(--gap-sm); }
+  .stat-chip {
+    font-size: calc(var(--font-base) * 0.85);
+    padding: 3px 9px;
+  }
+  .stat-chip-label { display: none; }   /* icon + value is enough */
+  .svc-chip-bars { display: none; }     /* CPU/RAM detail is desktop-only; dot + name remain */
+  .stat-chip-skeleton { width: 56px; height: 22px; }
 }

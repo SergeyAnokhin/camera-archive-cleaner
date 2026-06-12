@@ -20,7 +20,7 @@ export default function ToolsButton({ onDatabaseCleared, onCamerasChanged, camer
     <>
       <button className="tools-button" onClick={() => { setInitialTab(null); setOpen(true) }}>
         <i className="mdi mdi-wrench-outline" />
-        Tools
+        <span className="btn-label">Tools</span>
       </button>
       {open && (
         <ToolsModal

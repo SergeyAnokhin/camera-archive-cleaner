@@ -261,6 +261,15 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           ))}
         </select>
 
+        <button
+          className={`hv-select-btn${selectionMode ? ' active' : ''}`}
+          onClick={toggleSelectionMode}
+        >
+          <i className={`mdi mdi-${selectionMode ? 'close' : 'checkbox-multiple-marked-outline'}`} />
+          {selectionMode ? 'Cancel' : 'Select'}
+        </button>
+
+        {/* destructive action goes last so it's not the first touch target */}
         {!selectionMode && total > 0 && (
           <button
             className="hv-select-btn"
@@ -275,14 +284,6 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             }
           </button>
         )}
-
-        <button
-          className={`hv-select-btn${selectionMode ? ' active' : ''}`}
-          onClick={toggleSelectionMode}
-        >
-          <i className={`mdi mdi-${selectionMode ? 'close' : 'checkbox-multiple-marked-outline'}`} />
-          {selectionMode ? 'Cancel' : 'Select'}
-        </button>
 
         <span className="hv-count">{total.toLocaleString()} files</span>
       </div>
@@ -493,7 +494,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         )
       })()}
 
-      <div style={{
+      <div className="hv-kb-hints" style={{
         fontSize: 'calc(var(--font-base) * 0.72)',
         color: 'var(--text-dim)',
         textAlign: 'center',

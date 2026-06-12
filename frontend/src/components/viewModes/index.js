@@ -31,6 +31,6 @@ export function getViewModesWithStatus() {
   return VIEW_MODES.map(m => ({
     ...m,
     disabled: off && !!m.needsCompute,
-    disabledHint: (off && m.needsCompute) ? 'Включите compute-service в Tools → Compute' : '',
+    disabledHint: (off && m.needsCompute) ? 'Enable the compute-service in Tools → Compute' : '',
   }))
 }

@@ -24,6 +24,7 @@ function makeThumbName(file) {
 export default function Lightbox({ files, index, onClose, onNavigate }) {
   const [videoError, setVideoError] = useState(false)
   const videoRef = useRef(null)
+  const touchRef = useRef(null)
 
   const file = files[index]
   const isVideo = file?.file_type === 'video'
@@ -74,6 +75,23 @@ export default function Lightbox({ files, index, onClose, onNavigate }) {
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
   }, [file, index, files.length, isVideo, mediaUrl, thumbUrl, onClose, onNavigate, videoError])
+
+  function onTouchStart(e) {
+    const t = e.touches[0]
+    touchRef.current = { x: t.clientX, y: t.clientY }
+  }
+
+  function onTouchEnd(e) {
+    const start = touchRef.current
+    touchRef.current = null
+    if (!start) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - start.x
+    const dy = t.clientY - start.y
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    if (dx < 0 && index < files.length - 1) onNavigate(index + 1)
+    if (dx > 0 && index > 0) onNavigate(index - 1)
+  }
 
   if (!file) return null
 
@@ -133,7 +151,7 @@ export default function Lightbox({ files, index, onClose, onNavigate }) {
         </div>
 
         {/* Content */}
-        <div className="lb-content">
+        <div className="lb-content" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
           {isVideo ? (
             videoError ? (
               <div className="lb-video-error">

@@ -18,20 +18,20 @@ export default function HelpModal({ onClose }) {
     <div className="modal-backdrop" onClick={handleBackdropClick}>
       <div className="help-modal-card">
         <div className="modal-header">
-          <span><i className="mdi mdi-help-circle-outline" /> Руководство пользователя</span>
+          <span><i className="mdi mdi-help-circle-outline" /> User Guide</span>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
         <div className="help-modal-body">
-          {/* Typial Scenario Section */}
+          {/* Typical Scenario Section */}
           <div className="help-section">
-            <h3 className="help-section-title"><i className="mdi mdi-play-circle-outline" /> Типовой сценарий очистки архива</h3>
+            <h3 className="help-section-title"><i className="mdi mdi-play-circle-outline" /> Typical archive cleanup workflow</h3>
             <div className="scenario-flow">
               <div className="scenario-step">
                 <div className="step-num">1</div>
                 <div className="step-content">
-                  <strong>Сканирование (Scan)</strong>
-                  <p>Нажмите <code>Scan</code> в правом верхнем углу, чтобы проиндексировать новые файлы с камеры в базу данных.</p>
+                  <strong>Scan</strong>
+                  <p>Press <code>Scan</code> in the top-right corner to index new camera files into the database.</p>
                 </div>
               </div>
               <div className="scenario-step-arrow"><i className="mdi mdi-chevron-down" /></div>
@@ -39,8 +39,8 @@ export default function HelpModal({ onClose }) {
               <div className="scenario-step">
                 <div className="step-num">2</div>
                 <div className="step-content">
-                  <strong>Тепловая карта (Heatmap)</strong>
-                  <p>Проанализируйте распределение данных на сетке. Перейдите по уровням (Год → Месяц → День → Час), кликая по ячейкам, чтобы найти всплески активности.</p>
+                  <strong>Heatmap</strong>
+                  <p>Explore how the data is distributed on the grid. Drill down the levels (Year → Month → Day → Hour) by clicking cells to find activity spikes.</p>
                 </div>
               </div>
               <div className="scenario-step-arrow"><i className="mdi mdi-chevron-down" /></div>
@@ -48,8 +48,8 @@ export default function HelpModal({ onClose }) {
               <div className="scenario-step">
                 <div className="step-num">3</div>
                 <div className="step-content">
-                  <strong>Просмотр часа (Hour Viewer)</strong>
-                  <p>Кликните по ячейке часа. Вы перейдёте на страницу детального просмотра снимков и видеозаписей за выбранный час.</p>
+                  <strong>Hour Viewer</strong>
+                  <p>Click an hour cell to open the detailed view of snapshots and video recordings for that hour.</p>
                 </div>
               </div>
               <div className="scenario-step-arrow"><i className="mdi mdi-chevron-down" /></div>
@@ -57,8 +57,8 @@ export default function HelpModal({ onClose }) {
               <div className="scenario-step">
                 <div className="step-num">4</div>
                 <div className="step-content">
-                  <strong>Режим движения (View Mode)</strong>
-                  <p>Переключите режим просмотра вверху с <code>Normal</code> на <code>Motion highlight</code> или <code>Erosion</code>. Это скроет статичный фон и подсветит изменения.</p>
+                  <strong>View Mode</strong>
+                  <p>Switch the view mode at the top from <code>Normal</code> to <code>Motion highlight</code> or <code>Erosion</code>. This hides the static background and highlights changes.</p>
                 </div>
               </div>
               <div className="scenario-step-arrow"><i className="mdi mdi-chevron-down" /></div>
@@ -66,8 +66,8 @@ export default function HelpModal({ onClose }) {
               <div className="scenario-step">
                 <div className="step-num">5</div>
                 <div className="step-content">
-                  <strong>Выделение (Selection)</strong>
-                  <p>Нажмите <code>Select</code> (или зажмите <code>Shift</code> и кликайте) для выделения группы файлов. Можно нажать <code>Select All</code> в панели.</p>
+                  <strong>Selection</strong>
+                  <p>Press <code>Select</code> (or hold <code>Shift</code> and click) to select a group of files. You can also press <code>Select All</code> in the toolbar.</p>
                 </div>
               </div>
               <div className="scenario-step-arrow"><i className="mdi mdi-chevron-down" /></div>
@@ -75,8 +75,8 @@ export default function HelpModal({ onClose }) {
               <div className="scenario-step-danger">
                 <div className="step-num-danger"><i className="mdi mdi-trash-can-outline" /></div>
                 <div className="step-content">
-                  <strong>Удаление (Safe Delete)</strong>
-                  <p>Нажмите <code>Delete</code> в появившейся панели снизу, просмотрите превью файлов во всплывающем окне и подтвердите безопасное удаление с диска.</p>
+                  <strong>Safe Delete</strong>
+                  <p>Press <code>Delete</code> in the bottom panel, review the file preview in the confirmation dialog, and confirm safe deletion from disk.</p>
                 </div>
               </div>
             </div>
@@ -84,64 +84,64 @@ export default function HelpModal({ onClose }) {
 
           {/* Hotkeys Section */}
           <div className="help-section">
-            <h3 className="help-section-title"><i className="mdi mdi-keyboard-outline" /> Быстрые клавиши (Горячие клавиши)</h3>
+            <h3 className="help-section-title"><i className="mdi mdi-keyboard-outline" /> Keyboard shortcuts</h3>
             <div className="hotkeys-grid">
               <div className="hotkey-row">
                 <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd>
-                <span>Навигация по сетке теплокарты / списку файлов</span>
+                <span>Navigate the heatmap grid / file list</span>
               </div>
               <div className="hotkey-row">
                 <kbd>Enter</kbd>
-                <span>Провалиться внутрь ячейки теплокарты / Открыть оригинал</span>
+                <span>Drill into a heatmap cell / open the original</span>
               </div>
               <div className="hotkey-row">
                 <kbd>Esc</kbd> / <kbd>Backspace ⌫</kbd>
-                <span>Вернуться на уровень выше (назад)</span>
+                <span>Go back one level up</span>
               </div>
               <div className="hotkey-row">
                 <kbd>Space</kbd>
-                <span>Выделить текущую ячейку / файл в списке</span>
+                <span>Select the current cell / file</span>
               </div>
               <div className="hotkey-row">
                 <kbd>Ctrl</kbd> + <kbd>A</kbd>
-                <span>Выделить все ячейки / файлы</span>
+                <span>Select all cells / files</span>
               </div>
               <div className="hotkey-row">
                 <kbd>Delete ⌦</kbd>
-                <span>Удалить выделенное</span>
+                <span>Delete the selection</span>
               </div>
             </div>
           </div>
 
           {/* Uniformity Section */}
           <div className="help-section">
-            <h3 className="help-section-title"><i className="mdi mdi-chart-bell-curve" /> Индикаторы равномерности (Ложные тревоги)</h3>
+            <h3 className="help-section-title"><i className="mdi mdi-chart-bell-curve" /> Uniformity indicators (false alarms)</h3>
             <p className="help-text">
-              Приложение вычисляет равномерность распределения файлов внутри часа для выявления ложных тревог (например, из-за ветра, дождя или паутины):
+              The app measures how uniformly files are distributed within an hour to detect false alarms (e.g. caused by wind, rain, or a spider web):
             </p>
             <div className="uniformity-info-grid">
               <div className="uniformity-card af">
                 <span className="badge-name">AF (Active Fraction)</span>
-                <span className="badge-desc">Какую долю часа (в минутах) занимала запись. 100% — запись велась каждую минуту.</span>
+                <span className="badge-desc">The share of the hour (in minutes) that has recordings. 100% — something was recorded every minute.</span>
               </div>
               <div className="uniformity-card se">
                 <span className="badge-name">SE (Shannon Entropy)</span>
-                <span className="badge-desc">Насколько равномерно распределён объём файлов по минутам. Показывает хаотичность.</span>
+                <span className="badge-desc">How evenly the file volume is spread across the minutes. Indicates randomness.</span>
               </div>
               <div className="uniformity-card bc">
                 <span className="badge-name">BC (Block Coverage)</span>
-                <span className="badge-desc">Какое количество 5-минутных интервалов часа содержат хотя бы одну запись.</span>
+                <span className="badge-desc">How many 5-minute intervals of the hour contain at least one recording.</span>
               </div>
             </div>
             <div className="modal-setting-hint" style={{ marginTop: 10 }}>
               <i className="mdi mdi-information-outline" style={{ marginRight: 4 }} />
-              Жёлтый или красный цвет баджа на сетке означает высокую равномерность (подозрение на циклическую ложную тревогу). Зелёный цвет означает редкие, точечные события.
+              A yellow or red badge on the grid means a highly uniform distribution (likely a cyclic false alarm). Green means rare, isolated events.
             </div>
           </div>
         </div>
 
         <div className="help-modal-footer">
-          <button className="modal-btn" onClick={onClose}>Понятно</button>
+          <button className="modal-btn" onClick={onClose}>Got it</button>
         </div>
       </div>
     </div>
