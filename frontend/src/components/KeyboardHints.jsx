@@ -2,7 +2,7 @@
 export default function KeyboardHints({ hints }) {
   if (!hints.length) return null
   return (
-    <div style={{
+    <div className="kb-hints" style={{
       padding: '4px 16px 6px',
       fontSize: 'calc(var(--font-base) * 0.75)',
       color: 'var(--text-dim)',

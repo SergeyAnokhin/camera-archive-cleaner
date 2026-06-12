@@ -66,6 +66,7 @@
   gap: 6px;
   flex: 1;
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .ts__chip {
@@ -117,6 +118,14 @@
   font-variant-numeric: tabular-nums;
   min-width: 26px;
   text-align: right;
+}
+
+/* Narrow screens: title + actions on the first row, metric chips below */
+@media (max-width: 640px) {
+  .ts__chips {
+    order: 1;
+    flex-basis: 100%;
+  }
 }
 
 /* ── Toolbar actions ──────────────────────────────────────────── */

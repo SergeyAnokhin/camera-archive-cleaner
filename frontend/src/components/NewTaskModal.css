@@ -248,6 +248,13 @@
   color: var(--text);
 }
 
+/* ── Narrow screens ───────────────────────────────────────── */
+@media (max-width: 640px) {
+  .ntm__type-grid  { grid-template-columns: 1fr; }
+  .ntm__params-grid { grid-template-columns: 1fr; }
+  .ntm__section { padding-left: 14px; padding-right: 14px; }
+}
+
 /* ── Footer ───────────────────────────────────────────────── */
 .ntm__footer {
   display: flex;

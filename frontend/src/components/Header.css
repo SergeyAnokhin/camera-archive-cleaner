@@ -30,12 +30,31 @@
   display: flex;
   align-items: center;
   gap: var(--gap-md);
+  flex-wrap: wrap;
 }
 
 .header-stats {
   display: flex;
   align-items: center;
   gap: var(--gap-md);
+  flex-wrap: wrap;
+}
+
+/* Narrow screens: let the header grow vertically instead of overflowing */
+@media (max-width: 640px) {
+  .header {
+    height: auto;
+    min-height: 48px;
+    flex-wrap: wrap;
+    padding: 6px var(--gap-md);
+    gap: 6px;
+  }
+  .header-right { gap: var(--gap-sm); }
+  .header-stats { gap: var(--gap-sm); }
+  .stat-chip {
+    font-size: calc(var(--font-base) * 0.85);
+    padding: 3px 9px;
+  }
 }
 
 .stat-chip {

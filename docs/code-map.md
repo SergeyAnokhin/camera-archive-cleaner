@@ -249,14 +249,16 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 
 | File | What it styles | Key class prefixes |
 |---|---|---|
-| [`styles/variables.css`](../frontend/src/styles/variables.css) | CSS custom properties | `--font-base`, `--accent`, `--bg-*`, `--heatmap-*` |
-| [`styles/global.css`](../frontend/src/styles/global.css) | Global reset, body, scrollbar | — |
+| [`styles/variables.css`](../frontend/src/styles/variables.css) | CSS custom properties; ≤640px media query shrinks `--gap-*` for narrow screens | `--font-base`, `--accent`, `--bg-*`, `--heatmap-*` |
+| [`styles/global.css`](../frontend/src/styles/global.css) | Global reset, body, scrollbar, app shell layout + mobile rules (hides `.kb-hints` ≤640px) | `.app-main`, `.app-toolbar`, `.kb-hints` |
 | [`components/HourViewer.css`](../frontend/src/components/HourViewer.css) | HourViewer shell + shared base classes (loaded first so `hour/*.css` can override) | `.hv-root`, `.hv-header`, `.hv-grid`, `.hv-card` base, `.hv-lightbox` base, `.hv-mode-settings` base, `.hv-select-btn`, pagination |
 | `components/hour/*.css` | Co-located styles, one file per `hour/` component: `PhotoCard.css`, `VideoCard.css`, `VideoModal.css`, `DistributionChart.css`, `SelectionBar.css`, `AiModePanel.css`, `ModeSettingsPanel.css` | `.hv-card-photo`/`.hv-card-ai-*`, `.hv-card-video`/`.hv-video-*`, `.hv-video-modal-*`, `.hv-dist-*`, `.hv-sbar-*`, `.hv-ai-*`, `.hv-mode-param-*` |
 | [`components/ToolsModal.css`](../frontend/src/components/ToolsModal.css) | Tools modal — shared by the shell and all `tools/` tabs | `.modal-*` |
 | [`components/HeatmapCell.css`](../frontend/src/components/HeatmapCell.css) | Heatmap cell | `.cell-*` |
 | [`components/DeleteConfirmModal.css`](../frontend/src/components/DeleteConfirmModal.css) | Delete confirmation modal | `.dcm-*` |
 | Other `*.css` beside components | Styles scoped to that one component | — |
+
+> **Responsive:** the app adapts to narrow screens (phones / vertical windows) via `@media (max-width: 640px)` queries co-located in each component's CSS file (HeatmapGrid → 1–2 columns, Header/TasksScreen wrap, modals → single column). The breakpoint is 640px everywhere.
 
 > **Search tip:** `.hv-*` classes are split per component. Photo card / AI overlays → `hour/PhotoCard.css`; video card → `hour/VideoCard.css`; video player → `hour/VideoModal.css`; `.hv-dist-*` → `hour/DistributionChart.css`; `.hv-sbar-*` → `hour/SelectionBar.css`; `.hv-ai-*` → `hour/AiModePanel.css`. Shared base classes (`.hv-card`, `.hv-lightbox`, `.hv-mode-settings`, header, grid, pagination) stay in `HourViewer.css`.
 

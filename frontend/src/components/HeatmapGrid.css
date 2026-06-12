@@ -15,6 +15,15 @@
 .heatmap-grid.level-day   { grid-template-columns: repeat(7, 1fr); }
 .heatmap-grid.level-hour  { grid-template-columns: repeat(6, 1fr); }
 
+/* Narrow screens: years/months in 2 columns, days/hours as a vertical list */
+@media (max-width: 640px) {
+  .heatmap-wrapper { padding: var(--gap-md); }
+  .heatmap-grid.level-year,
+  .heatmap-grid.level-month { grid-template-columns: repeat(2, 1fr); }
+  .heatmap-grid.level-day,
+  .heatmap-grid.level-hour  { grid-template-columns: 1fr; }
+}
+
 .heatmap-empty {
   text-align: center;
   color: var(--text-muted);

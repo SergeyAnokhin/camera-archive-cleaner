@@ -4,6 +4,7 @@
   gap: 6px;
   font-size: var(--font-base);
   color: var(--text-muted);
+  flex-wrap: wrap;
 }
 
 .breadcrumb-sep {

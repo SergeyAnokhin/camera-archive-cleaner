@@ -37,6 +37,19 @@
   grid-column: 1 / -1;
 }
 
+/* Narrow screens: settings collapse to a single column */
+@media (max-width: 640px) {
+  .modal-2col { grid-template-columns: 1fr; }
+  .modal-2col > .modal-section:nth-child(odd):not(.col-span-2) { border-right: none; }
+  .modal-tabs { flex-wrap: wrap; }
+  .modal-card {
+    max-width: calc(100vw - 12px);
+    max-height: calc(100vh - 16px);
+  }
+  .modal-header,
+  .modal-section { padding-left: 14px; padding-right: 14px; }
+}
+
 /* ── AI tab provider headers ── */
 .modal-ai-provider-header {
   padding: 10px 20px 8px;

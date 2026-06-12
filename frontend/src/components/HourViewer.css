@@ -105,7 +105,9 @@
 /* ── File grid ── */
 .hv-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--thumb-w, 140px), 1fr));
+  /* min() caps the column width at the container width so a large
+     thumb-w setting never causes horizontal overflow on narrow screens */
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--thumb-w, 140px), 100%), 1fr));
   gap: var(--gap-sm);
   overflow: visible;
 }

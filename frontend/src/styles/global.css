@@ -49,3 +49,29 @@ button {
   display: inline-block;
   animation: spin 1s linear infinite;
 }
+
+/* ── App shell layout (App.jsx) ── */
+.app-main {
+  flex: 1;
+  padding: var(--gap-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-md);
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.app-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--gap-sm);
+}
+
+@media (max-width: 640px) {
+  .app-main { padding: var(--gap-sm); }
+  /* Keyboard hints are useless on touch screens */
+  .kb-hints { display: none; }
+}
