@@ -20,6 +20,7 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`database.py`](../backend/database.py) | SQLite: table schema + migrations, all SQL queries. Tables: `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks`, `tuning_sessions`, `cameras`. |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed |
 | [`config.py`](../backend/config.py) | Defines `Camera(id, name, path)` and `load_cameras()` which queries the database and appends `CAMERA_ROOT`. |
+| [`cameras.yaml`](../backend/cameras.yaml) | Seed only: migrated into the `cameras` DB table on first startup when the table is empty (`database.py`); not read afterwards |
 | [`settings_manager.py`](../backend/settings_manager.py) | Persists user settings (without credentials) to `settings.json` on the server |
 | [`google_oauth.py`](../backend/google_oauth.py) | Google OAuth 2.0: client credentials + tokens in `DATA_DIR/google_oauth.json`, consent URL, code exchange, access-token refresh. See [`google-integration.md`](google-integration.md) |
 | [`google_api.py`](../backend/google_api.py) | Sync REST client for Gmail + Drive (httpx): labels, message/attachment fetch, folder find-or-create, resumable upload. Pure helpers `extract_attachments()` / `split_drive_path()` |
@@ -128,6 +129,7 @@ Imported by both the main backend and the compute-service.
 | [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI display utilities: `resolveAiIcons(str)` → `[{emoji,label}]` — builds lookup from `COCO_CLASSES` (both `en`/`ru` keys), always returns Russian display labels |
 | [`cocoClasses.js`](../frontend/src/cocoClasses.js) | The 80 COCO classes (`{id, en, ru, emoji}`) in class-ID order + `DETECTION_CLASSES_DEFAULT`. Source for the Detection-tab class checklist; IDs flow to YOLO's `classes=` param |
 | [`prompts.js`](../frontend/src/prompts.js) | Single source of truth for all AI prompt templates: `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude), `GEMINI_FREEFORM_PROMPT`, `CELL_ANALYSIS_PROMPT(n)` (heatmap batch). `{n}` = image count |
+| [`viewedStatus.js`](../frontend/src/viewedStatus.js) | Viewed-hour tracking, localStorage only (`viewed_hours_*`, `data_*` keys): `markHourViewed()`, per-level aggregation for the heatmap viewed strips, `hour-viewed-change` CustomEvent |
 | [`main.jsx`](../frontend/src/main.jsx) | React entry point. Mounts `<App />` |
 | [`test-setup.js`](../frontend/src/test-setup.js) | Vitest setup: in-memory `localStorage` stub (no jsdom). Tests are co-located `*.test.js` files (`components/navUtils.test.js`, `components/hour/hourUtils.test.js`). See [`testing.md`](testing.md) |
 
@@ -146,6 +148,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`compute.js`](../frontend/src/api/compute.js) | `/compute/*`, `/services/status` |
 | [`tasks.js`](../frontend/src/api/tasks.js) | `/tasks` CRUD, metrics, logs, `estimate_files`, `getTaskMaxErrors()` |
 | [`tuning.js`](../frontend/src/api/tuning.js) | `/tuning/sessions/*` |
+| [`settings.js`](../frontend/src/api/settings.js) | `/settings` GET/PUT (server-side settings sync) |
 | [`google.js`](../frontend/src/api/google.js) | `/google/*` (auth status/credentials/url, disconnect, Gmail labels) + `googleRedirectUri()` |
 
 ### Components (`frontend/src/components/`)
@@ -162,12 +165,13 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`aiModal/StructuredAiResult.jsx`](../frontend/src/components/aiModal/StructuredAiResult.jsx) | `AiStatsRow` (tokens/cost/time) + `StructuredResponse` (scene/images/raw) — shared by Gemini and Claude modals |
 | [`DeleteConfirmModal.jsx`](../frontend/src/components/DeleteConfirmModal.jsx) | Delete confirmation modal: file list with relative paths (`toRelative()` finds `camera.path` as a substring, falling back to the camera folder name — `file_path` may be indexed under a different `CAMERA_ROOT`), paired video preview |
 | [`HelpModal.jsx`](../frontend/src/components/HelpModal.jsx) | Help modal (toolbar Help button): cleanup workflow steps, hotkey list, uniformity-badge explanation |
-| [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal — thin shell: backdrop, tab bar, renders the active tab. 5 tabs: General, View, AI, Compute, Service. `TAB_ALIASES` maps old tab IDs for deep-link compatibility |
+| [`ToolsModal.jsx`](../frontend/src/components/ToolsModal.jsx) | Settings modal — thin shell: backdrop, tab bar, renders the active tab. 7 tabs: General, Cameras, View, AI, Compute, Google, Service. `TAB_ALIASES` maps old tab IDs (detection→ai, tasks/logging/maintenance→service) for deep-link compatibility |
 | [`CellSelBar.jsx`](../frontend/src/components/CellSelBar.jsx) | Heatmap cell-selection toolbar: bulk select, delete (hour level), and AI analysis across selected day/hour cells. Rendered by `App.jsx` in selection mode |
 | [`navUtils.js`](../frontend/src/components/navUtils.js) | Heatmap navigation helpers: `LEVELS`, `GRID_COLS`, `dateRangeForPeriod`, `computeIntensity`, `formatBytes`, nav-state persistence |
 | [`useHeatmapKeyboard.js`](../frontend/src/components/useHeatmapKeyboard.js) | Custom hook — arrow-key navigation + selection/delete shortcuts for the heatmap grid. Inactive while HourViewer is open |
 | [`useCellSelection.js`](../frontend/src/components/useCellSelection.js) | Custom hook — heatmap cell-selection state + actions: bulk hour delete, batch AI analysis, send-to-task. Feeds CellSelBar |
 | [`useTaskNavigation.js`](../frontend/src/components/useTaskNavigation.js) | Custom hook — Tasks screen → heatmap/hour navigation, owns TaskResultsModal state |
+| [`TaskResultsModal.jsx`](../frontend/src/components/TaskResultsModal.jsx) | Results modal for finished AI tasks (openvino/gemini/claude): per-photo object list, token/cost stats, click-through to the hour |
 | [`useRangeDelete.js`](../frontend/src/components/useRangeDelete.js) | Custom hook — date-range delete preview → confirm flow, drives DeleteConfirmModal |
 | [`KeyboardHints.jsx`](../frontend/src/components/KeyboardHints.jsx) | Footer strip of keyboard shortcuts under the heatmap |
 | [`Header.jsx`](../frontend/src/components/Header.jsx) | Top bar: total GB / photo count / video count |
@@ -179,9 +183,9 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`ServiceStatus.jsx`](../frontend/src/components/ServiceStatus.jsx) | Status chips in the header (Backend / Compute): up/down dot, CPU %, RAM usage. Polls `/api/services/status` every 5 s, paused while the tab is hidden |
 | [`TasksScreen.jsx`](../frontend/src/components/TasksScreen.jsx) | Tasks screen — polls `/tasks` every 3 s, shows system metrics bar + task card list, hosts NewTaskModal |
 | [`TuningScreen.jsx`](../frontend/src/components/TuningScreen.jsx) | Model tuning orchestrator: session sidebar + step switching. Steps live in `tuning/` (table below). See [`docs/tuning.md`](tuning.md) |
-| [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card: type icon, status badge, progress bar, speed/ETA, thumbnail, pause/resume/cancel buttons. Logs button (console icon) for `video_convert`/`file_organizer` types; dry-run amber tag |
+| [`TaskCard.jsx`](../frontend/src/components/TaskCard.jsx) | Task card: type icon, status badge, progress bar, speed/ETA, thumbnail, pause/resume/cancel buttons. Logs button (console icon) for `video_convert`/`file_organizer`/`gmail_download`/`gdrive_upload` types; dry-run amber tag |
 | [`NewTaskModal.jsx`](../frontend/src/components/NewTaskModal.jsx) | Modal to create a task: type selector, camera/dates, AI scheduling, estimates, param assembly (`handleAdd`). Eight types: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert`, `file_organizer`, `gmail_download`, `gdrive_upload`. Per-type param panels live in `newTask/` (table below) |
-| [`TaskLogsModal.jsx`](../frontend/src/components/TaskLogsModal.jsx) | Log viewer modal for `video_convert` and `file_organizer` tasks. Polls `GET /tasks/{id}/logs` every 2 s while task is active; colour-codes DRY/ERROR/Skip lines. Header has a fullscreen toggle (⛶/⊡) that expands the modal to 98 vw × 96 vh |
+| [`TaskLogsModal.jsx`](../frontend/src/components/TaskLogsModal.jsx) | Log viewer modal for log-enabled task types (see TaskCard). Polls `GET /tasks/{id}/logs` every 2 s while task is active; colour-codes DRY/ERROR/Skip lines. Header has a fullscreen toggle (⛶/⊡) that expands the modal to 98 vw × 96 vh |
 
 ### Tools modal tabs (`frontend/src/components/tools/`)
 
@@ -200,6 +204,8 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
 | [`GoogleTab.jsx`](../frontend/src/components/tools/GoogleTab.jsx) | Google account: OAuth client setup (redirect URI display, client id/secret), connect/disconnect with status polling. See [`google-integration.md`](google-integration.md) |
 | [`ServiceTab.jsx`](../frontend/src/components/tools/ServiceTab.jsx) | Combined service tab: Tasks settings (ETA window, log tail lines), Logging (log level, buffer, live viewer), Maintenance (DB/thumbnail cleanup) |
+
+> **Dead files:** `DetectionTab.jsx`, `LoggingTab.jsx`, `MaintenanceTab.jsx` are not imported anywhere — superseded by the merged `AiTab`/`ServiceTab`. Don't edit them; the live code is in the merged tabs.
 
 ### New Task modal parts (`frontend/src/components/newTask/`)
 
@@ -308,10 +314,9 @@ Third deployment target: HA OS / Supervised, exposed via HA ingress (no host por
 | [`repository.yaml`](../repository.yaml) | HA add-on repository manifest (required by HA store) |
 | [`camera-cleaner-addon/config.yaml`](../camera-cleaner-addon/config.yaml) | Add-on manifest: arch, ingress port 8099, `map: media:rw`, options `camera_root` + `compute_remote_url` |
 | [`camera-cleaner-addon/build.yaml`](../camera-cleaner-addon/build.yaml) | Per-arch base images (`ghcr.io/home-assistant/{arch}-base-debian:bookworm`) |
-| [`camera-cleaner-addon/Dockerfile`](../camera-cleaner-addon/Dockerfile) | Multi-stage: Node.js frontend build → HA Debian base with Python 3 + nginx + s6-overlay services. Build context = repo root: `docker build -f camera-cleaner-addon/Dockerfile .` |
-| [`camera-cleaner-addon/rootfs/etc/cont-init.d/01-setup.sh`](../camera-cleaner-addon/rootfs/etc/cont-init.d/01-setup.sh) | s6 init: seeds `/data/compute_config.json` from options on first run |
-| [`camera-cleaner-addon/rootfs/etc/services.d/backend/run`](../camera-cleaner-addon/rootfs/etc/services.d/backend/run) | s6 service: reads `camera_root` option → `CAMERA_ROOT`, sets `DATA_DIR=/data`, starts uvicorn on 127.0.0.1:8000 |
-| [`camera-cleaner-addon/rootfs/etc/services.d/nginx/run`](../camera-cleaner-addon/rootfs/etc/services.d/nginx/run) | s6 service: starts nginx on port 8099 |
+| [`camera-cleaner-addon/Dockerfile`](../camera-cleaner-addon/Dockerfile) | Multi-stage: Node.js frontend build → HA Debian base with Python 3 + nginx. Build context = repo root: `docker build -f camera-cleaner-addon/Dockerfile .` |
+| [`camera-cleaner-addon/run.sh`](../camera-cleaner-addon/run.sh) | Container ENTRYPOINT (bypasses s6-overlay): options.json → `CAMERA_ROOT`/`DATA_DIR=/data`, seeds compute config, starts nginx + uvicorn |
 | [`camera-cleaner-addon/rootfs/etc/nginx/nginx.conf`](../camera-cleaner-addon/rootfs/etc/nginx/nginx.conf) | nginx: `allow 172.30.32.2; deny all` (ingress-only); serves SPA; `location /api/` proxies to uvicorn, stripping the prefix |
+| `camera-cleaner-addon/rootfs/etc/services.d/`, `cont-init.d/` | **Not executed** — legacy s6 scripts from before the ENTRYPOINT override; the live logic is in `run.sh` |
 | [`camera-cleaner-addon/DOCS.md`](../camera-cleaner-addon/DOCS.md) | User-facing add-on documentation shown in HA store |
 | [`.github/workflows/addon-build.yml`](../.github/workflows/addon-build.yml) | CI: multi-arch (amd64+aarch64) image build and push to `ghcr.io` on `addon/v*` tag |

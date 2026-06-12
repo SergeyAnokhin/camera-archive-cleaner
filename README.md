@@ -95,6 +95,7 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 | [`docs/testing.md`](docs/testing.md) | Unit tests: what rule each test pins, how to run (`npm test`), how to add new ones |
 | [`docs/logging.md`](docs/logging.md) | Log levels, format, colours, how to configure |
 | [`docs/deployment.md`](docs/deployment.md) | k3s deployment: Docker images, Helm chart, ArgoCD GitOps, SMB camera share, node pinning |
+| [`docs/home-assistant-addon.md`](docs/home-assistant-addon.md) | HA add-on: single-container packaging, ingress flow, run.sh entrypoint, addon/v* release CI |
 
 ---
 
