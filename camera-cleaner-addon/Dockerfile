@@ -5,7 +5,7 @@
 ARG BUILD_FROM=debian:bookworm-slim
 
 # ── Stage 1: build frontend ────────────────────────────────────────────────
-FROM node:20-alpine AS frontend-builder
+FROM node:24-alpine AS frontend-builder
 WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm ci --prefer-offline
