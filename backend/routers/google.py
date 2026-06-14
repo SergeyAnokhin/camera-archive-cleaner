@@ -76,6 +76,19 @@ def oauth_callback(state: str = "", code: str = "", error: str = ""):
         message=f"{status.get('email') or ''} — you can close this tab."))
 
 
+class ManualCallbackRequest(BaseModel):
+    url: str
+
+
+@router.post("/auth/manual_callback")
+def manual_callback(req: ManualCallbackRequest):
+    """Accept a full callback URL pasted from the browser (HA ingress / local IP workaround)."""
+    try:
+        return google_oauth.exchange_redirect_url(req.url)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/auth/disconnect")
 def auth_disconnect():
     google_oauth.disconnect()

@@ -113,6 +113,20 @@ def _email_from_id_token(id_token: str) -> "str | None":
         return None
 
 
+def exchange_redirect_url(url: str) -> dict:
+    """Parse a full callback URL pasted from the browser address bar and exchange the code."""
+    from urllib.parse import urlparse, parse_qs
+    qs = parse_qs(urlparse(url).query)
+    error = qs.get("error", [None])[0]
+    if error:
+        raise ValueError(f"Google OAuth error: {error}")
+    code = qs.get("code", [None])[0]
+    state = qs.get("state", [None])[0]
+    if not code or not state:
+        raise ValueError("URL does not contain 'code' and 'state' — copy the full redirect URL from the browser address bar")
+    return exchange_code(state, code)
+
+
 def exchange_code(state: str, code: str) -> dict:
     redirect_uri = _pending_states.pop(state, None)
     if redirect_uri is None:

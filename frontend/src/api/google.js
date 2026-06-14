@@ -23,6 +23,10 @@ export function disconnectGoogle() {
   return postJson('/google/auth/disconnect', {})
 }
 
+export function submitManualCallback(url) {
+  return postJson('/google/auth/manual_callback', { url })
+}
+
 export function getGmailLabels() {
   return get('/google/gmail/labels')
 }

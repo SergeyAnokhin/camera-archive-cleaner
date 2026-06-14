@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   getGoogleAuthStatus, saveGoogleCredentials, getGoogleAuthUrl,
-  disconnectGoogle, googleRedirectUri,
+  disconnectGoogle, googleRedirectUri, submitManualCallback,
 } from '../../api.js'
 
 // Tools → Google tab: connect a Google account for the Gmail Download and
@@ -14,6 +14,8 @@ export default function GoogleTab() {
   const [savedMsg, setSavedMsg]     = useState('')
   const [connecting, setConnecting] = useState(false)
   const [copied, setCopied]         = useState(false)
+  const [manualUrl, setManualUrl]   = useState('')
+  const [manualMsg, setManualMsg]   = useState('')
   const pollRef = useRef(null)
 
   const redirectUri = googleRedirectUri()
@@ -64,6 +66,22 @@ export default function GoogleTab() {
   async function handleDisconnect() {
     const s = await disconnectGoogle()
     setStatus(s)
+    setManualUrl('')
+    setManualMsg('')
+  }
+
+  async function handleManualCallback() {
+    setManualMsg('')
+    try {
+      const s = await submitManualCallback(manualUrl.trim())
+      setStatus(s)
+      setConnecting(false)
+      clearInterval(pollRef.current)
+      setManualUrl('')
+      setManualMsg('')
+    } catch (e) {
+      setManualMsg('Error: ' + e.message)
+    }
   }
 
   function copyRedirect() {
@@ -111,6 +129,31 @@ export default function GoogleTab() {
             </>
           )}
         </div>
+
+        {connecting && (
+          <div style={{ marginTop: 14 }}>
+            <div className="modal-setting-hint" style={{ marginBottom: 6 }}>
+              <i className="mdi mdi-information-outline" style={{ marginRight: 5, color: '#60a5fa' }} />
+              If the redirect failed (e.g. Home Assistant ingress returned 401), copy the full URL
+              from the browser address bar and paste it below:
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <input
+                className="modal-text-input"
+                style={{ flex: 1 }}
+                type="text"
+                placeholder="https://starec.duckdns.org/api/hassio_ingress/…?code=…&state=…"
+                value={manualUrl}
+                onChange={e => setManualUrl(e.target.value)}
+              />
+              <button className="modal-btn" onClick={handleManualCallback} disabled={!manualUrl.trim()}>
+                <i className="mdi mdi-check" /> Complete
+              </button>
+            </div>
+            {manualMsg && <div style={{ marginTop: 6, color: manualMsg.startsWith('Error') ? '#f87171' : '#34d399' }}>{manualMsg}</div>}
+          </div>
+        )}
+
       </div>
 
       <div className="modal-section">
@@ -176,10 +219,14 @@ export default function GoogleTab() {
               <strong>Client ID</strong> and <strong>Client secret</strong> — copy both.
             </li>
             <li>
-              Enable the required APIs: go to{' '}
+              Enable the Gmail API: go to{' '}
               <strong>APIs &amp; Services → Library</strong>, search for{' '}
-              <strong>Gmail API</strong> and enable it, then repeat for{' '}
-              <strong>Google Drive API</strong>.
+              <strong>Gmail API</strong> and enable it.
+            </li>
+            <li>
+              Add yourself as a test user: go to{' '}
+              <strong>APIs &amp; Services → OAuth consent screen → Test users</strong>{' '}
+              and add your Gmail address. Without this step Google returns 403.
             </li>
           </ol>
           <div style={{
