@@ -27,7 +27,7 @@ npm install          # root — installs concurrently (once)
 cd backend && pip install -r requirements.txt
 cd compute-service && pip install -r requirements.txt
 cd frontend && npm install
-# Edit backend/cameras.yaml (or add later via UI) — set camera IDs, names, and paths
+# Add cameras via Tools → Cameras in the UI after first start
 ```
 
 **Start frontend + backend + compute-service (one command):**
@@ -115,20 +115,11 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 
 ## Camera configuration
 
-Cameras are configured and stored in the SQLite database (`snapshots.db`). You can manage them directly via the UI in **Tools → Cameras**.
+Cameras are configured and stored in the SQLite database (`snapshots.db`). Manage them via the UI in **Tools → Cameras**.
 
-On the first start, if the database configuration is empty, the application will automatically migrate cameras from `backend/cameras.yaml` if it exists.
-
-The `cameras.yaml` format (used for migration or initial setup):
-```yaml
-cameras:
-  - id: "foscam_fi9805w"
-    name: "Foscam FI9805W"
-    path: "Foscam/FI9805W_C4D6553DECE1"  # relative to CAMERA_ROOT
-  - id: "reolink_front"
-    name: "Reolink Front"
-    path: "ReolinkFront"
-```
+On the first start with an empty database, two cameras are seeded automatically:
+- **Demo Camera** — points to `backend/demo_camera/` (bundled sample images, always works, no setup needed)
+- **My Camera** — placeholder pointing to `Camera` relative to `CAMERA_ROOT`; shows HA setup instructions until configured
 
 Set `CAMERA_ROOT` env var to the mount point (e.g. `\\192.168.1.99\Camera` locally,
 `/camera` in Kubernetes). The absolute path is `CAMERA_ROOT / path`.

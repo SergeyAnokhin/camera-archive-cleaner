@@ -67,7 +67,6 @@ caches, the DB and `*.pt` out of the build context.
 | `backend-service.yaml` / `backend-pvc.yaml` | backend Service :8000; state PVC (RWO) |
 | `compute-deployment.yaml` / `compute-service.yaml` | compute Deployment (`nodeSelector role=compute`); Service :8001 |
 | `frontend-deployment.yaml` / `frontend-service.yaml` | nginx Deployment; Service :80 |
-| `cameras-configmap.yaml` | `cameras.yaml` with **Linux** paths under the SMB mount |
 | `smb-camera.yaml` | SMB CSI PV + PVC (RWX) + optional credentials Secret |
 | `ingress.yaml` | Traefik Ingress (`/api`→backend, `/`→frontend) + StripPrefix Middleware |
 
@@ -90,11 +89,7 @@ Both pods mount the same NAS share via the SMB CSI driver at the **same** path
 `CAMERA_ROOT` into both the backend and compute containers automatically — you never
 need to configure it separately.
 
-`backend/cameras.yaml` stores **relative** paths (e.g. `FoscamHut`); `CAMERA_ROOT` is
-prepended at runtime to form absolute paths. When the backend calls the compute service
-it strips `CAMERA_ROOT` from the path; compute prepends its own `CAMERA_ROOT` to
-reconstruct the absolute path. Because both pods use the same mount point, paths are
-always consistent with no remapping.
+Camera configuration is stored in the `cameras` table of `snapshots.db` (the state PVC) and managed via the UI (Tools → Cameras). On a fresh deploy the DB is empty, so configure cameras after first start. Relative paths (e.g. `FoscamHut`) are stored in the DB; `CAMERA_ROOT` is prepended at runtime to form absolute paths. When the backend calls the compute service it strips `CAMERA_ROOT` from the path; compute prepends its own `CAMERA_ROOT` to reconstruct the absolute path. Because both pods use the same mount point, paths are always consistent with no remapping.
 
 The backend mounts the share read-write (it deletes files via `/delete`); compute
 mounts it read-only.
@@ -120,11 +115,7 @@ request body ([`backend/routers/ai.py`](../backend/routers/ai.py)).
 ## CI/CD
 
 [`.github/workflows/build.yml`](../.github/workflows/build.yml) (push to `main`):
-builds + pushes the three images to `ghcr.io/<owner>/<repo>/{backend,compute,frontend}`
-tagged with the short git SHA, then `yq`-rewrites `image.*.tag` in `values.yaml` and
-commits back (`[skip ci]`; the bump path is outside the workflow's trigger paths, so it
-does not re-trigger). ArgoCD ([`deploy/argocd/application.yaml`](../deploy/argocd/application.yaml))
-auto-syncs the change.
+builds + pushes the three images to `ghcr.io/<owner>/<repo>/{backend,compute,frontend}` tagged with the short git SHA, then `yq`-rewrites `image.*.tag` in `values.yaml` and commits back (`[skip ci]`; the bump path is outside the workflow's trigger paths, so it does not re-trigger). ArgoCD ([`deploy/argocd/application.yaml`](../deploy/argocd/application.yaml)) auto-syncs the change.
 
 ---
 
@@ -200,24 +191,19 @@ and commit — ArgoCD deploys from git, so changes must be pushed, not applied l
 | `image.registry` | `ghcr.io/<your-owner>/<your-repo>` (lowercase) |
 | `camera.smb.source` | your share, e.g. `//192.168.1.91/Camera` |
 | `camera.smb.mountPath` | mount point inside both pods (default `/camera`) |
-| `camerasConfig` | AUTO-MANAGED by CI from `backend/cameras.yaml` — contains **relative** paths (`Foscam/FI9805W_...`); `CAMERA_ROOT` is prepended at runtime |
 | `ingress.host` | the hostname you will open in the browser |
 | `imagePullSecrets` | `[{name: ghcr-creds}]` only if images are private |
 
 ```bash
 git add deploy/helm/camera-cleaner/values.yaml && git commit -m "config: cluster values" && git push
 ```
-> The `camerasConfig` paths and the SMB `mountPath` must agree: the backend stores paths
-> as written here, and the compute-service reads the *same* paths off the *same* mount —
-> that is why `compute.pathRemap` stays empty.
 
 ### Step 6 — Register the app with ArgoCD
 ```bash
 kubectl apply -f deploy/argocd/application.yaml      # creates the namespace-scoped Application
 kubectl -n argocd get application camera-cleaner     # wait for SYNCED / HEALTHY
 ```
-ArgoCD now renders the chart and creates: SMB PV/PVC, state PVC, cameras ConfigMap, the
-three Deployments + Services, and the Ingress + StripPrefix middleware.
+ArgoCD now renders the chart and creates: SMB PV/PVC, state PVC, the three Deployments + Services, and the Ingress + StripPrefix middleware.
 
 ### Step 7 — DNS / hosts
 Resolve `ingress.host` to any node IP (Traefik listens cluster-wide). For a quick local
@@ -225,9 +211,10 @@ test add a hosts entry, e.g. `192.168.1.x  camera.local`, then open `http://came
 
 ### Step 8 — First run in the UI
 1. Open the host → the frontend loads (served by nginx, calls relative `/api`).
-2. **Scan** (top bar) → the backend walks the SMB share and fills the DB; the heatmap populates.
-3. **Tools → Compute** → should show the remote compute-service **Healthy**.
-4. Switch a view to **OpenVINO Detection** → a bounding-box image confirms backend ↔ compute ↔ SMB all work.
+2. **Tools → Cameras** → add your camera(s): set an ID, name, and relative path (e.g. `FoscamHut`). Save.
+3. **Scan** (top bar) → the backend walks the SMB share and fills the DB; the heatmap populates.
+4. **Tools → Compute** → should show the remote compute-service **Healthy**.
+5. Switch a view to **OpenVINO Detection** → a bounding-box image confirms backend ↔ compute ↔ SMB all work.
 
 ---
 
@@ -269,7 +256,7 @@ kubectl -n camera-cleaner exec deploy/camera-cleaner-backend -- ls /camera
 | Pod stuck `ContainerCreating`, PVC unbound | SMB CSI driver missing, bad `smb-creds`, or wrong `camera.smb.source` |
 | compute pod won't schedule (`Pending`) | no node labelled `role=compute`, or taint applied without toleration in chart |
 | Unexpected pod lands on compute node | taint not applied — run `kubectl taint nodes <node> role=compute:NoSchedule` |
-| Heatmap empty after scan | `camerasConfig` paths don't match the SMB mount contents |
+| Heatmap empty after scan | camera path in Tools → Cameras doesn't match the SMB mount contents |
 | Tools → Compute shows unavailable | compute pod not Ready, or seeded `remote_url` doesn't match the compute Service name |
 | `/api` calls 404 | StripPrefix middleware not applied (`ingress.stripApiPrefix: true`) |
 | Site down after compute node shutdown | a kube-system pod (e.g. `csi-smb-controller`, `traefik`) drifted onto the compute node — see "Node stability" below |

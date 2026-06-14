@@ -33,16 +33,12 @@ In Home Assistant: **Settings → System → Storage → Add network storage**
 
 ### 3. Start and open
 
-Click **Start**, then **Open Web UI**. On first launch the camera list is empty — go to **Tools → Cameras** to add your cameras (ID, display name, path relative to `camera_root`).
+Click **Start**, then **Open Web UI**. On first launch two cameras are pre-configured:
 
-To pre-seed cameras, place a `cameras.yaml` in the `/data` directory of the add-on (accessible via Samba add-on or File Editor) before the first start:
+- **Demo Camera** — bundled sample images, no setup needed. Click **Scan** to index them.
+- **My Camera** — placeholder pointing to `Camera` under your `camera_root`. The UI shows setup instructions until you point it at a real folder in **Tools → Cameras**.
 
-```yaml
-cameras:
-  - id: foscam_front
-    name: Front Door
-    path: Foscam/FI9805W_C4D6553DECE1
-```
+To configure a real camera: go to **Tools → Cameras**, set the path to the subfolder inside `camera_root` that contains your camera's files (e.g. `FrontDoor`), then click **Scan**.
 
 ## Google Integration (optional)
 

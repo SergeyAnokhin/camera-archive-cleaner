@@ -1,7 +1,6 @@
 fastapi
 uvicorn[standard]
 httpx
-pyyaml
 Pillow
 numpy
 opencv-python-headless

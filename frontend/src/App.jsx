@@ -358,8 +358,7 @@ export default function App() {
           />
         ) : camerasLoaded && cameras.length === 0 ? (
           <FirstRunNotice icon="mdi-cctv-off" title="No cameras configured">
-            Add cameras in <strong>Tools → Cameras</strong>, or place a{' '}
-            <code>cameras.yaml</code> in the backend directory before first start.
+            Add cameras in <strong>Tools → Cameras</strong>.
           </FirstRunNotice>
         ) : totals && totals.photo_count === 0 && totals.video_count === 0 && currentCamera?.path_exists === false ? (
           <FirstRunNotice icon="mdi-lan-disconnect" title="Camera folder not found">

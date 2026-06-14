@@ -61,9 +61,6 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           volumeMounts:
-            - name: cameras
-              mountPath: /app/backend/cameras.yaml
-              subPath: cameras.yaml
             - name: state
               mountPath: /app/backend/snapshots.db
               subPath: snapshots.db
@@ -78,9 +75,6 @@ spec:
             - name: camera-share
               mountPath: {{ .Values.camera.smb.mountPath }}
       volumes:
-        - name: cameras
-          configMap:
-            name: {{ $fullname }}-cameras
         - name: state
           persistentVolumeClaim:
             claimName: {{ $fullname }}-state

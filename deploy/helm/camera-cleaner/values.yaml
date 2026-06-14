@@ -60,22 +60,6 @@ frontend:
     kubernetes.io/hostname: k3s
   service:
     port: 80
-# cameras.yaml served to the backend as a ConfigMap. Paths are LINUX paths under
-# the SMB mountPath below — NOT the Windows/UNC paths used in local dev.
-# AUTO-MANAGED by CI — do not edit here.
-# Edit backend/cameras.yaml; CI injects it here on every push to main.
-# Paths are relative to CAMERA_ROOT (/camera in the pod = SMB mount).
-camerasConfig: |
-  cameras:
-    - id: "foscam_fi9805w"
-      name: "Foscam FI9805W"
-      path: "Foscam/FI9805W_C4D6553DECE1"
-    - id: "foscamHut"
-      name: "Foscam Hut"
-      path: "FoscamHut"
-    - id: "ReolinkFront"
-      name: "ReolinkFront"
-      path: "ReolinkFront"
 # Camera NAS share, mounted (read-write — backend deletes files) into both pods
 # via the SMB CSI driver. Requires csi-driver-smb installed in the cluster.
 camera:

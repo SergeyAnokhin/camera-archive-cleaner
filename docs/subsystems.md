@@ -31,7 +31,7 @@ The exception is [`routers/delete.py`](../backend/routers/delete.py), which runs
 - `backend/compute_client.py` — strips `CAMERA_ROOT` from `camera.path`
 - `frontend/src/components/DeleteConfirmModal.jsx` — displays `camera.path`
 
-**When changing camera configuration** — the camera configuration is stored in the database (`snapshots.db`) and managed via the UI. On first startup, it can be migrated from `cameras.yaml` if it exists. At runtime, the `CAMERA_ROOT` env var is prepended to the camera relative path to get the absolute media path.
+**When changing camera configuration** — the camera configuration is stored in the `cameras` table of `snapshots.db` and managed via the UI (Tools → Cameras). On first startup with an empty table, two default cameras are seeded by `_seed_default_cameras()` in `database.py`. At runtime, the `CAMERA_ROOT` env var is prepended to the camera relative path to get the absolute media path.
 
 ---
 

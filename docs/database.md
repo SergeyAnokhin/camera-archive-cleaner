@@ -13,7 +13,7 @@ Main table. Populated by the scanner on `/scan`. One row per file (photo or vide
 | Column | Type | Description |
 |---|---|---|
 | `id` | INTEGER PK | Auto-increment |
-| `camera_id` | TEXT | Camera ID from `cameras.yaml` |
+| `camera_id` | TEXT | Camera ID from the `cameras` table |
 | `file_type` | TEXT | `'photo'` or `'video'` |
 | `file_path` | TEXT UNIQUE | Full path to the file on disk |
 | `file_size` | INTEGER | File size in bytes |

@@ -71,7 +71,7 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
 
-      - name: Bump image tags and sync cameras config in Helm values
+      - name: Bump image tags in Helm values
         env:
           TAG: ${{ steps.vars.outputs.tag }}
         run: |
@@ -81,8 +81,6 @@ jobs:
           yq -i ".image.backend.tag = strenv(TAG)"  "$f"
           yq -i ".image.compute.tag = strenv(TAG)"  "$f"
           yq -i ".image.frontend.tag = strenv(TAG)" "$f"
-          # Inject backend/cameras.yaml verbatim as the ConfigMap source of truth
-          CAMERAS=$(cat backend/cameras.yaml) yq -i '.camerasConfig = strenv(CAMERAS)' "$f"
 
       - name: Commit tag bump
         run: |
