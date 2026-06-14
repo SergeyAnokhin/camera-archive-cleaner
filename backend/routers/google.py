@@ -9,6 +9,7 @@ GET  /google/gmail/labels      — Gmail labels for the gmail_download task form
 """
 import logging
 
+import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -101,3 +102,11 @@ def gmail_labels():
         return {"labels": google_api.gmail_list_labels()}
     except google_oauth.NotConnected as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 403:
+            raise HTTPException(
+                status_code=400,
+                detail="Gmail API returned 403 — make sure the Gmail API is enabled in your Google Cloud project "
+                       "(APIs & Services → Library → Gmail API → Enable), then try again.",
+            )
+        raise HTTPException(status_code=400, detail=f"Gmail API error: {e.response.status_code}")

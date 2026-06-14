@@ -87,6 +87,11 @@ Each user creates their own private OAuth client — your Google password is nev
 4. Grant the requested Gmail read permission.
 5. The tab closes and the add-on shows **Connected: you@gmail.com**.
 
+**If the redirect fails with 401 (Home Assistant ingress):** After granting permission Google redirects the browser back to the add-on, but HA ingress may reject it as 401 because the redirect happens in a fresh popup without an HA session. When this happens:
+- Copy the full URL from the popup's address bar (it still contains `?code=…&state=…`)
+- Paste it into the **"If the redirect failed…"** field that appears below the Connect button
+- Click **Complete** — the add-on will extract the code and finish connecting
+
 ### Step 6 — Download attachments
 
 1. Go to **Tasks** and click **New task**.
