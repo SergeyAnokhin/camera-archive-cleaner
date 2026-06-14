@@ -32,7 +32,6 @@ SCOPES = [
     "openid",
     "email",
     "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/drive",
 ]
 
 # state → redirect_uri for in-flight consent flows (CSRF protection)
