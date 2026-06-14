@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getCamerasConfig, saveCamerasConfig, checkCameraPath, getCameraRoot, putCameraRoot, getMediaDirs } from '../../api.js'
+import { getCamerasConfig, saveCamerasConfig, checkCameraPath, getCameraRoot, putCameraRoot, getMediaDirs, getCameraRootSubdirs } from '../../api.js'
 
 export default function CamerasTab({ onSaveSuccess }) {
   const [cameras, setCameras] = useState([])
@@ -16,6 +16,11 @@ export default function CamerasTab({ onSaveSuccess }) {
   const [savingRoot, setSavingRoot] = useState(false)
   const [rootStatus, setRootStatus] = useState(null)
 
+  // Per-camera directory browser state
+  const [openBrowserIndex, setOpenBrowserIndex] = useState(null)
+  const [cameraDirs, setCameraDirs] = useState(null) // cached subdirs of CAMERA_ROOT
+  const [loadingCameraDirs, setLoadingCameraDirs] = useState(false)
+
   useEffect(() => {
     setLoading(true)
     getCamerasConfig()
@@ -29,6 +34,12 @@ export default function CamerasTab({ onSaveSuccess }) {
       .then(r => { setCameraRoot(r.camera_root); setEditRoot(r.camera_root) })
       .catch(() => {})
   }, [])
+
+  // Invalidate per-camera dir cache when root changes
+  useEffect(() => {
+    setCameraDirs(null)
+    setOpenBrowserIndex(null)
+  }, [cameraRoot])
 
   async function handleBrowseMedia() {
     setLoadingMediaDirs(true)
@@ -63,11 +74,49 @@ export default function CamerasTab({ onSaveSuccess }) {
     }
   }
 
+  async function handleBrowseCameraRoot(index) {
+    if (openBrowserIndex === index) {
+      setOpenBrowserIndex(null)
+      return
+    }
+    setOpenBrowserIndex(index)
+    if (cameraDirs !== null) return // already loaded
+    setLoadingCameraDirs(true)
+    try {
+      const r = await getCameraRootSubdirs()
+      setCameraDirs(r)
+    } catch (e) {
+      setCameraDirs({ exists: false, dirs: [], error: e.message })
+    } finally {
+      setLoadingCameraDirs(false)
+    }
+  }
+
+  function sanitizeCameraId(name) {
+    const sanitized = name.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/^_+|_+$/g, '')
+    return sanitized || 'camera'
+  }
+
+  function handleSelectCameraDir(index, dirName) {
+    const updated = [...cameras]
+    const cam = { ...updated[index], path: dirName }
+    if (!cam.id.trim()) cam.id = sanitizeCameraId(dirName)
+    if (!cam.name.trim()) cam.name = dirName
+    updated[index] = cam
+    setCameras(updated)
+    setOpenBrowserIndex(null)
+    setCheckResults(prev => {
+      const next = { ...prev }
+      delete next[index]
+      return next
+    })
+  }
+
   function handleChange(index, field, value) {
     const updated = [...cameras]
     updated[index] = { ...updated[index], [field]: value }
     setCameras(updated)
-    
+
     // Clear path check results for this index if path changed
     if (field === 'path') {
       setCheckResults(prev => {
@@ -85,6 +134,8 @@ export default function CamerasTab({ onSaveSuccess }) {
   function handleDelete(index) {
     const updated = cameras.filter((_, i) => i !== index)
     setCameras(updated)
+    if (openBrowserIndex === index) setOpenBrowserIndex(null)
+    else if (openBrowserIndex > index) setOpenBrowserIndex(openBrowserIndex - 1)
     setCheckResults(prev => {
       const next = {}
       Object.keys(prev).forEach(k => {
@@ -132,7 +183,7 @@ export default function CamerasTab({ onSaveSuccess }) {
 
   async function handleSave() {
     setStatus(null)
-    
+
     // Validation
     const seenIds = new Set()
     for (let i = 0; i < cameras.length; i++) {
@@ -284,6 +335,7 @@ export default function CamerasTab({ onSaveSuccess }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWait: '50vh', overflowY: 'auto', paddingRight: 4 }}>
         {cameras.map((cam, index) => {
           const check = checkResults[index]
+          const browserOpen = openBrowserIndex === index
           return (
             <div key={index} style={{
               display: 'flex',
@@ -335,9 +387,9 @@ export default function CamerasTab({ onSaveSuccess }) {
                 </div>
               </div>
 
-              {/* Path Input & Check */}
+              {/* Path Input, Browse & Check */}
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1, minWidth: 240 }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
                   <label style={{ display: 'block', fontSize: 11, color: 'var(--text-dim)', marginBottom: 3 }}>Relative Folder Path</label>
                   <input
                     type="text"
@@ -349,7 +401,18 @@ export default function CamerasTab({ onSaveSuccess }) {
                   />
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 38 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38 }}>
+                  <button
+                    className={`modal-btn neutral${browserOpen ? ' active-browse' : ''}`}
+                    onClick={() => handleBrowseCameraRoot(index)}
+                    disabled={loadingCameraDirs && openBrowserIndex === index}
+                    style={{ whiteSpace: 'nowrap', background: browserOpen ? 'var(--bg-card-hover)' : undefined, color: browserOpen ? 'var(--text-primary)' : undefined }}
+                    title="Browse camera root for folders"
+                  >
+                    {loadingCameraDirs && openBrowserIndex === index
+                      ? <i className="mdi mdi-loading mdi-spin" />
+                      : <><i className="mdi mdi-folder-search-outline" /> Browse</>}
+                  </button>
                   <button
                     className="modal-btn neutral"
                     onClick={() => handleCheck(index)}
@@ -364,6 +427,41 @@ export default function CamerasTab({ onSaveSuccess }) {
                   </button>
                 </div>
               </div>
+
+              {/* Per-camera directory picker */}
+              {browserOpen && cameraDirs && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
+                  {!cameraDirs.exists ? (
+                    <div style={{ color: '#fca5a5', fontSize: 12 }}>
+                      <i className="mdi mdi-alert-circle-outline" style={{ marginRight: 4 }} />
+                      {cameraDirs.error || `Camera root does not exist on the server: ${cameraRoot}`}
+                    </div>
+                  ) : cameraDirs.dirs.length === 0 ? (
+                    <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+                      <i className="mdi mdi-information-outline" style={{ marginRight: 4 }} />
+                      No subdirectories found in <code>{cameraRoot}</code>.
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                        Select a folder from <code style={{ fontFamily: 'monospace' }}>{cameraRoot}</code>:
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {cameraDirs.dirs.map(d => (
+                          <button
+                            key={d}
+                            className="modal-btn neutral"
+                            style={{ fontSize: 12, padding: '4px 10px', fontFamily: 'monospace' }}
+                            onClick={() => handleSelectCameraDir(index, d)}
+                          >
+                            {d}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Path check result message */}
               {check && !check.loading && (

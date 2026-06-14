@@ -54,7 +54,7 @@ export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, onC
   }, [])
 
   return (
-    <div className="modal-backdrop" onClick={handleBackdropClick}>
+    <div className="modal-backdrop tools-modal-backdrop" onClick={handleBackdropClick}>
       <div className="modal-card">
         <div className="modal-header">
           <span><i className="mdi mdi-wrench-outline" /> Tools</span>

@@ -36,3 +36,7 @@ export function putCameraRoot(camera_root) {
 export function getMediaDirs() {
   return get('/media_dirs')
 }
+
+export function getCameraRootSubdirs() {
+  return get('/camera_root/subdirs')
+}

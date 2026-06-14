@@ -9,6 +9,17 @@
   justify-content: center;
 }
 
+/* Tools modal is top-anchored so switching tabs doesn't make it jump */
+.tools-modal-backdrop {
+  align-items: flex-start;
+  padding-top: 8vh;
+  padding-bottom: 16px;
+}
+
+.tools-modal-backdrop .modal-card {
+  max-height: calc(92vh - 16px);
+}
+
 .modal-card {
   background: #1a2436;
   border: 1px solid rgba(255, 255, 255, 0.12);

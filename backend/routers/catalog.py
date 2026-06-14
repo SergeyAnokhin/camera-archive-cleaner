@@ -111,6 +111,19 @@ def get_media_dirs():
     return {"exists": True, "path": str(media), "dirs": dirs}
 
 
+@router.get("/camera_root/subdirs", summary="List immediate subdirectories of CAMERA_ROOT for camera path selection")
+def get_camera_root_subdirs():
+    """Returns immediate subdirs of CAMERA_ROOT so the UI can offer a directory picker for camera paths."""
+    root = config.CAMERA_ROOT
+    if not root.exists() or not root.is_dir():
+        return {"exists": False, "path": str(root), "dirs": []}
+    dirs = sorted(
+        p.name for p in root.iterdir()
+        if p.is_dir() and not p.name.startswith(".")
+    )
+    return {"exists": True, "path": str(root), "dirs": dirs}
+
+
 
 @router.get("/cameras", summary="List all configured cameras")
 def list_cameras():

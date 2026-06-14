@@ -372,7 +372,7 @@ export default function App() {
                 <li>
                   Mount your NAS / NVR share:{' '}
                   <a
-                    href="https://my.home-assistant.io/redirect/storage/"
+                    href="/config/storage"
                     target="_blank"
                     rel="noreferrer"
                     style={{ color: 'var(--accent)', textDecoration: 'underline' }}
