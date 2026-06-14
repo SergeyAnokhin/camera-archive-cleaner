@@ -115,13 +115,18 @@ def get_media_dirs():
 def get_camera_root_subdirs():
     """Returns immediate subdirs of CAMERA_ROOT so the UI can offer a directory picker for camera paths."""
     root = config.CAMERA_ROOT
-    if not root.exists() or not root.is_dir():
-        return {"exists": False, "path": str(root), "dirs": []}
-    dirs = sorted(
-        p.name for p in root.iterdir()
-        if p.is_dir() and not p.name.startswith(".")
-    )
-    return {"exists": True, "path": str(root), "dirs": dirs}
+    try:
+        if not root.exists() or not root.is_dir():
+            return {"exists": False, "path": str(root), "dirs": []}
+        dirs = sorted(
+            p.name for p in root.iterdir()
+            if p.is_dir() and not p.name.startswith(".")
+        )
+        return {"exists": True, "path": str(root), "dirs": dirs}
+    except Exception as e:
+        # Windows UNC paths (\\server\share) can raise OSError if the share is
+        # not accessible from the process context
+        return {"exists": False, "path": str(root), "dirs": [], "error": str(e)}
 
 
 

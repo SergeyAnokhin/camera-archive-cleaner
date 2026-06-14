@@ -83,12 +83,13 @@ async def startup():
 
     task_runner.init_runner_state()
     asyncio.create_task(task_runner.task_loop())
-    # Убираем uvicorn-хендлеры (у них свой формат) — пускаем через наш root
+    # Remove uvicorn handlers (у них свой формат) — пускаем через наш root
     for _n in ("uvicorn", "uvicorn.access", "uvicorn.error"):
         _lg = logging.getLogger(_n)
         _lg.handlers.clear()
         _lg.propagate = True
     logging.getLogger("uvicorn.access").addFilter(AccessFilter())
+
 
 
 app.include_router(catalog.router)
@@ -104,4 +105,3 @@ app.include_router(tuning.router)
 app.include_router(logging_api.router)
 app.include_router(settings.router)
 app.include_router(google.router)
-

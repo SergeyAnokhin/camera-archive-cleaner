@@ -53,7 +53,7 @@ export const TASK_TYPES = [
   { type: 'video_convert',    icon: 'mdi-video-check',           name: 'Video Convert',      desc: 'Video conversion via ffmpeg (H.265)' },
   { type: 'file_organizer',   icon: 'mdi-folder-move-outline',   name: 'File Organizer',     desc: 'Sort files into YYYY/MM/DD folders' },
   { type: 'gmail_download',   icon: 'mdi-email-download-outline', name: 'Gmail Download',    desc: 'Download photo attachments from a Gmail label' },
-  { type: 'gdrive_upload',    icon: 'mdi-cloud-upload-outline',   name: 'Drive Upload',      desc: 'Upload photos/videos to Google Drive' },
+  { type: 'gdrive_upload',      icon: 'mdi-cloud-upload-outline',   name: 'Drive Upload',       desc: 'Upload photos/videos to Google Drive' },
 ]
 
 export function isGoogleType(type) { return type === 'gmail_download' || type === 'gdrive_upload' }

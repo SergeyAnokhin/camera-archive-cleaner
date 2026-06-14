@@ -259,6 +259,7 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
     || (type === 'gdrive_upload' && !gd.driveFolder.trim())
   )
 
+
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-card ntm">

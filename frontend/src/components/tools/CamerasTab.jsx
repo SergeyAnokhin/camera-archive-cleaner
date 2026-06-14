@@ -86,7 +86,10 @@ export default function CamerasTab({ onSaveSuccess }) {
       const r = await getCameraRootSubdirs()
       setCameraDirs(r)
     } catch (e) {
-      setCameraDirs({ exists: false, dirs: [], error: e.message })
+      const hint = e.message.includes('404')
+        ? `${e.message} — backend may need a full restart (kill + re-run uvicorn)`
+        : e.message
+      setCameraDirs({ exists: false, dirs: [], error: hint })
     } finally {
       setLoadingCameraDirs(false)
     }

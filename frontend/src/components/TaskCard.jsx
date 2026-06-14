@@ -8,8 +8,8 @@ const TYPE_CONFIG = {
   claude:           { icon: 'mdi-robot',               label: 'Claude AI Analysis' },
   video_convert:    { icon: 'mdi-video-check',          label: 'Video Convert' },
   file_organizer:   { icon: 'mdi-folder-move-outline', label: 'File Organizer' },
-  gmail_download:   { icon: 'mdi-email-download-outline', label: 'Gmail Download' },
-  gdrive_upload:    { icon: 'mdi-cloud-upload-outline',   label: 'Drive Upload' },
+  gmail_download:     { icon: 'mdi-email-download-outline', label: 'Gmail Download' },
+  gdrive_upload:      { icon: 'mdi-cloud-upload-outline',   label: 'Drive Upload' },
 }
 
 const STATUS_CONFIG = {
