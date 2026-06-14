@@ -15,7 +15,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/SergeyAnokhin/camera-snapshots-cleaner-claude.git
+    repoURL: https://github.com/SergeyAnokhin/camera-archive-cleaner.git
     targetRevision: deploy
     path: deploy/helm/camera-cleaner
     helm:

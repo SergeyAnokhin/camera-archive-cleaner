@@ -175,7 +175,7 @@ k3s cluster's backend pod to offload detection work to it.
 python --version
 
 # Clone or copy the repo onto this machine. Then:
-cd C:\path\to\camera-snapshots-cleaner-claude\compute-service
+cd C:\path\to\camera-archive-cleaner\compute-service
 pip install -r requirements.txt
 ```
 
@@ -190,7 +190,7 @@ pip install -r requirements.txt
 Speeds up inference 2–5× on Intel CPUs. Skip if you only want the PyTorch path.
 
 ```powershell
-cd C:\path\to\camera-snapshots-cleaner-claude\compute-service
+cd C:\path\to\camera-archive-cleaner\compute-service
 python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='openvino')"
 python -c "from ultralytics import YOLO; YOLO('yolov8s.pt').export(format='openvino')"
 python -c "from ultralytics import YOLO; YOLO('yolov8m.pt').export(format='openvino')"
@@ -240,7 +240,7 @@ Verify from another machine: `curl http://<windows-ip>:8001/health`
 
 PowerShell:
 ```powershell
-cd C:\path\to\camera-snapshots-cleaner-claude\compute-service
+cd C:\path\to\camera-archive-cleaner\compute-service
 
 $env:CAMERA_ROOT = "\\192.168.1.91\Camera"
 
@@ -249,7 +249,7 @@ uvicorn app:app --host 0.0.0.0 --port 8001
 
 Bash (Git Bash / MSYS2 — single quotes so backslashes are literal):
 ```bash
-cd /c/path/to/camera-snapshots-cleaner-claude/compute-service
+cd /c/path/to/camera-archive-cleaner/compute-service
 
 export CAMERA_ROOT='\\192.168.1.91\Camera'
 

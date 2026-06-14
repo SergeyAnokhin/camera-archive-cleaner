@@ -88,7 +88,7 @@ No compute-service in the add-on: heavy detection is `off` or `remote`
 
 1. **Add the repository** — HA → Settings → Add-ons → Add-on Store → ⋮ → Repositories → add:
    ```
-   https://github.com/SergeyAnokhin/camera-snapshots-cleaner-claude
+   https://github.com/SergeyAnokhin/camera-archive-cleaner
    ```
 2. **Mount camera share** — Settings → System → Storage → Add network storage
    - Type: Samba/CIFS · Share: `\\<NAS-IP>\Camera` · Usage: **media**

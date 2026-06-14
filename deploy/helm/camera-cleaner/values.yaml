@@ -5,7 +5,7 @@ nameOverride: ""
 fullnameOverride: "camera-cleaner"
 image:
   # GHCR base for all three images: <registry>/<component>:<tag>
-  registry: ghcr.io/sergeyanokhin/camera-snapshots-cleaner-claude
+  registry: ghcr.io/sergeyanokhin/camera-archive-cleaner
   pullPolicy: IfNotPresent
   backend:
     repository: backend
