@@ -49,9 +49,53 @@ All state (SQLite DB, thumbnail caches, OAuth tokens, compute config) lives in
 
 ## Release
 
-Push a tag `addon/v<X.Y.Z>` → CI builds amd64 + aarch64 images, pushes
-`ghcr.io/sergeyanokhin/camera-cleaner-addon:<X.Y.Z>` (+ `latest`) as a
-multi-arch manifest. The tag version must match `version:` in `config.yaml` —
-HA pulls `image:<version>` and offers the update when the version bumps.
+Two workflows exist; **use the automated one** for normal releases.
+
+### Automated (recommended) — workflow_dispatch
+
+GitHub → **Actions → Release HA Add-on → Run workflow** → enter version (e.g. `1.2.0`).
+
+The workflow ([`.github/workflows/release-addon.yml`](../.github/workflows/release-addon.yml)):
+1. Updates `version:` in `config.yaml` and commits + pushes to `main`
+2. Creates and pushes tag `addon/v1.2.0`
+3. Builds amd64 + aarch64 Docker images in parallel
+4. Creates multi-arch manifest `ghcr.io/sergeyanokhin/camera-cleaner-addon:1.2.0` (+ `latest`)
+
+After it completes, click **Check for updates** in the HA add-on page — HA reads the new `config.yaml` version, pulls the matching image, and offers the update.
+
+### Manual (fallback)
+
+```bash
+# 1. bump config.yaml
+sed -i 's/^version: .*/version: "1.2.0"/' camera-cleaner-addon/config.yaml
+git add camera-cleaner-addon/config.yaml
+git commit -m "chore(addon): bump version to 1.2.0"
+git push
+
+# 2. tag — triggers addon-build.yml (.github/workflows/addon-build.yml)
+git tag addon/v1.2.0
+git push origin addon/v1.2.0
+```
+
+**Critical:** `version:` in `config.yaml` and the git tag suffix **must be identical**. HA reads the version from `config.yaml` and pulls `image:<version>`. If they diverge, HA shows a stale version or fails to pull the image.
+
 No compute-service in the add-on: heavy detection is `off` or `remote`
 (`compute_remote_url` option).
+
+---
+
+## Minimum HA setup
+
+1. **Add the repository** — HA → Settings → Add-ons → Add-on Store → ⋮ → Repositories → add:
+   ```
+   https://github.com/SergeyAnokhin/camera-snapshots-cleaner-claude
+   ```
+2. **Mount camera share** — Settings → System → Storage → Add network storage
+   - Type: Samba/CIFS · Share: `\\<NAS-IP>\Camera` · Usage: **media**
+   - The share appears as `/media/<name>` inside the container.
+3. **Install and configure** — find "Camera Snapshots Cleaner" in the store, install, set options:
+   | Option | Required | Example |
+   |---|---|---|
+   | `camera_root` | yes | `/media/Camera` |
+   | `compute_remote_url` | no | `http://192.168.1.10:8001` |
+4. **Start** → **Open Web UI** → Tools → Cameras → add cameras (ID, name, path relative to `camera_root`).

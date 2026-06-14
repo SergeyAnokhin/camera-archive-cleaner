@@ -319,4 +319,5 @@ Third deployment target: HA OS / Supervised, exposed via HA ingress (no host por
 | [`camera-cleaner-addon/rootfs/etc/nginx/nginx.conf`](../camera-cleaner-addon/rootfs/etc/nginx/nginx.conf) | nginx: `allow 172.30.32.2; deny all` (ingress-only); serves SPA; `location /api/` proxies to uvicorn, stripping the prefix |
 | `camera-cleaner-addon/rootfs/etc/services.d/`, `cont-init.d/` | **Not executed** — legacy s6 scripts from before the ENTRYPOINT override; the live logic is in `run.sh` |
 | [`camera-cleaner-addon/DOCS.md`](../camera-cleaner-addon/DOCS.md) | User-facing add-on documentation shown in HA store |
-| [`.github/workflows/addon-build.yml`](../.github/workflows/addon-build.yml) | CI: multi-arch (amd64+aarch64) image build and push to `ghcr.io` on `addon/v*` tag |
+| [`.github/workflows/addon-build.yml`](../.github/workflows/addon-build.yml) | CI: multi-arch (amd64+aarch64) image build and push to `ghcr.io` on `addon/v*` tag (manual tag push) |
+| [`.github/workflows/release-addon.yml`](../.github/workflows/release-addon.yml) | CI: workflow_dispatch release — bumps `config.yaml`, commits, creates tag, then builds + pushes images |
