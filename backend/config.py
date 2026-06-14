@@ -4,7 +4,14 @@ from pathlib import Path
 
 # Set explicitly in the container (Helm: camera.smb.mountPath).
 # Windows local dev: set CAMERA_ROOT=\\192.168.1.91\Camera before starting uvicorn.
-CAMERA_ROOT = Path(os.environ.get("CAMERA_ROOT", "/camera"))
+# Can be overridden at runtime via PUT /camera_root (persisted to server_config.json).
+CAMERA_ROOT = Path(os.environ.get("CAMERA_ROOT", "/media"))
+
+
+def set_camera_root(path: str) -> None:
+    """Override CAMERA_ROOT at runtime (called on startup from server_config and via API)."""
+    global CAMERA_ROOT
+    CAMERA_ROOT = Path(path)
 
 # Backend directory — used to resolve "./" paths (demo/built-in data).
 _BACKEND_DIR = Path(__file__).parent

@@ -32,7 +32,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from database import init_db
+import config
+import settings_manager
+from database import init_db, get_connection
 import task_runner
 from routers import ai, catalog, compute, delete, google, logging_api, maintenance, media, stats, tasks, thumbnails_api, tuning, settings
 
@@ -58,6 +60,27 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.on_event("startup")
 async def startup():
     init_db()
+
+    # Apply camera_root from server_config.json if set in-app (overrides env var)
+    srv = settings_manager.load_server_config()
+    if "camera_root" in srv:
+        config.set_camera_root(srv["camera_root"])
+        logger.info("📁 CAMERA_ROOT loaded from server config: %s", srv["camera_root"])
+
+    # Auto-scan demo camera on first launch (0 files in DB)
+    try:
+        from config import load_cameras
+        from scanner import scan_camera
+        with get_connection() as conn:
+            row = conn.execute("SELECT COUNT(*) AS cnt FROM files WHERE camera_id = 'demo'").fetchone()
+            if row and row["cnt"] == 0:
+                cams = {c.id: c for c in load_cameras()}
+                if "demo" in cams:
+                    scan_camera(conn, cams["demo"])
+                    logger.info("🎬 Demo camera auto-scanned on first launch")
+    except Exception as e:
+        logger.warning("Demo camera auto-scan failed: %s", e)
+
     task_runner.init_runner_state()
     asyncio.create_task(task_runner.task_loop())
     # Убираем uvicorn-хендлеры (у них свой формат) — пускаем через наш root

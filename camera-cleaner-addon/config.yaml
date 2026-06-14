@@ -10,11 +10,5 @@ ingress_port: 8099
 panel_icon: mdi:cctv
 map:
   - media:rw
-options:
-  camera_root: /media
-  compute_remote_url: ""
-schema:
-  camera_root: str
-  compute_remote_url: str
 image: ghcr.io/sergeyanokhin/camera-archive-cleaner-addon
 startup: application

@@ -26,7 +26,7 @@ def init_cameras_table(conn: sqlite3.Connection) -> None:
 
 
 _DEFAULT_CAMERAS = [
-    ("demo",     "Demo Camera", "/demo_camera"),
+    ("demo",     "Demo Camera", "./demo_camera"),
     ("Camera1",  "Camera 1",    "Camera/Camera1"),
 ]
 
@@ -44,10 +44,19 @@ def _seed_default_cameras(conn: sqlite3.Connection) -> None:
     logging.getLogger("api").info("📷 Seeded %d default cameras", len(_DEFAULT_CAMERAS))
 
 
+def _migrate_demo_camera_path(conn: sqlite3.Connection) -> None:
+    """Fix demo camera seeded with wrong absolute path /demo_camera → ./demo_camera."""
+    conn.execute(
+        "UPDATE cameras SET path = './demo_camera' WHERE id = 'demo' AND path = '/demo_camera'"
+    )
+    conn.commit()
+
+
 def init_db() -> None:
     with get_connection() as conn:
         init_cameras_table(conn)
         _seed_default_cameras(conn)
+        _migrate_demo_camera_path(conn)
         init_ai_analysis_table(conn)
         init_object_detection_table(conn)
         init_video_previews_table(conn)

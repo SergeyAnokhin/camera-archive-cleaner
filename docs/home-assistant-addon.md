@@ -21,18 +21,22 @@ nginx :8099 ── /        → SPA static files (/usr/share/camera-cleaner/)
 
 [`run.sh`](../camera-cleaner-addon/run.sh) is the container ENTRYPOINT — it
 **bypasses the s6-overlay** of the HA base image (s6 caused startup failures;
-see commit 535fc96). It reads `/data/options.json` (`camera_root`,
-`compute_remote_url`), exports `CAMERA_ROOT` and `DATA_DIR=/data`, seeds
-`/data/compute_config.json` on first run, starts nginx in the background, and
-`exec`s uvicorn as PID 1.
+see commit 535fc96). It exports `DATA_DIR=/data`, starts nginx in the
+background, and `exec`s uvicorn as PID 1.
 
 > The s6 scripts under `rootfs/etc/services.d/` and `rootfs/etc/cont-init.d/`
 > are **not executed** — legacy from the s6 attempt. Only
 > `rootfs/etc/nginx/nginx.conf` is used (COPY'd in the Dockerfile).
 
-All state (SQLite DB, thumbnail caches, OAuth tokens, compute config) lives in
-`/data` — HA's persistent add-on volume. Camera files come from `map: media:rw`
-(default `camera_root: /media`).
+All state (SQLite DB, thumbnail caches, OAuth tokens, compute config,
+`server_config.json`) lives in `/data` — HA's persistent add-on volume.
+Camera files come from `map: media:rw`.
+
+`CAMERA_ROOT` is configured **in-app** via **Tools → Cameras → Camera Root**
+(persisted to `/data/server_config.json`, applied on startup without a restart).
+The compute URL is configured via **Tools → Compute** (persisted to
+`/data/compute_config.json`). The add-on has **no options page** — all
+configuration happens inside the web UI.
 
 ## Files
 
@@ -90,12 +94,10 @@ No compute-service in the add-on: heavy detection is `off` or `remote`
    ```
    https://github.com/SergeyAnokhin/camera-archive-cleaner
    ```
-2. **Mount camera share** — Settings → System → Storage → Add network storage
+2. **Mount camera share** — [Settings → System → Storage → Add network storage](https://my.home-assistant.io/redirect/storage/)
    - Type: Samba/CIFS · Share: `\\<NAS-IP>\Camera` · Usage: **media**
    - The share appears as `/media/<name>` inside the container.
-3. **Install and configure** — find "Camera Archive Cleaner" in the store, install, set options:
-   | Option | Required | Example |
-   |---|---|---|
-   | `camera_root` | yes | `/media/Camera` |
-   | `compute_remote_url` | no | `http://192.168.1.10:8001` |
-4. **Start** → **Open Web UI** → Tools → Cameras → add cameras (ID, name, path relative to `camera_root`).
+3. **Install** — find "Camera Archive Cleaner" in the store, install, start. No options to set.
+4. **Open Web UI** — the Demo Camera is auto-scanned and shown immediately.
+5. **Set Camera Root** — go to **Tools → Cameras → Camera Root**, click **Browse /media**, select your mounted share, click **Apply**.
+6. **Add cameras** — add rows below with ID, name, and path relative to the camera root.

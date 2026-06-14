@@ -1,11 +1,14 @@
-"""Camera catalog and directory scanning endpoints: /cameras, /scan."""
+"""Camera catalog and directory scanning endpoints: /cameras, /scan, /camera_root, /media_dirs."""
 import logging
+import os
 import time
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+import config
+import settings_manager
 from config import load_cameras
 from database import get_connection
 from scanner import scan_camera
@@ -59,14 +62,53 @@ def put_cameras_config(req: list[CameraConfigItem]):
 
 @router.post("/cameras/check-path", summary="Check if camera relative path exists under CAMERA_ROOT")
 def check_camera_path(req: CheckPathRequest):
-    from config import CAMERA_ROOT
-    abs_path = CAMERA_ROOT / req.path
+    abs_path = config.CAMERA_ROOT / req.path
     exists = abs_path.exists() and abs_path.is_dir()
     return {
         "exists": exists,
         "absolute_path": str(abs_path),
         "is_dir": abs_path.is_dir() if exists else False
     }
+
+
+class CameraRootRequest(BaseModel):
+    camera_root: str
+
+
+@router.get("/camera_root", summary="Get current CAMERA_ROOT value and its source")
+def get_camera_root():
+    srv = settings_manager.load_server_config()
+    return {
+        "camera_root": str(config.CAMERA_ROOT),
+        "from_server_config": "camera_root" in srv,
+        "from_env": bool(os.environ.get("CAMERA_ROOT")),
+    }
+
+
+@router.put("/camera_root", summary="Set CAMERA_ROOT (persisted to server_config.json, takes effect immediately)")
+def put_camera_root(req: CameraRootRequest):
+    new_root = req.camera_root.strip()
+    if not new_root:
+        raise HTTPException(status_code=400, detail="camera_root cannot be empty")
+    config.set_camera_root(new_root)
+    srv = settings_manager.load_server_config()
+    srv["camera_root"] = new_root
+    settings_manager.save_server_config(srv)
+    logger.info("📁 CAMERA_ROOT updated to: %s", new_root)
+    return {"camera_root": new_root, "ok": True}
+
+
+@router.get("/media_dirs", summary="List subdirectories of /media for camera root selection")
+def get_media_dirs():
+    """Returns the subdirs of /media so the UI can offer a dropdown for camera_root selection."""
+    media = Path("/media")
+    if not media.exists() or not media.is_dir():
+        return {"exists": False, "path": "/media", "dirs": []}
+    dirs = sorted(
+        p.name for p in media.iterdir()
+        if p.is_dir() and not p.name.startswith(".")
+    )
+    return {"exists": True, "path": str(media), "dirs": dirs}
 
 
 
