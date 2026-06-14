@@ -40,15 +40,61 @@ Click **Start**, then **Open Web UI**. On first launch two cameras are pre-confi
 
 To configure a real camera: go to **Tools → Cameras**, set the path to the subfolder inside `camera_root` that contains your camera's files (e.g. `FrontDoor`), then click **Scan**.
 
-## Google Integration (optional)
+## Google Integration — Gmail Download (optional)
 
-To enable Gmail download or Google Drive upload tasks:
+Allows the add-on to download photo/video attachments from a Gmail label into a camera folder.
+Each user creates their own private OAuth client — your Google password is never entered here.
 
-1. Go to **Tools → Google** and click **Connect Google Account**.
-2. Complete the OAuth flow in the browser (you will be redirected back to the add-on).
-3. Once authorized, create tasks of type **Gmail Download** or **Google Drive Upload** in the Tasks screen.
+### Step 1 — Create a Google Cloud project
 
-The OAuth token is stored in `/data/google_oauth.json` and persists across restarts.
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and sign in with the Gmail account whose mail you want to download.
+2. At the top, open the project selector and click **New project**. Give it any name (e.g. *Camera Cleaner*) and click **Create**.
+
+### Step 2 — Enable the Gmail API
+
+1. Go to **APIs & Services → Library**.
+2. Search for **Gmail API** and open it.
+3. Click **Enable**.
+
+### Step 3 — Configure the OAuth consent screen
+
+1. Go to **APIs & Services → OAuth consent screen**.
+2. Choose **External** and click **Create**.
+3. Fill in the required fields:
+   - **App name**: any name (e.g. *Camera Cleaner*)
+   - **User support email**: your email
+   - **Developer contact email**: your email
+4. Click **Save and continue** through the Scopes and Optional info steps (no changes needed).
+5. On the **Test users** page, click **+ Add users** and add your Gmail address (e.g. `you@gmail.com`). Click **Save and continue**.
+
+> **Why "Test users"?** The Gmail scope requires this step for unverified apps.
+> Without it Google shows "Access blocked: 403 access_denied" and the flow fails.
+
+### Step 4 — Create OAuth credentials
+
+1. Go to **APIs & Services → Credentials**.
+2. Click **+ Create credentials → OAuth client ID**.
+3. Application type: **Web application**. Name: anything.
+4. Under **Authorized redirect URIs** click **+ Add URI**.
+5. Open the add-on Web UI, go to **Tools → Google**, and copy the redirect URI shown there (use the copy button next to it). Paste it into Google Cloud Console.
+6. Click **Create**. A dialog shows your **Client ID** and **Client secret** — copy both.
+
+### Step 5 — Connect the account
+
+1. In the add-on: **Tools → Google → OAuth client** — paste the Client ID and Client secret, click **Save credentials**.
+2. Click **Connect Google account**. A Google consent screen opens in a new tab.
+3. Select your account → click **Continue** (you may see an "unverified app" warning — click **Advanced → Go to [app name]** to proceed).
+4. Grant the requested Gmail read permission.
+5. The tab closes and the add-on shows **Connected: you@gmail.com**.
+
+### Step 6 — Download attachments
+
+1. Go to **Tasks** and click **New task**.
+2. Choose **Gmail Download**.
+3. Select the Gmail **label** that contains the camera emails, choose the target camera folder, and optionally set a date range.
+4. Click **Create** — the task runs in the background and saves attachments incrementally (already-downloaded files are skipped on re-run).
+
+The OAuth token is stored in `/data/google_oauth.json` and persists across add-on restarts and updates.
 
 ## Compute Service (optional)
 
