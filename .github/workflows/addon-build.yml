@@ -47,13 +47,13 @@ jobs:
         id: meta
         run: |
           echo "version=${GITHUB_REF_NAME#addon/v}" >> $GITHUB_OUTPUT
-          echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/camera-cleaner-addon" >> $GITHUB_OUTPUT
+          echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/camera-archive-cleaner-addon" >> $GITHUB_OUTPUT
 
       - name: Build and push per-arch image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: camera-cleaner-addon/Dockerfile
+          file: camera-archive-cleaner-addon/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
           build-args: BUILD_FROM=${{ matrix.base }}
@@ -80,7 +80,7 @@ jobs:
         id: meta
         run: |
           echo "version=${GITHUB_REF_NAME#addon/v}" >> $GITHUB_OUTPUT
-          echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/camera-cleaner-addon" >> $GITHUB_OUTPUT
+          echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/camera-archive-cleaner-addon" >> $GITHUB_OUTPUT
 
       - name: Create and push multi-arch manifest
         run: |

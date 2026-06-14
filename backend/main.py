@@ -38,7 +38,7 @@ from routers import ai, catalog, compute, delete, google, logging_api, maintenan
 
 logger = logging.getLogger("api")
 
-app = FastAPI(title="Camera Snapshots Cleaner", version="1.0.0")
+app = FastAPI(title="Camera Archive Cleaner", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,

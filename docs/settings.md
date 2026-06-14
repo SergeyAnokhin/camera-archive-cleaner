@@ -152,7 +152,7 @@ Downloads `snapshots-settings.yaml` to the browser's downloads folder. Contains 
 
 Example output:
 ```yaml
-# Camera Snapshots Cleaner — settings export
+# Camera Archive Cleaner — settings export
 # Generated: 2026-05-19T10:30:00.000Z
 
 ui:

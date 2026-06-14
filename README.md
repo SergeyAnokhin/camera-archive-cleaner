@@ -1,6 +1,6 @@
-# Camera Snapshots Cleaner
+# Camera Archive Cleaner
 
-Visual archive manager for surveillance camera snapshots and videos.
+Visual archive manager for surveillance camera archives and videos.
 Dark-mode dashboard to navigate, inspect, and safely delete camera files stored on a NAS/SMB share.
 
 ---

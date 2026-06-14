@@ -174,7 +174,7 @@ def configure_logging(cfg: dict):
     logger.info("Log config updated: level=%s  file_max_lines=%d", level_name, max_lines)
 
 
-app = FastAPI(title="Camera Snapshots Compute Service", version="1.0.0")
+app = FastAPI(title="Camera Archive Compute Service", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,

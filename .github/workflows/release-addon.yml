@@ -47,7 +47,7 @@ jobs:
       - name: Set image name
         id: meta
         run: |
-          echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/camera-cleaner-addon" >> $GITHUB_OUTPUT
+          echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/camera-archive-cleaner-addon" >> $GITHUB_OUTPUT
 
   build:
     name: Build ${{ matrix.arch }}

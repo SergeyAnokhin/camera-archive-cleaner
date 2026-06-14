@@ -1,12 +1,12 @@
-# Camera Snapshots Cleaner
+# Camera Archive Cleaner
 
-Browse, review, and clean up camera snapshot archives stored on a network share.
+Browse, review, and clean up camera archive files stored on a network share.
 
 ## Features
 
 - Heatmap view: Year → Month → Day → Hour drill-down
 - Thumbnail grid with motion diff and image viewer
-- Delete selected snapshots with matching video preview auto-detection
+- Delete selected files with matching video preview auto-detection
 - Cloud AI analysis (Google Gemini, Anthropic Claude) per image
 - Local object detection via remote compute service (optional)
 - Task queue for background scanning and batch analysis

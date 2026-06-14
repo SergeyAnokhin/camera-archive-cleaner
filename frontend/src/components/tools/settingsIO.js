@@ -64,7 +64,7 @@ export function collectSettings() {
 }
 
 export function exportSettingsYaml() {
-  const header = `# Camera Snapshots Cleaner — settings export\n# Generated: ${new Date().toISOString()}\n\n`
+  const header = `# Camera Archive Cleaner — settings export\n# Generated: ${new Date().toISOString()}\n\n`
   const body = yaml.dump(collectSettings(), { lineWidth: 120, quotingType: '"' })
   const blob = new Blob([header + body], { type: 'text/yaml' })
   const url = URL.createObjectURL(blob)

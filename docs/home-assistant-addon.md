@@ -59,7 +59,7 @@ The workflow ([`.github/workflows/release-addon.yml`](../.github/workflows/relea
 1. Updates `version:` in `config.yaml` and commits + pushes to `main`
 2. Creates and pushes tag `addon/v1.2.0`
 3. Builds amd64 + aarch64 Docker images in parallel
-4. Creates multi-arch manifest `ghcr.io/sergeyanokhin/camera-cleaner-addon:1.2.0` (+ `latest`)
+4. Creates multi-arch manifest `ghcr.io/sergeyanokhin/camera-archive-cleaner-addon:1.2.0` (+ `latest`)
 
 After it completes, click **Check for updates** in the HA add-on page — HA reads the new `config.yaml` version, pulls the matching image, and offers the update.
 
@@ -93,7 +93,7 @@ No compute-service in the add-on: heavy detection is `off` or `remote`
 2. **Mount camera share** — Settings → System → Storage → Add network storage
    - Type: Samba/CIFS · Share: `\\<NAS-IP>\Camera` · Usage: **media**
    - The share appears as `/media/<name>` inside the container.
-3. **Install and configure** — find "Camera Snapshots Cleaner" in the store, install, set options:
+3. **Install and configure** — find "Camera Archive Cleaner" in the store, install, set options:
    | Option | Required | Example |
    |---|---|---|
    | `camera_root` | yes | `/media/Camera` |

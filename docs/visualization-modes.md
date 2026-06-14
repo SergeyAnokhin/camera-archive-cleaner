@@ -1,6 +1,6 @@
 # Visualization Modes
 
-The HourViewer offers 6 visualization modes for browsing camera snapshots. Modes 2–3 are motion-analysis modes computed server-side and cached on disk. Modes 4–6 are AI / object-detection modes that send photos to an external API or run a local model.
+The HourViewer offers 6 visualization modes for browsing camera archives. Modes 2–3 are motion-analysis modes computed server-side and cached on disk. Modes 4–6 are AI / object-detection modes that send photos to an external API or run a local model.
 
 Mode registry: [`viewModes/index.js`](../frontend/src/components/viewModes/index.js) — one file per mode.
 
