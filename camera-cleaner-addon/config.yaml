@@ -1,6 +1,6 @@
 name: Camera Archive Cleaner
 description: Browse, review, and clean camera archive files from a network share.
-version: "1.1.7"
+version: "1.1.8"
 slug: camera_archive_cleaner
 arch:
   - amd64
