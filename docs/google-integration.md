@@ -29,15 +29,15 @@ up incrementally, and pause/restart resume safely.
 ## OAuth flow
 
 One-time setup (Tools → Google): the user creates an OAuth client of type
-**Web application** in Google Cloud Console, enables the **Gmail API** and
-**Drive API**, registers the redirect URI shown in the tab
+**Web application** in Google Cloud Console, enables the **Gmail API**,
+registers the redirect URI shown in the tab
 (`<app origin>/api/google/oauth/callback`), and saves the client id/secret.
 
 ```
 GoogleTab "Connect"
    │ GET /google/auth/url?redirect_uri=…      (state stored in memory, CSRF)
    ▼
-Google consent screen (popup; scopes: openid email gmail.readonly drive)
+Google consent screen (popup; scopes: openid email gmail.readonly)
    │ redirect with ?code&state
    ▼
 GET /google/oauth/callback  ──►  exchange code → refresh+access token
@@ -50,9 +50,11 @@ GoogleTab polls /google/auth/status every 2 s until connected=true
 - **Tokens are stored server-side** (unlike AI API keys) — background tasks must
   refresh access tokens without a browser. `get_access_token()` refreshes when
   < 60 s of validity remain; `invalid_grant` (revoked) auto-disconnects.
-- Scope `drive` (full) instead of `drive.file` so the user can target any
-  existing Drive folder, not only app-created ones. With a personal unverified
-  OAuth client Google shows an "unverified app" warning — Advanced → continue.
+- `gmail.readonly` is a sensitive scope — Google blocks unverified apps with
+  `403 access_denied` unless the authenticating account is listed under
+  **Test users** in the OAuth consent screen (GCP Console → APIs & Services →
+  OAuth consent screen → Test users). Each user must add their own address.
+  There is no "Advanced → continue" bypass for this error.
 - Changing the client id drops the stored tokens (they belong to the old client).
 
 ## Endpoints
