@@ -98,6 +98,7 @@ export default function App() {
   }, [])
 
   const currentLevel = LEVELS[Math.min(drillStack.length, LEVELS.length - 1)]
+  const currentCamera = cameras.find(c => c.id === cameraId)
 
   const handleScanComplete = useCallback(() => setRefreshKey(k => k + 1), [])
 
@@ -357,8 +358,26 @@ export default function App() {
           />
         ) : camerasLoaded && cameras.length === 0 ? (
           <FirstRunNotice icon="mdi-cctv-off" title="No cameras configured">
-            Add your cameras to <code>backend/cameras.yaml</code>, set the <code>CAMERA_ROOT</code><br />
-            environment variable to your camera share, then restart the backend.
+            Add cameras in <strong>Tools → Cameras</strong>, or place a{' '}
+            <code>cameras.yaml</code> in the backend directory before first start.
+          </FirstRunNotice>
+        ) : totals && totals.photo_count === 0 && totals.video_count === 0 && currentCamera?.path_exists === false ? (
+          <FirstRunNotice icon="mdi-lan-disconnect" title="Camera folder not found">
+            <div style={{ textAlign: 'left', maxWidth: 500, lineHeight: 1.7 }}>
+              <p style={{ marginBottom: 'var(--gap-sm)' }}>
+                The folder for <strong>{currentCamera?.name}</strong> was not found.
+                Update the path in <strong>Tools → Cameras</strong>.
+              </p>
+              <p style={{ fontWeight: 600, marginBottom: 4 }}>Using Home Assistant?</p>
+              <ol style={{ paddingLeft: '1.4em', margin: 0 }}>
+                <li>Go to <strong>Settings → System → Storage → Add network storage</strong></li>
+                <li>Connect your NAS / NVR share (type: <em>Samba</em>, usage: <em>media</em>)</li>
+                <li>Set <code>camera_root</code> in the add-on options to the mount path
+                  {' '}(e.g. <code>/media/Camera</code>), then restart the add-on</li>
+                <li>Set this camera&apos;s path in <strong>Tools → Cameras</strong> to the subfolder
+                  {' '}inside that mount (e.g. <code>FrontDoor</code>)</li>
+              </ol>
+            </div>
           </FirstRunNotice>
         ) : totals && totals.photo_count === 0 && totals.video_count === 0 ? (
           <FirstRunNotice icon="mdi-magnify-scan" title="Archive not indexed yet">

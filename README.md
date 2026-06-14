@@ -5,6 +5,20 @@ Dark-mode dashboard to navigate, inspect, and safely delete camera files stored 
 
 ---
 
+## Screenshots
+
+| Year heatmap | Month heatmap |
+|:---:|:---:|
+| ![Year heatmap — all snapshots by year](screenshots/heatmap-year.png) | ![Month heatmap — drill down into a year](screenshots/heatmap-month.png) |
+
+| Hour viewer — photo inspection | Camera folder not found |
+|:---:|:---:|
+| ![Hour viewer with photo preview](screenshots/hour-viewer.png) | ![Camera folder not found — setup instructions](screenshots/camera-not-found.png) |
+
+A built-in **Demo Camera** with sample images from March, August, and December 2024 is included — no setup needed to try the app.
+
+---
+
 ## How to run
 
 **First time setup:**

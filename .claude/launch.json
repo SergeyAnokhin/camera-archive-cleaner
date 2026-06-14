@@ -3,15 +3,10 @@
   "configurations": [
     {
       "name": "frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "frontend", "run", "dev", "--", "--port", "5180", "--strictPort"],
-      "port": 5180
-    },
-    {
-      "name": "backend",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "uvicorn", "main:app", "--app-dir", "backend", "--port", "8000"],
-      "port": 8000
+      "runtimeExecutable": "C:\\Progs\\nodejs\\npm.cmd",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "C:\\REPOS\\camera-snapshots-cleaner-claude\\frontend",
+      "port": 5173
     }
   ]
 }

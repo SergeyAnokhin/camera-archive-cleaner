@@ -1,6 +1,7 @@
 """Camera catalog and directory scanning endpoints: /cameras, /scan."""
 import logging
 import time
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -72,7 +73,15 @@ def check_camera_path(req: CheckPathRequest):
 @router.get("/cameras", summary="List all configured cameras")
 def list_cameras():
     cameras = load_cameras()
-    result = [{"id": c.id, "name": c.name, "path": c.path} for c in cameras]
+    result = [
+        {
+            "id": c.id,
+            "name": c.name,
+            "path": c.path,
+            "path_exists": Path(c.path).is_dir(),
+        }
+        for c in cameras
+    ]
     logger.debug("📷 Список камер → %d камер: %s", len(result), [c["id"] for c in result])
     return result
 
