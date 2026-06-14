@@ -5,7 +5,7 @@ import { STRUCTURED_ANALYSIS_TEMPLATE } from '../../prompts.js'
 export const FONT_KEY = 'font-base'
 export const FONT_MIN = 12
 export const FONT_MAX = 22
-export const FONT_DEFAULT = 15
+export const FONT_DEFAULT = 16
 
 export const PREVIEWS_PER_CELL_KEY = 'previews_per_cell'
 export const PREVIEWS_PER_CELL_MIN = 0

@@ -26,8 +26,8 @@ def init_cameras_table(conn: sqlite3.Connection) -> None:
 
 
 _DEFAULT_CAMERAS = [
-    ("demo",      "Demo Camera", "./demo_camera"),
-    ("ha_camera", "My Camera",   "Camera"),
+    ("demo",     "Demo Camera", "/demo_camera"),
+    ("Camera1",  "Camera 1",    "Camera/Camera1"),
 ]
 
 

@@ -6,7 +6,7 @@
       "runtimeExecutable": "C:\\Progs\\nodejs\\npm.cmd",
       "runtimeArgs": ["run", "dev"],
       "cwd": "C:\\REPOS\\camera-snapshots-cleaner-claude\\frontend",
-      "port": 5173
+      "port": 5183
     }
   ]
 }

@@ -98,12 +98,16 @@ export default function GoogleTab() {
               <span style={{ color: 'var(--text-dim)' }}>
                 <i className="mdi mdi-circle-outline" /> Not connected
               </span>
-              <button className="modal-btn" onClick={handleConnect}
-                disabled={!status.client_id_set || connecting}>
-                {connecting
-                  ? <><i className="mdi mdi-loading mdi-spin" /> Waiting for Google…</>
-                  : <><i className="mdi mdi-google" /> Connect Google account</>}
-              </button>
+              <span title={!status.client_id_set
+                ? 'OAuth credentials not saved — follow the setup guide below'
+                : undefined}>
+                <button className="modal-btn" onClick={handleConnect}
+                  disabled={!status.client_id_set || connecting}>
+                  {connecting
+                    ? <><i className="mdi mdi-loading mdi-spin" /> Waiting for Google…</>
+                    : <><i className="mdi mdi-google" /> Connect Google account</>}
+                </button>
+              </span>
             </>
           )}
         </div>
@@ -112,18 +116,15 @@ export default function GoogleTab() {
       <div className="modal-section">
         <div className="modal-section-title">OAuth client (Google Cloud Console)</div>
         <div className="modal-setting-hint">
-          One-time setup: create an OAuth client of type <strong>Web application</strong> in
-          {' '}<a href="https://console.cloud.google.com/apis/credentials" target="_blank"
-                 rel="noreferrer" style={{ color: 'var(--accent)' }}>Google Cloud Console</a>,
-          enable the <strong>Gmail API</strong> and <strong>Drive API</strong>, and add this
-          redirect URI:
+          Paste the Client ID and Client secret from Google Cloud Console here.
+          After saving, the Connect button above will unlock.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
           <code style={{ background: '#1f2937', padding: '4px 8px', borderRadius: 6,
                          fontSize: 'calc(var(--font-base) * 0.85)', wordBreak: 'break-all' }}>
             {redirectUri}
           </code>
-          <button className="modal-btn" onClick={copyRedirect} title="Copy">
+          <button className="modal-btn" onClick={copyRedirect} title="Copy redirect URI">
             <i className={`mdi ${copied ? 'mdi-check' : 'mdi-content-copy'}`} />
           </button>
         </div>
@@ -143,6 +144,55 @@ export default function GoogleTab() {
           {savedMsg && <span className="compute-saved">{savedMsg}</span>}
         </div>
       </div>
+
+      {!status.client_id_set && (
+        <div className="modal-section">
+          <div className="modal-section-title">
+            <i className="mdi mdi-help-circle-outline" style={{ marginRight: 6 }} />
+            How to get the OAuth credentials
+          </div>
+          <ol style={{ margin: '8px 0 0', paddingLeft: 20, lineHeight: 1.7,
+                        display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <li>
+              Open{' '}
+              <a href="https://console.cloud.google.com/apis/credentials" target="_blank"
+                 rel="noreferrer" style={{ color: 'var(--accent)' }}>
+                Google Cloud Console
+              </a>
+              {' '}→ <strong>APIs &amp; Services → Credentials</strong>
+            </li>
+            <li>
+              Click <strong>«+ Create Credentials»</strong> → <strong>«OAuth client ID»</strong>
+            </li>
+            <li>
+              Application type: <strong>Web application</strong>. Give it any name (e.g. <em>Camera Archive</em>).
+            </li>
+            <li>
+              Under <strong>«Authorized redirect URIs»</strong> click <strong>«+ Add URI»</strong>{' '}
+              and paste the redirect URI shown above (copy it with the button next to it).
+            </li>
+            <li>
+              Click <strong>«Create»</strong>. A dialog shows your{' '}
+              <strong>Client ID</strong> and <strong>Client secret</strong> — copy both.
+            </li>
+            <li>
+              Enable the required APIs: go to{' '}
+              <strong>APIs &amp; Services → Library</strong>, search for{' '}
+              <strong>Gmail API</strong> and enable it, then repeat for{' '}
+              <strong>Google Drive API</strong>.
+            </li>
+          </ol>
+          <div style={{
+            marginTop: 12, padding: '8px 12px', borderRadius: 6,
+            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)',
+            fontSize: 'calc(var(--font-base) * 0.92)',
+          }}>
+            <i className="mdi mdi-arrow-up" style={{ color: '#60a5fa', marginRight: 5 }} />
+            Paste the Client ID and Client secret into the fields above and click{' '}
+            <strong>Save credentials</strong>. The Connect button will unlock.
+          </div>
+        </div>
+      )}
     </>
   )
 }
