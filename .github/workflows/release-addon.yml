@@ -28,14 +28,22 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Bump version in config.yaml and tag (without touching main)
+      - name: Update config.yaml version
         run: |
           sed -i 's/^version: .*/version: "${{ inputs.version }}"/' camera-cleaner-addon/config.yaml
           grep "^version:" camera-cleaner-addon/config.yaml
+
+      - name: Commit and push
+        run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add camera-cleaner-addon/config.yaml
           git commit -m "chore(addon): bump version to ${{ inputs.version }}"
+          git pull --rebase origin main
+          git push
+
+      - name: Create and push tag
+        run: |
           git tag addon/v${{ inputs.version }}
           git push origin addon/v${{ inputs.version }}
 
