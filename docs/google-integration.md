@@ -70,7 +70,7 @@ GoogleTab polls /google/auth/status every 2 s until connected=true
 
 ## Task: `gmail_download`
 
-`params`: `{camera_id, label_id, label_name?, output_folder?, date_from?, date_to?, max_errors?}`
+`params`: `{camera_id, label_id, label_name?, organize_by_date?, output_folder?, date_from?, date_to?, max_errors?}`
 
 - Lists all message ids in the label (Gmail `q: after:/before:` epoch filters),
   processes **oldest first** — so `resume_from` slicing stays consistent when new
@@ -79,12 +79,39 @@ GoogleTab polls /google/auth/status every 2 s until connected=true
   `image/*`, `video/*`, **or** have a media file extension (cameras often send
   `application/octet-stream` named `*.jpg`). Both `attachmentId` and inline
   `body.data` parts are handled.
-- Destination: `CAMERA_ROOT/camera.path/[output_folder/]<original filename>`;
-  file mtime is set to the email's `internalDate` (scanner mtime fallback works).
+- **Immediate DB indexing**: after each download the file is inserted into the
+  `files` table (via `upsert_file`) so it appears in the library without a manual
+  scan. The timestamp used is the one parsed from the subject (see Reolink section
+  below) or the email `internalDate`.
+- **Automatic object detection from subject**: if the email subject matches the
+  Reolink alarm pattern `{EventType} Detected from …`, the event type (e.g.
+  `person`, `animal`, `vehicle`) is written to `object_detection` with
+  `model = "reolink-alarm"` — the photo appears in the heatmap with AI icons
+  exactly as if OpenVINO had detected the object. Log lines show `[person]`/
+  `[animal]` etc. for matched emails.
+- **`organize_by_date`** (bool, default false; UI defaults to true): when true,
+  files are placed in `YYYY/MM/DD/` subfolders under the destination directory. The
+  date is parsed from the email subject (`at YYYY/M/D H:MM:SS`, Reolink format);
+  falls back to the email `internalDate` if the subject has no timestamp.
+- Destination: `CAMERA_ROOT/camera.path/[output_folder/][YYYY/MM/DD/]<filename>`;
+  file mtime is set to the email's `internalDate`.
 - **Skip-if-exists by filename** → re-running only fetches new attachments.
 - Network errors (`httpx.TransportError`/timeout) pause the task instead of
   failing — resume continues after the outage. Other per-message errors are
   logged and counted against `max_errors`.
+
+### Reolink alarm email format
+
+Reolink cameras send alarm emails with subject:
+```
+Person Detected from reolink-chicken-coop at 2026/6/15 19:31:46
+```
+Body contains `Alarm Camera Name`, `Alarm Event`, `Alarm Device Name`. Attachment
+filename encodes the timestamp: `01_20260615193146049.jpg` (channel_YYYYMMDDHHMMSS[ms]).
+The scanner recognises this filename pattern and indexes the correct timestamp.
+
+Supported event types (all lowercase in DB): `person`, `animal`, `vehicle`,
+`package`, `motion`, and any other word before `Detected` in the subject.
 
 ## Task: `gdrive_upload`
 

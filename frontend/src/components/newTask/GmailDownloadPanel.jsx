@@ -20,7 +20,7 @@ export default function GmailDownloadPanel({ gm, patch, labels, connected }) {
           </select>
         )}
         <div className="ntm__param-hint">
-          Photo/video attachments from every email in this label are saved
+          Photo/video attachments from every email in this label are saved and indexed
         </div>
       </div>
 
@@ -30,6 +30,31 @@ export default function GmailDownloadPanel({ gm, patch, labels, connected }) {
           onChange={e => patch({ outputFolder: e.target.value })}
           placeholder="empty = camera folder root" />
         <div className="ntm__param-hint">Created inside the camera directory</div>
+      </div>
+
+      <div className="ntm__section ntm__row">
+        <label className="ntm__label">Object extraction regex (optional)</label>
+        <input type="text" className="modal-text-input" value={gm.subjectObjectRegex}
+          onChange={e => patch({ subjectObjectRegex: e.target.value })}
+          placeholder="^(\w+)\s+Detected" />
+        <div className="ntm__param-hint">
+          Applied to the email subject — <strong>capture group 1</strong> becomes the detected object.
+          Example: <code>^(\w+)\s+Detected</code> extracts <code>person</code> from
+          &ldquo;Person Detected from camera at …&rdquo;
+        </div>
+      </div>
+
+      <div className="ntm__section ntm__row">
+        <label className="ntm__label">Organize by date</label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input type="checkbox" checked={gm.organizeByDate}
+            onChange={e => patch({ organizeByDate: e.target.checked })} />
+          Place files in YYYY/MM/DD subfolders
+        </label>
+        <div className="ntm__param-hint">
+          Date is parsed from the subject line
+          (<code>at 2026/6/15 19:31:46</code> — Reolink format), falling back to email date
+        </div>
       </div>
 
       <div className="ntm__section">
@@ -51,8 +76,9 @@ export default function GmailDownloadPanel({ gm, patch, labels, connected }) {
       <div className="ntm__section ntm__example-row">
         <i className="mdi mdi-information-outline" style={{ color: 'var(--accent)' }} />
         <span>
-          Files that already exist on disk are skipped — re-run the task anytime
-          to fetch only the new emails
+          Files are immediately indexed in the library. If the subject matches the Reolink
+          alarm format (<em>Person Detected from camera at …</em>), the event type is
+          also saved as a detected object — no scan or OpenVINO run needed.
         </span>
       </div>
     </>

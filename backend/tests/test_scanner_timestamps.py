@@ -26,6 +26,12 @@ def test_invalid_calendar_date_returns_none():
     assert _timestamp_from_filename("MDAlarm_20231399-256199.jpg") is None
 
 
+def test_reolink_pattern():
+    # 01_20260615193146049.jpg — channel_YYYYMMDDHHMMSS[ms]
+    dt = _timestamp_from_filename("01_20260615193146049.jpg")
+    assert dt == datetime(2026, 6, 15, 19, 31, 46, tzinfo=timezone.utc)
+
+
 def test_unrecognized_name_returns_none():
     # None → scanner falls back to file mtime (README rule)
     assert _timestamp_from_filename("IMG_random_photo.jpg") is None

@@ -4,12 +4,24 @@ Idempotent: an attachment whose file name already exists on disk is skipped,
 so re-running the task (or resuming after a restart/pause) only downloads new
 files. Messages are processed oldest-first, so resume_from slicing stays
 consistent when new mail arrives during the run.
+
+After each download the file is immediately inserted into the files table so it
+is visible in the library without a full scan. If the email subject matches the
+Reolink alarm pattern ("{EventType} Detected from {camera} at {datetime}") the
+event type is also written to object_detection, as if OpenVINO had detected it.
+
+Optional params:
+  organize_by_date — if true, files are placed in YYYY/MM/DD subfolders.
+                     The date is parsed from the subject "at YYYY/M/D H:MM:SS"
+                     or falls back to the email internalDate.
 """
 import asyncio
 import base64
 import logging
 import os
+import re
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -17,6 +29,7 @@ import httpx
 import google_api
 import google_oauth
 from config import load_cameras
+from database import get_connection, save_object_detection, upsert_file
 
 from task_executors.common import (
     PROGRESS_INTERVAL, SpeedTracker, append_log, mark_completed, parse_dt,
@@ -25,6 +38,71 @@ from task_executors.common import (
 
 logger = logging.getLogger("api")
 
+_SUBJECT_DT_RE = re.compile(r"at (\d{4})/(\d{1,2})/(\d{1,2}) (\d{1,2}):(\d{2}):(\d{2})")
+
+_PHOTO_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+_VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".webm"}
+
+
+def _get_msg_header(msg: dict, name: str) -> str:
+    for h in msg.get("payload", {}).get("headers", []):
+        if h["name"].lower() == name.lower():
+            return h["value"]
+    return ""
+
+
+def _event_from_subject(subject: str, object_re: "re.Pattern | None") -> "str | None":
+    """Return lowercase object label extracted by the user-supplied regex (group 1), or None."""
+    if object_re is None:
+        return None
+    m = object_re.search(subject)
+    if not m:
+        return None
+    try:
+        return m.group(1).strip().lower()
+    except IndexError:
+        return None
+
+
+def _dt_from_subject(subject: str) -> "datetime | None":
+    m = _SUBJECT_DT_RE.search(subject)
+    if not m:
+        return None
+    try:
+        return datetime(int(m[1]), int(m[2]), int(m[3]), int(m[4]), int(m[5]), int(m[6]),
+                        tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _file_type(filename: str) -> str:
+    ext = Path(filename).suffix.lower()
+    return "video" if ext in _VIDEO_EXTENSIONS else "photo"
+
+
+def _dest_for(base_dir: Path, filename: str, dt: "datetime | None", organize: bool) -> Path:
+    if not organize or dt is None:
+        return base_dir / filename
+    day_dir = base_dir / f"{dt.year:04d}" / f"{dt.month:02d}" / f"{dt.day:02d}"
+    day_dir.mkdir(parents=True, exist_ok=True)
+    return day_dir / filename
+
+
+def _index_file(camera_id: str, dest: Path, dt: "datetime | None",
+                event_obj: "str | None") -> None:
+    """Insert the file into the files table and optionally into object_detection."""
+    ts = (dt.isoformat() if dt
+          else datetime.fromtimestamp(dest.stat().st_mtime, tz=timezone.utc).isoformat())
+    ftype = _file_type(dest.name)
+    with get_connection() as conn:
+        upsert_file(conn, camera_id, ftype, str(dest), dest.stat().st_size, ts)
+        if event_obj and ftype == "photo":
+            row = conn.execute(
+                "SELECT id FROM files WHERE file_path = ?", (str(dest),)
+            ).fetchone()
+            if row:
+                save_object_detection(conn, row["id"], "reolink-alarm", event_obj)
+
 
 async def run(task_id: str, params: dict, resume_from: int) -> None:
     camera_id     = params["camera_id"]
@@ -32,6 +110,12 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
     output_folder = params.get("output_folder", "")
     dt_from       = parse_dt(params.get("date_from"))
     dt_to         = parse_dt(params.get("date_to"))
+    organize      = bool(params.get("organize_by_date", False))
+    obj_regex_str = params.get("subject_object_regex", "")
+    try:
+        object_re = re.compile(obj_regex_str, re.IGNORECASE) if obj_regex_str else None
+    except re.error as e:
+        raise ValueError(f"Invalid subject_object_regex: {e}")
 
     cameras_map = {c.id: c for c in load_cameras()}
     camera = cameras_map.get(camera_id)
@@ -68,9 +152,18 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
         try:
             msg = await asyncio.to_thread(google_api.gmail_get_message, msg_id)
             msg_ts = int(msg.get("internalDate", 0)) / 1000
+            subject = _get_msg_header(msg, "Subject")
+
+            # Extract detected object via user-supplied regex (group 1 = object label)
+            event_obj = _event_from_subject(subject, object_re)
+            dt_subject = _dt_from_subject(subject)    # exact datetime if present
+            dt_for_path = dt_subject
+            if organize and dt_for_path is None and msg_ts > 0:
+                dt_for_path = datetime.fromtimestamp(msg_ts, tz=timezone.utc)
+
             for att in google_api.extract_attachments(msg.get("payload", {})):
-                name = Path(att["filename"]).name  # strip any path components
-                dest = dest_dir / name
+                name = Path(att["filename"]).name
+                dest = _dest_for(dest_dir, name, dt_for_path, organize)
                 if dest.exists():
                     skipped += 1
                     continue
@@ -82,9 +175,13 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
                 await asyncio.to_thread(dest.write_bytes, data)
                 if msg_ts > 0:
                     os.utime(dest, (msg_ts, msg_ts))
+                await asyncio.to_thread(_index_file, camera_id, dest, dt_subject, event_obj)
                 saved += 1
                 last_path = str(dest)
-                await asyncio.to_thread(append_log, task_id, f"Saved: {name}")
+                log_line = f"Saved: {name}"
+                if event_obj:
+                    log_line += f" [{event_obj}]"
+                await asyncio.to_thread(append_log, task_id, log_line)
         except google_oauth.NotConnected:
             raise
         except (httpx.TransportError, httpx.TimeoutException) as e:

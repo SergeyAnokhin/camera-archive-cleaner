@@ -196,12 +196,19 @@ def _save_config(cfg: dict):
 
 
 # ── Handlers ───────────────────────────────────────────────────────────────────
+
+# Запись логов в файл backend.log.
+# Логи в Tools → Logging читаются из памяти (ring buffer), файл для этого не нужен.
+# В HA аддоне логи идут в stdout и показываются HA автоматически — файл тоже не нужен.
+# Включи, если нужно анализировать краш после перезапуска (файл переживает рестарт).
+_WRITE_LOG_FILE = False
+
 _console_handler = logging.StreamHandler()
 _console_handler.setFormatter(_ColorFmt())
 _console_handler.setLevel(TRACE)
 
 _cfg = _load_config()
-_ring_buffer = RingBufferHandler(max_lines=_cfg["file_max_lines"], filepath=_LOG_FILE)
+_ring_buffer = RingBufferHandler(max_lines=_cfg["file_max_lines"], filepath=_LOG_FILE if _WRITE_LOG_FILE else None)
 
 logging.root.handlers = [_console_handler, _ring_buffer]
 
@@ -227,6 +234,16 @@ logging.root.setLevel(_LEVEL_MAP[_cfg["level"]])
 # httpx/httpcore генерируют очень много DEBUG-мусора при каждом запросе к compute
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+# watchfiles пишет "1 change detected" при каждой записи .log-файла на диск —
+# понижаем до TRACE, чтобы при INFO не было видно, но при уровне TRACE появлялось
+class _WatchfilesFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.levelno, record.levelname = TRACE, "TRACE"
+        return record.levelno >= logging.root.level
+
+_wf = logging.getLogger("watchfiles")
+_wf.setLevel(TRACE)
+_wf.addFilter(_WatchfilesFilter())
 
 logger = logging.getLogger("api")
 

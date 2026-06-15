@@ -45,7 +45,7 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
   const patchFo = p => setFo(v => ({ ...v, ...p }))
 
   // gmail_download params (panel: newTask/GmailDownloadPanel.jsx)
-  const [gm, setGm] = useState({ labelId: '', dateFrom: '', dateTo: '', outputFolder: '' })
+  const [gm, setGm] = useState({ labelId: '', dateFrom: '', dateTo: '', outputFolder: '', organizeByDate: true, subjectObjectRegex: '^(\\w+)\\s+Detected' })
   const patchGm = p => setGm(v => ({ ...v, ...p }))
 
   // gdrive_upload params (panel: newTask/GDriveUploadPanel.jsx)
@@ -229,6 +229,8 @@ export default function NewTaskModal({ cameras, onAdd, onClose }) {
       } else if (type === 'gmail_download') {
         params.label_id   = gm.labelId
         params.label_name = gmailLabels?.find(l => l.id === gm.labelId)?.name || gm.labelId
+        if (gm.organizeByDate) params.organize_by_date = true
+        if (gm.subjectObjectRegex.trim()) params.subject_object_regex = gm.subjectObjectRegex.trim()
         if (gm.outputFolder.trim()) params.output_folder = gm.outputFolder.trim()
         if (gm.dateFrom) params.date_from = gm.dateFrom + ':00'
         if (gm.dateTo)   params.date_to   = gm.dateTo   + ':00'

@@ -136,15 +136,30 @@ class _RingBufferHandler(logging.Handler):
 
 _cfg = _load_config()
 
+# Запись логов в файл compute.log.
+# /logging/tail читает из памяти — файл для этого не нужен.
+# Включи, если нужно анализировать краш после перезапуска.
+_WRITE_LOG_FILE = False
+
 # Console handler (simple format, matches existing style)
 _console_handler = logging.StreamHandler()
 _console_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
 _console_handler.setLevel(TRACE)
 
-_ring_buffer = _RingBufferHandler(max_lines=_cfg["file_max_lines"], filepath=_LOG_FILE)
+_ring_buffer = _RingBufferHandler(max_lines=_cfg["file_max_lines"], filepath=_LOG_FILE if _WRITE_LOG_FILE else None)
 
 logging.root.handlers = [_console_handler, _ring_buffer]
 logging.root.setLevel(_LEVEL_MAP[_cfg["level"]])
+# watchfiles пишет "1 change detected" при каждой записи .log-файла на диск —
+# понижаем до TRACE, чтобы при INFO не было видно, но при уровне TRACE появлялось
+class _WatchfilesFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.levelno, record.levelname = TRACE, "TRACE"
+        return record.levelno >= logging.root.level
+
+_wf = logging.getLogger("watchfiles")
+_wf.setLevel(TRACE)
+_wf.addFilter(_WatchfilesFilter())
 
 logger = logging.getLogger("compute")
 
