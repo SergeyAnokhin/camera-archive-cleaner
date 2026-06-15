@@ -259,6 +259,19 @@ def skip_task_file(task_id: str):
     return {"ok": True}
 
 
+@router.put("/{task_id}/run_now")
+def run_task_now(task_id: str):
+    """Clear run_after so a waiting repeating task executes on the next runner tick."""
+    with get_connection() as conn:
+        task = get_task(conn, task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        if task["status"] != "queued":
+            raise HTTPException(status_code=400, detail="Task is not queued")
+        conn.execute("UPDATE tasks SET run_after=NULL WHERE id=?", (task_id,))
+    return {"ok": True}
+
+
 @router.put("/{task_id}/cancel")
 def cancel_task(task_id: str):
     with get_connection() as conn:

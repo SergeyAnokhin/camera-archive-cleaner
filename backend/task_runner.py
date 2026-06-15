@@ -57,6 +57,7 @@ async def task_loop() -> None:
             with get_connection() as conn:
                 row = conn.execute(
                     "SELECT * FROM tasks WHERE status='queued' "
+                    "AND (run_after IS NULL OR run_after <= datetime('now')) "
                     "ORDER BY order_index ASC, created_at ASC LIMIT 1"
                 ).fetchone()
             if row:

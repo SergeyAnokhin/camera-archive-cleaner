@@ -63,6 +63,10 @@ export function getTaskMetrics() {
   return get('/tasks/metrics')
 }
 
+export function runTaskNow(taskId) {
+  return putJson(`/tasks/${taskId}/run_now`, {})
+}
+
 export function getTaskLogs(taskId) {
   return get(`/tasks/${encodeURIComponent(taskId)}/logs`)
 }

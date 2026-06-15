@@ -77,3 +77,15 @@ button {
   /* Toolbar buttons collapse to icons */
   .app-toolbar .btn-label { display: none; }
 }
+
+/* ── First-run onboarding pulse (draws attention to buttons needing setup) ── */
+@keyframes setup-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--accent); }
+  50%       { box-shadow: 0 0 0 6px transparent; }
+}
+
+.setup-pulse {
+  animation: setup-pulse 1.6s ease-in-out infinite;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}

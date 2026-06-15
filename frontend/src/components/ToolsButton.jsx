@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import ToolsModal from './ToolsModal.jsx'
 import './ToolsButton.css'
 
-export default function ToolsButton({ onDatabaseCleared, onCamerasChanged, cameraId, cameras }) {
+export default function ToolsButton({ onDatabaseCleared, onCamerasChanged, cameraId, cameras, onboardingDone }) {
   const [open, setOpen] = useState(false)
   const [initialTab, setInitialTab] = useState(null)
 
@@ -18,13 +18,17 @@ export default function ToolsButton({ onDatabaseCleared, onCamerasChanged, camer
 
   return (
     <>
-      <button className="tools-button" onClick={() => { setInitialTab(null); setOpen(true) }}>
+      <button
+        className={`tools-button${!onboardingDone ? ' setup-pulse' : ''}`}
+        onClick={() => { setInitialTab(null); setOpen(true) }}
+      >
         <i className="mdi mdi-wrench-outline" />
         <span className="btn-label">Tools</span>
       </button>
       {open && (
         <ToolsModal
           initialTab={initialTab}
+          onboardingDone={onboardingDone}
           onClose={() => setOpen(false)}
           onDatabaseCleared={() => { setOpen(false); onDatabaseCleared() }}
           onCamerasChanged={onCamerasChanged}

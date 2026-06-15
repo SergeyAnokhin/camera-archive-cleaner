@@ -57,6 +57,25 @@ export default function GmailDownloadPanel({ gm, patch, labels, connected }) {
         </div>
       </div>
 
+      <div className="ntm__section ntm__row">
+        <label className="ntm__label">Repeat every</label>
+        <select className="modal-select ntm__select"
+          value={gm.repeatEveryHours}
+          onChange={e => patch({ repeatEveryHours: Number(e.target.value) })}>
+          <option value={0}>No repeat (run once)</option>
+          <option value={1}>1 hour</option>
+          <option value={2}>2 hours</option>
+          <option value={4}>4 hours</option>
+          <option value={6}>6 hours</option>
+          <option value={12}>12 hours</option>
+          <option value={24}>24 hours</option>
+          <option value={48}>48 hours</option>
+        </select>
+        <div className="ntm__param-hint">
+          After completing, the task re-queues itself automatically. Already-downloaded files are always skipped.
+        </div>
+      </div>
+
       <div className="ntm__section">
         <div className="ntm__date-header">
           <label className="ntm__label" style={{margin:0}}>Email date filter</label>

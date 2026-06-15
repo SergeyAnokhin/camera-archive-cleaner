@@ -74,9 +74,19 @@ function inTimeWindow(currentHour, fromHour, toHour) {
 
 function pad2(n) { return String(n).padStart(2, '0') }
 
+function fmtRunAfter(ms) {
+  const diff = Math.round((ms - Date.now()) / 1000)
+  if (diff <= 0) return 'soon'
+  if (diff < 60) return `${diff}s`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`
+  const h = Math.floor(diff / 3600)
+  const m = Math.floor((diff % 3600) / 60)
+  return m > 0 ? `${h}h ${m}m` : `${h}h`
+}
+
 export default function TaskCard({
   task,
-  onPause, onResume, onSkip, onCancel, onDelete, onViewResults, onViewLogs,
+  onPause, onResume, onSkip, onCancel, onDelete, onViewResults, onViewLogs, onRunNow,
   onDragStart, onDragOver, onDrop, onDragEnd,
   isDragOver,
 }) {
@@ -105,8 +115,14 @@ export default function TaskCard({
     ? `${pad2(fromH)}:00–${pad2(toH)}:00`
     : ''
 
+  const runAfterMs = task.run_after
+    ? new Date(task.run_after.replace(' ', 'T') + 'Z').getTime()
+    : null
+  const isWaiting = isQueued && params.repeat_every_hours > 0 && runAfterMs != null && runAfterMs > Date.now()
+
+  const PHOTO_THUMB_TYPES = new Set(['openvino', 'gdrive_upload', 'gmail_download'])
   const thumbUrl = task.current_file_id
-    ? (task.type === 'openvino' || task.type === 'gdrive_upload'
+    ? (PHOTO_THUMB_TYPES.has(task.type)
         ? getThumbnailUrl(task.current_file_id)
         : getVideoThumbnailUrl(task.current_file_id, params.thumb_mode || 'four_frames'))
     : null
@@ -155,6 +171,11 @@ export default function TaskCard({
               <i className="mdi mdi-map-search-outline" />
             </button>
           )}
+          {isWaiting && onRunNow && (
+            <button className="tc__btn tc__btn--accent" title="Run now" onClick={onRunNow}>
+              <i className="mdi mdi-play-speed" />
+            </button>
+          )}
           {task.status === 'running' && (
             <button className="tc__btn tc__btn--warn" title="Pause" onClick={onPause}>
               <i className="mdi mdi-pause" />
@@ -182,6 +203,21 @@ export default function TaskCard({
           )}
         </div>
       </div>
+
+      {/* ── Waiting indicator (repeating task, scheduled for later) ── */}
+      {isWaiting && (
+        <div style={{
+          fontSize: 'calc(var(--font-base) * 0.8)',
+          color: '#34d399',
+          padding: '2px 12px 4px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
+        }}>
+          <i className="mdi mdi-refresh-auto" />
+          Next run in {fmtRunAfter(runAfterMs)}
+        </div>
+      )}
 
       {/* ── Sleeping indicator ─────────────────────────────────── */}
       {isSleeping && (
@@ -218,6 +254,9 @@ export default function TaskCard({
           )}
           {fromH != null && toH != null && (
             <span className="tc__tag"><i className="mdi mdi-clock-time-four-outline" /> {pad2(Number(fromH))}:00–{pad2(Number(toH))}:00</span>
+          )}
+          {params.repeat_every_hours > 0 && (
+            <span className="tc__tag"><i className="mdi mdi-refresh-auto" /> every {params.repeat_every_hours}h</span>
           )}
         </div>
       </div>

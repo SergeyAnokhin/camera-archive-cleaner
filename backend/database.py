@@ -490,6 +490,10 @@ def init_tasks_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE tasks ADD COLUMN log_tail TEXT")
     except Exception:
         pass
+    try:
+        conn.execute("ALTER TABLE tasks ADD COLUMN run_after TEXT")
+    except Exception:
+        pass
 
 
 def append_task_log(conn: sqlite3.Connection, task_id: str, line: str,

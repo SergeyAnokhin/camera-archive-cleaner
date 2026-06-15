@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { getCameras, getStatsTotal, getStatsGrouped, getSettings, saveSettings } from './api.js'
+import { getCameras, getStatsTotal, getStatsGrouped, getSettings, saveSettings, triggerScan } from './api.js'
 import DeleteConfirmModal from './components/DeleteConfirmModal.jsx'
 import Header from './components/Header.jsx'
 import CameraSelector from './components/CameraSelector.jsx'
@@ -65,6 +65,7 @@ export default function App() {
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState(null)
   const [refreshKey, setRefreshKey]     = useState(0)
+  const [onboardingDone, setOnboardingDone] = useState(() => localStorage.getItem('setup_done') === '1')
   const [selectedHour, setSelectedHour] = useState(_nav.selectedHour ?? null)
   const [previewsPerCell, setPreviewsPerCell] = useState(getPreviewsPerCell)
   const [focusedPeriod, setFocusedPeriod] = useState(null)
@@ -102,6 +103,12 @@ export default function App() {
 
   const handleScanComplete = useCallback(() => setRefreshKey(k => k + 1), [])
 
+  const handleScan = useCallback(async () => {
+    if (!cameraId) return
+    try { await triggerScan(cameraId) } catch {}
+    handleScanComplete()
+  }, [cameraId, handleScanComplete])
+
   // Cell selection mode: bulk delete / AI analysis / send-to-task (useCellSelection.js)
   const sel = useCellSelection({ cameraId, drillStack, currentLevel, onFilesDeleted: handleScanComplete })
 
@@ -127,19 +134,35 @@ export default function App() {
     return () => document.removeEventListener('hour-viewed-change', onViewed)
   }, [])
 
+  // Refresh heatmap when a gmail_download task finishes indexing new files
+  useEffect(() => {
+    document.addEventListener('camera-data-changed', handleScanComplete)
+    return () => document.removeEventListener('camera-data-changed', handleScanComplete)
+  }, [handleScanComplete])
+
   useEffect(() => {
     getCameras().then(setCameras).catch(() => {}).finally(() => setCamerasLoaded(true))
   }, [])
 
-  // Auto-select first camera if none selected or saved camera no longer exists
+  // Auto-select first camera if none selected or saved camera no longer exists.
+  // Prefer cameras whose path actually exists on disk (skip placeholder defaults).
   useEffect(() => {
     if (cameras.length === 0) return
     if (cameraId === null || !cameras.find(c => c.id === cameraId)) {
-      setCameraId(cameras[0].id)
+      const firstReal = cameras.find(c => c.path_exists) ?? cameras[0]
+      setCameraId(firstReal.id)
       setDrillStack([])
       setSelectedHour(null)
     }
   }, [cameras]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mark onboarding complete once at least one camera with a valid path exists
+  useEffect(() => {
+    if (!onboardingDone && cameras.some(c => c.path_exists)) {
+      setOnboardingDone(true)
+      localStorage.setItem('setup_done', '1')
+    }
+  }, [cameras, onboardingDone])
 
   // Persist nav state to localStorage
   useEffect(() => {
@@ -274,7 +297,7 @@ export default function App() {
               <i className="mdi mdi-playlist-play" />
               <span className="btn-label">Tasks</span>
             </button>
-            <ToolsButton onDatabaseCleared={handleScanComplete} onCamerasChanged={reloadCameras} cameraId={cameraId} cameras={cameras} />
+            <ToolsButton onDatabaseCleared={handleScanComplete} onCamerasChanged={reloadCameras} cameraId={cameraId} cameras={cameras} onboardingDone={onboardingDone} />
             <ScanButton cameraId={cameraId} onScanComplete={handleScanComplete} />
           </div>
         </div>
@@ -358,7 +381,13 @@ export default function App() {
           />
         ) : camerasLoaded && cameras.length === 0 ? (
           <FirstRunNotice icon="mdi-cctv-off" title="No cameras configured">
-            Add cameras in <strong>Tools → Cameras</strong>.
+            <p style={{ marginBottom: 8 }}>Add cameras in <strong>Tools → Cameras</strong>.</p>
+            <button
+              className="modal-btn setup-pulse"
+              onClick={() => window.dispatchEvent(new CustomEvent('open-tools', { detail: { tab: 'cameras' } }))}
+            >
+              <i className="mdi mdi-wrench-outline" /> Open Tools → Cameras
+            </button>
           </FirstRunNotice>
         ) : totals && totals.photo_count === 0 && totals.video_count === 0 && currentCamera?.path_exists === false ? (
           <FirstRunNotice icon="mdi-lan-disconnect" title="Camera folder not found">
@@ -386,11 +415,22 @@ export default function App() {
                 </li>
                 <li>Set this camera&apos;s path to the subfolder inside the mount (e.g. <code>FrontDoor</code>)</li>
               </ol>
+              <div style={{ marginTop: 12 }}>
+                <button
+                  className="modal-btn"
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-tools', { detail: { tab: 'cameras' } }))}
+                >
+                  <i className="mdi mdi-wrench-outline" /> Open Camera Settings
+                </button>
+              </div>
             </div>
           </FirstRunNotice>
         ) : totals && totals.photo_count === 0 && totals.video_count === 0 ? (
           <FirstRunNotice icon="mdi-magnify-scan" title="Archive not indexed yet">
-            Click <strong>Scan</strong> in the toolbar to index the files of this camera.
+            <p style={{ marginBottom: 8 }}>Index the files in this camera folder to view them on the heatmap.</p>
+            <button className="modal-btn" onClick={handleScan}>
+              <i className="mdi mdi-database-refresh" /> Scan now
+            </button>
           </FirstRunNotice>
         ) : (
           <>

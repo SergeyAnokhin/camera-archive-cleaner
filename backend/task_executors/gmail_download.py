@@ -89,19 +89,19 @@ def _dest_for(base_dir: Path, filename: str, dt: "datetime | None", organize: bo
 
 
 def _index_file(camera_id: str, dest: Path, dt: "datetime | None",
-                event_obj: "str | None") -> None:
-    """Insert the file into the files table and optionally into object_detection."""
+                event_obj: "str | None") -> "int | None":
+    """Insert the file into the files table and optionally into object_detection.
+    Returns the file's DB id (needed for thumbnail display in TaskCard)."""
     ts = (dt.isoformat() if dt
           else datetime.fromtimestamp(dest.stat().st_mtime, tz=timezone.utc).isoformat())
     ftype = _file_type(dest.name)
     with get_connection() as conn:
         upsert_file(conn, camera_id, ftype, str(dest), dest.stat().st_size, ts)
-        if event_obj and ftype == "photo":
-            row = conn.execute(
-                "SELECT id FROM files WHERE file_path = ?", (str(dest),)
-            ).fetchone()
-            if row:
-                save_object_detection(conn, row["id"], "reolink-alarm", event_obj)
+        row = conn.execute("SELECT id FROM files WHERE file_path = ?", (str(dest),)).fetchone()
+        file_id = row["id"] if row else None
+        if event_obj and ftype == "photo" and file_id:
+            save_object_detection(conn, file_id, "reolink-alarm", event_obj)
+    return file_id
 
 
 async def run(task_id: str, params: dict, resume_from: int) -> None:
@@ -144,6 +144,7 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
     max_errors = params.get("max_errors", None)
     last_save = time.time()
     last_path = None
+    last_file_id = None
 
     for msg_id in to_process:
         if await pause_if_requested(task_id, resume_from + processed, total, last_path):
@@ -175,12 +176,13 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
                 await asyncio.to_thread(dest.write_bytes, data)
                 if msg_ts > 0:
                     os.utime(dest, (msg_ts, msg_ts))
-                await asyncio.to_thread(_index_file, camera_id, dest, dt_subject, event_obj)
+                fid = await asyncio.to_thread(_index_file, camera_id, dest, dt_subject, event_obj)
                 saved += 1
                 last_path = str(dest)
+                last_file_id = fid
                 log_line = f"Saved: {name}"
                 if event_obj:
-                    log_line += f" [{event_obj}]"
+                    log_line += f" | detected: {event_obj}"
                 await asyncio.to_thread(append_log, task_id, log_line)
         except google_oauth.NotConnected:
             raise
@@ -210,7 +212,7 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
 
         if time.time() - last_save >= PROGRESS_INTERVAL:
             await asyncio.to_thread(write_progress, task_id, current, total,
-                                    None, last_path, speed, eta)
+                                    last_file_id, last_path, speed, eta)
             last_save = time.time()
 
     await asyncio.to_thread(append_log, task_id,
@@ -218,3 +220,14 @@ async def run(task_id: str, params: dict, resume_from: int) -> None:
     mark_completed(task_id, resume_from + processed, total)
     logger.info("✅ Task %s (gmail_download) done: %d messages, %d files saved",
                 task_id[:8], processed, saved)
+
+    repeat_h = int(params.get("repeat_every_hours") or 0)
+    if repeat_h > 0:
+        with get_connection() as conn:
+            conn.execute(
+                "UPDATE tasks SET status='queued', progress_current=0, "
+                "started_at=NULL, completed_at=NULL, log_tail='[]', "
+                "run_after=datetime('now', ?) WHERE id=?",
+                (f"+{repeat_h} hours", task_id),
+            )
+        logger.info("Task %s (gmail_download) scheduled for re-run in %d h", task_id[:8], repeat_h)

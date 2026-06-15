@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   getTasks, createTask, deleteTask, pauseTask, resumeTask, skipTask, cancelTask,
-  reorderTasks, getTaskMetrics, pauseAllTasks, resumeAllTasks,
+  reorderTasks, getTaskMetrics, pauseAllTasks, resumeAllTasks, runTaskNow,
 } from '../api.js'
 import TaskCard from './TaskCard.jsx'
 import NewTaskModal from './NewTaskModal.jsx'
@@ -75,12 +75,25 @@ export default function TasksScreen({ cameras, onNavigate, onShowTuning }) {
   const [error, setError]               = useState(null)
   const [dragIdx, setDragIdx]           = useState(null)
   const [overIdx, setOverIdx]           = useState(null)
-  const pollRef    = useRef(null)
-  const metricsRef = useRef(null)
+  const pollRef       = useRef(null)
+  const metricsRef    = useRef(null)
+  const prevStatusRef = useRef({})  // task_id → previous status
 
   const fetchTasks = useCallback(async () => {
     try {
       const data = await getTasks()
+      // Detect gmail_download tasks that just finished a run (running → completed/queued)
+      for (const t of data.tasks) {
+        const prev = prevStatusRef.current[t.id]
+        if (
+          t.type === 'gmail_download' &&
+          prev === 'running' &&
+          (t.status === 'completed' || t.status === 'queued')
+        ) {
+          document.dispatchEvent(new CustomEvent('camera-data-changed'))
+        }
+      }
+      prevStatusRef.current = Object.fromEntries(data.tasks.map(t => [t.id, t.status]))
       setTasks(data.tasks)
       setGlobalPaused(data.global_paused)
       setError(null)
@@ -225,6 +238,7 @@ export default function TasksScreen({ cameras, onNavigate, onShowTuning }) {
               onSkip={() => act(skipTask, task.id)}
               onCancel={() => act(cancelTask, task.id)}
               onDelete={() => act(deleteTask, task.id)}
+              onRunNow={() => act(runTaskNow, task.id)}
               onViewResults={onNavigate ? (t) => onNavigate(t) : undefined}
               onViewLogs={t => setLogsTask(t)}
             />

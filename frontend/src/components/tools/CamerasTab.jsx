@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { getCamerasConfig, saveCamerasConfig, checkCameraPath, getCameraRoot, putCameraRoot, getMediaDirs, getCameraRootSubdirs } from '../../api.js'
 
-export default function CamerasTab({ onSaveSuccess }) {
+export default function CamerasTab({ onSaveSuccess, onboarding }) {
   const [cameras, setCameras] = useState([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [checkResults, setCheckResults] = useState({}) // { index: { loading: bool, exists: bool, error: str, absolute_path: str } }
   const [status, setStatus] = useState(null) // { type: 'success' | 'error', text: str }
+  const [newRowIndex, setNewRowIndex] = useState(null) // index of the most recently added camera row
 
   // Camera root state
   const [cameraRoot, setCameraRoot] = useState('')
@@ -131,7 +132,9 @@ export default function CamerasTab({ onSaveSuccess }) {
   }
 
   function handleAdd() {
+    const newIndex = cameras.length
     setCameras([...cameras, { id: '', name: '', path: '' }])
+    setNewRowIndex(newIndex)
   }
 
   function handleDelete(index) {
@@ -263,7 +266,7 @@ export default function CamerasTab({ onSaveSuccess }) {
             />
           </div>
           <button
-            className="modal-btn neutral"
+            className={`modal-btn neutral${onboarding && !cameraRoot ? ' setup-pulse' : ''}`}
             onClick={handleBrowseMedia}
             disabled={loadingMediaDirs}
             style={{ whiteSpace: 'nowrap', height: 38 }}
@@ -406,8 +409,8 @@ export default function CamerasTab({ onSaveSuccess }) {
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, height: 38 }}>
                   <button
-                    className={`modal-btn neutral${browserOpen ? ' active-browse' : ''}`}
-                    onClick={() => handleBrowseCameraRoot(index)}
+                    className={`modal-btn neutral${browserOpen ? ' active-browse' : ''}${onboarding && index === newRowIndex && !cam.path ? ' setup-pulse' : ''}`}
+                    onClick={() => { handleBrowseCameraRoot(index); if (index === newRowIndex) setNewRowIndex(null) }}
                     disabled={loadingCameraDirs && openBrowserIndex === index}
                     style={{ whiteSpace: 'nowrap', background: browserOpen ? 'var(--bg-card-hover)' : undefined, color: browserOpen ? 'var(--text-primary)' : undefined }}
                     title="Browse camera root for folders"

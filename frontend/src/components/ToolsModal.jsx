@@ -28,7 +28,7 @@ function resolveTab(id) {
   return TAB_ALIASES[id] || 'general'
 }
 
-export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, onCamerasChanged, cameraId, cameras }) {
+export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, onCamerasChanged, cameraId, cameras, onboardingDone }) {
   const [activeTab, setActiveTab] = useState(() => resolveTab(initialTab))
 
   function handleBackdropClick(e) {
@@ -65,7 +65,7 @@ export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, onC
           {TABS.map(t => (
             <button
               key={t.id}
-              className={`modal-tab${activeTab === t.id ? ' active' : ''}`}
+              className={`modal-tab${activeTab === t.id ? ' active' : ''}${!onboardingDone && t.id === 'cameras' && activeTab !== 'cameras' ? ' setup-pulse' : ''}`}
               onClick={() => setActiveTab(t.id)}
             >
               {t.label}
@@ -75,7 +75,7 @@ export default function ToolsModal({ initialTab, onClose, onDatabaseCleared, onC
 
         <div className="modal-tab-content">
           {activeTab === 'general' && <GeneralTab />}
-          {activeTab === 'cameras' && <CamerasTab onSaveSuccess={onCamerasChanged} />}
+          {activeTab === 'cameras' && <CamerasTab onSaveSuccess={onCamerasChanged} onboarding={!onboardingDone} />}
           {activeTab === 'view'    && <HourViewTab />}
           {activeTab === 'ai'      && <AiTab />}
           {activeTab === 'compute' && <ComputeTab />}
