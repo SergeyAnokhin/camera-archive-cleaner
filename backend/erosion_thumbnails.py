@@ -6,9 +6,10 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from compute_cache import CACHE_BASE_DIR
 from database import get_thumbnail_path
 
-EROSION_THUMB_DIR = Path(__file__).parent / "erosion_thumbnails_cache"
+EROSION_THUMB_DIR = CACHE_BASE_DIR / "erosion"
 
 # Processing resolution — CPU-friendly downscale
 PROCESS_SIZE = (160, 120)

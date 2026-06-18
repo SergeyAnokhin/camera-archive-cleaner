@@ -3,9 +3,10 @@ from pathlib import Path
 
 from PIL import Image
 
+from compute_cache import CACHE_BASE_DIR
 from database import get_thumbnail_path, save_thumbnail_path
 
-THUMB_DIR = Path(__file__).parent / "thumbnails_cache"
+THUMB_DIR = CACHE_BASE_DIR / "basic"
 THUMB_SIZE = (256, 256)
 
 

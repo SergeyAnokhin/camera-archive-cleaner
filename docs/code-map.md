@@ -15,7 +15,7 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`ai_pricing.py`](../backend/ai_pricing.py) | Per-million-token USD pricing tables for Gemini and Claude models |
 | [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `convert_video`, `health`). Strips `CAMERA_ROOT` prefix from all paths before sending (so compute can apply its own root). Raises `ComputeDisabled` / `ComputeUnavailable`. Timeouts: detect 120 s, thumbnail 120 s, convert 7200 s |
 | [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` (path respects `DATA_DIR` env var) |
-| [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. Directories placed under `DATA_DIR` env var. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
+| [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for all five thumbnail types. Exports `CACHE_BASE_DIR` (driven by `CACHE_DIR` env var → defaults to `backend/cache/`). `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
 | [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks and dispatches to `task_executors/` by type (registry `EXECUTORS`). Owns global pause and stuck-task reset; per-type logic lives in the executors (see table below) |
 | [`database.py`](../backend/database.py) | Backward-compatible **facade** — re-exports the whole `db/` package (table below). Import `from database import …` as before; add new queries to the matching `db/*.py` module and re-export here |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed |
@@ -23,9 +23,9 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`settings_manager.py`](../backend/settings_manager.py) | Persists user settings (without credentials) to `settings.json` on the server |
 | [`google_oauth.py`](../backend/google_oauth.py) | Google OAuth 2.0: client credentials + tokens in `DATA_DIR/google_oauth.json`, consent URL, code exchange, access-token refresh. See [`google-integration.md`](google-integration.md) |
 | [`google_api.py`](../backend/google_api.py) | Sync REST client for Gmail + Drive (httpx): labels, message/attachment fetch, folder find-or-create, resumable upload. Pure helpers `extract_attachments()` / `split_drive_path()` |
-| [`thumbnails.py`](../backend/thumbnails.py) | Basic 256×256 JPEG thumbnails (Pillow). Cache in `thumbnails_cache/` |
-| [`diff_thumbnails.py`](../backend/diff_thumbnails.py) | Motion Diff thumbnails: per-pixel delta from page mean (numpy). Cache in `diff_thumbnails_cache/` |
-| [`erosion_thumbnails.py`](../backend/erosion_thumbnails.py) | Erosion thumbnails: MOG2 + morphological erosion. Cache in `erosion_thumbnails_cache/` |
+| [`thumbnails.py`](../backend/thumbnails.py) | Basic 256×256 JPEG thumbnails (Pillow). Cache in `CACHE_BASE_DIR/basic/` |
+| [`diff_thumbnails.py`](../backend/diff_thumbnails.py) | Motion Diff thumbnails: per-pixel delta from page mean (numpy). Cache in `CACHE_BASE_DIR/diff/` |
+| [`erosion_thumbnails.py`](../backend/erosion_thumbnails.py) | Erosion thumbnails: MOG2 + morphological erosion. Cache in `CACHE_BASE_DIR/erosion/` |
 | `snapshots.db` | SQLite database (auto-created on startup). Path = `DATA_DIR/snapshots.db`; `DATA_DIR` env var defaults to `backend/` for local and K8s, set to `/data` for HA add-on |
 | [`pytest.ini`](../backend/pytest.ini) | Pytest config: `tests/` dir, quiet output (`-q --tb=short`) |
 | [`tests/`](../backend/tests/) | Unit tests for documented complex logic (timestamp parsing, ±5 s video matching, golden-section search, AI JSON/cost, path contract, SpeedTracker). See [`testing.md`](testing.md) |

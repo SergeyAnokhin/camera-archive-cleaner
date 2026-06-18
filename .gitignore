@@ -146,6 +146,7 @@ vite.config.ts.timestamp-*
 /backend/snapshots.db
 /backend/snapshots.db*
 /backend/*_cache/*
+/backend/cache/
 /backend/models/*
 /backend/yolo**.pt
 /backend/compute_config.json

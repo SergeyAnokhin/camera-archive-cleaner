@@ -6,7 +6,9 @@ set -e
 # This script only sets DATA_DIR so the backend knows where persistent storage lives.
 
 export DATA_DIR=/data
-mkdir -p /data
+# Regeneratable thumbnail caches go to /tmp so they are excluded from HA backups.
+export CACHE_DIR=/tmp/camera-cleaner-cache
+mkdir -p /data /tmp/camera-cleaner-cache
 
 echo "Starting Camera Archive Cleaner: DATA_DIR=${DATA_DIR}"
 

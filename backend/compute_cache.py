@@ -8,11 +8,17 @@ import hashlib
 import os
 from pathlib import Path
 
+# All regeneratable caches live under CACHE_BASE_DIR so they stay in one place
+# and are excluded from HA backups.
+# In the HA add-on run.sh sets CACHE_DIR=/tmp/camera-cleaner-cache (not /data).
+# In local dev CACHE_DIR is unset → defaults to backend/cache/.
 _data_dir = Path(os.getenv('DATA_DIR', str(Path(__file__).parent)))
-OV_THUMB_DIR = _data_dir / "openvino_thumbnails_cache"
+CACHE_BASE_DIR = Path(os.getenv('CACHE_DIR', str(_data_dir / "cache")))
+
+OV_THUMB_DIR = CACHE_BASE_DIR / "openvino"
 OV_THUMB_VERSION = "v5"  # bumped: removed excluded-objects from cache key
 
-VID_THUMB_DIR = _data_dir / "video_thumbnails_cache"
+VID_THUMB_DIR = CACHE_BASE_DIR / "video"
 
 
 def ov_cache_path(file_id: int, model: str, confidence: float,

@@ -5,9 +5,10 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+from compute_cache import CACHE_BASE_DIR
 from database import get_thumbnail_path
 
-DIFF_THUMB_DIR = Path(__file__).parent / "diff_thumbnails_cache"
+DIFF_THUMB_DIR = CACHE_BASE_DIR / "diff"
 DARK_FACTOR = 0.15
 RESIZE = (256, 256)
 
