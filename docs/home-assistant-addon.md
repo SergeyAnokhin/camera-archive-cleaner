@@ -43,10 +43,10 @@ configuration happens inside the web UI.
 | File | Role |
 |---|---|
 | [`repository.yaml`](../repository.yaml) | HA add-on repository manifest (repo root — required by the HA store) |
-| [`config.yaml`](../camera-cleaner-addon/config.yaml) | Add-on manifest: version, arch (amd64/aarch64), `ingress_port: 8099`, `map: media:rw`, options + schema, prebuilt `image:` ref |
+| [`config.yaml`](../camera-cleaner-addon/config.yaml) | Add-on manifest: version, arch (amd64/aarch64), `ingress: true` + `ingress_port: 8099`, `map: media:rw`, `panel_icon`, `startup: application`, prebuilt `image:` ref. **No `options`/`schema`** — all config is in-app |
 | [`build.yaml`](../camera-cleaner-addon/build.yaml) | Per-arch HA Debian base images |
 | [`Dockerfile`](../camera-cleaner-addon/Dockerfile) | Multi-stage: Node builds the frontend → HA Debian base + Python venv + nginx. Build context = repo root |
-| [`run.sh`](../camera-cleaner-addon/run.sh) | ENTRYPOINT — options → env vars, nginx + uvicorn (see above) |
+| [`run.sh`](../camera-cleaner-addon/run.sh) | ENTRYPOINT — sets `DATA_DIR=/data`, starts nginx, `exec`s uvicorn (see above) |
 | [`rootfs/etc/nginx/nginx.conf`](../camera-cleaner-addon/rootfs/etc/nginx/nginx.conf) | Ingress-only nginx: `allow 172.30.32.2; deny all`, SPA fallback, `/api/` proxy |
 | [`DOCS.md`](../camera-cleaner-addon/DOCS.md) | User-facing docs shown in the HA store |
 | [`.github/workflows/addon-build.yml`](../.github/workflows/addon-build.yml) | CI release (below) |
@@ -83,8 +83,8 @@ git push origin addon/v1.2.0
 
 **Critical:** `version:` in `config.yaml` and the git tag suffix **must be identical**. HA reads the version from `config.yaml` and pulls `image:<version>`. If they diverge, HA shows a stale version or fails to pull the image.
 
-No compute-service in the add-on: heavy detection is `off` or `remote`
-(`compute_remote_url` option).
+No compute-service in the add-on: heavy detection is `off` or `remote`, set in
+**Tools → Compute** (persisted to `/data/compute_config.json`).
 
 ---
 

@@ -111,13 +111,19 @@ Persistent task queue for long-running compute jobs. Tasks survive server restar
 
 | Method | Path | Body / Params | Description |
 |---|---|---|---|
-| `GET` | `/tasks` | — | List all tasks ordered by `order_index` |
-| `POST` | `/tasks` | `{type, params, label?}` | Create a task. `type`: `video_thumbnails` \| `openvino`. Returns the new task row |
+| `GET` | `/tasks` | — | List all tasks ordered by `order_index`; also returns `global_paused` |
+| `POST` | `/tasks` | `{type, params, label?}` | Create a task. `type` ∈ `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert`, `file_organizer`, `gmail_download`, `gdrive_upload`. Returns the new task row |
 | `GET` | `/tasks/metrics` | — | CPU/RAM from compute-service + `compute_mode`. Returns `null` fields when compute is off |
+| `GET` | `/tasks/estimate_files` | `camera_id, task_type, input_pattern?, date_from?, date_to?, output_suffix?` | Count files a `video_convert` / `file_organizer` task would process |
 | `PUT` | `/tasks/reorder` | `{order: [{id, order_index}]}` | Reorder tasks |
+| `PUT` | `/tasks/pause_all` | — | Pause the whole queue (global pause) |
+| `PUT` | `/tasks/resume_all` | — | Resume the queue |
+| `GET` | `/tasks/{id}/logs` | — | Task log tail: `{task_id, status, lines: [...]}` |
 | `DELETE` | `/tasks/{id}` | — | Delete a task (must not be `running`) |
 | `PUT` | `/tasks/{id}/pause` | — | Signal running task to pause after current file (`running` → `pausing`) |
 | `PUT` | `/tasks/{id}/resume` | — | Resume a paused/failed task (`paused`\|`failed` → `queued`) |
+| `PUT` | `/tasks/{id}/skip` | — | Skip the current failed file (bumps `progress_current`, re-queues `paused`/`failed`) |
+| `PUT` | `/tasks/{id}/run_now` | — | Clear `run_after` so a waiting repeating task runs on the next tick (must be `queued`) |
 | `PUT` | `/tasks/{id}/cancel` | — | Cancel any non-finished task |
 
 **Task statuses:** `queued` → `running` → `completed` / (`pausing` → `paused`) / `failed` / `cancelled`
@@ -125,8 +131,13 @@ Persistent task queue for long-running compute jobs. Tasks survive server restar
 **`params` shape by type:**
 - `video_thumbnails`: `{camera_id, date_from, date_to, thumb_mode}` — `thumb_mode` matches `/video_thumbnail` modes
 - `openvino`: `{camera_id, date_from, date_to, model_name, confidence}`
-- `gmail_download`: `{camera_id, label_id, label_name?, output_folder?, date_from?, date_to?}` — see [`google-integration.md`](google-integration.md)
+- `gemini` / `claude`: `{camera_id, date_from, date_to, model, api_key, delay_min_sec?, delay_max_sec?, reprocess_existing?}`
+- `video_convert`: `{camera_id, input_pattern?, output_suffix?, output_extension?, codec?, crf?, preset?, dry_run?, date_from?, date_to?}` — ffmpeg re-encode via compute-service
+- `file_organizer`: `{camera_id, source_type?, input_pattern?, output_folder?, date_regex?, dry_run?, date_from?, date_to?}` — move files into `YYYY/MM/DD/` folders
+- `gmail_download`: `{camera_id, label_id, label_name?, output_folder?, date_from?, date_to?, repeat_every_hours?}` — see [`google-integration.md`](google-integration.md)
 - `gdrive_upload`: `{camera_id, file_type, drive_folder, date_from?, date_to?}` — see [`google-integration.md`](google-integration.md)
+
+**Repeating tasks:** `gmail_download` with `repeat_every_hours > 0` re-queues itself on completion and sets `run_after = now + N hours`; the runner skips it until then. `run_now` clears `run_after` to run immediately.
 
 **Compute-service `/metrics`** (new endpoint): returns `{cpu_percent, memory_total, memory_used, memory_percent}`. Requires `psutil` in the compute-service.
 

@@ -109,9 +109,9 @@ Persistent queue for long-running compute jobs (video thumbnails, OpenVINO batch
 | Column | Type | Description |
 |---|---|---|
 | `id` | TEXT PK | UUID |
-| `type` | TEXT | `'video_thumbnails'` or `'openvino'` |
+| `type` | TEXT | One of: `video_thumbnails`, `openvino`, `gemini`, `claude`, `video_convert`, `file_organizer`, `gmail_download`, `gdrive_upload` |
 | `status` | TEXT | `queued` → `running` → `completed` / (`pausing` → `paused`) / `failed` / `cancelled` |
-| `params` | TEXT | JSON blob — `{camera_id, date_from, date_to, thumb_mode\|model_name, confidence, label}` |
+| `params` | TEXT | JSON blob — per-type keys (camera, date range, mode/model + type-specific); see [api.md → Tasks](api.md#tasks) |
 | `order_index` | INTEGER | Sort order for the queue |
 | `progress_current` | INTEGER | Files processed so far (saved periodically; used as resume offset) |
 | `progress_total` | INTEGER | Total files in range |
@@ -121,8 +121,12 @@ Persistent queue for long-running compute jobs (video thumbnails, OpenVINO batch
 | `eta_seconds` | INTEGER | Estimated seconds remaining |
 | `created_at` / `started_at` / `completed_at` | TEXT | Timestamps |
 | `error_message` | TEXT | Set on failure |
+| `log_tail` | TEXT | JSON array of the last N log lines (served by `GET /tasks/{id}/logs`) |
+| `run_after` | TEXT | If set (ISO time), the runner skips this task until then. Used by **repeating** tasks; `PUT /tasks/{id}/run_now` clears it |
 
 On server startup, any task left in `running`/`pausing` state is reset to `paused` so the user can resume manually.
+
+**Repeating tasks:** when a `gmail_download` task with `repeat_every_hours > 0` completes, it re-queues itself and sets `run_after = now + N hours`; the runner picks it up again once that time passes. **Run now** (`/tasks/{id}/run_now`) clears `run_after` to execute on the next tick.
 
 ---
 

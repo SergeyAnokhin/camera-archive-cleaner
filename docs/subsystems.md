@@ -59,11 +59,11 @@ In short:
   [`scanner.py`](../backend/scanner.py)) so file-organizer output is never
   re-indexed as fresh snapshots.
 
-**Cross-boundary contract to preserve:** `COCO_TO_RUSSIAN` in
-[`shared/coco_names.py`](../shared/coco_names.py) must keep producing the same
-Russian words — the frontend's `OBJECT_EMOJI_DEFAULTS` in
-[`aiHelpers.js`](../frontend/src/aiHelpers.js) maps those exact words to emoji.
-Change one side, change both.
+**Cross-boundary contract to preserve:** [`detection.py`](../compute-service/detection.py)
+returns **canonical English COCO class names** (from `yolo.names`). The frontend's
+[`aiHelpers.js`](../frontend/src/aiHelpers.js) builds its emoji/label lookup from the
+`en` keys in [`cocoClasses.js`](../frontend/src/cocoClasses.js). If the class-name
+spelling changes on one side, it must change on the other.
 
 ---
 

@@ -17,7 +17,7 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` (path respects `DATA_DIR` env var) |
 | [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO bbox JPEGs and video thumbnails. Directories placed under `DATA_DIR` env var. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
 | [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks and dispatches to `task_executors/` by type (registry `EXECUTORS`). Owns global pause and stuck-task reset; per-type logic lives in the executors (see table below) |
-| [`database.py`](../backend/database.py) | SQLite: table schema + migrations, all SQL queries. Tables: `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks`, `tuning_sessions`, `cameras`. On first start with empty `cameras` table, `_seed_default_cameras()` inserts the Demo Camera and a placeholder HA camera. |
+| [`database.py`](../backend/database.py) | Backward-compatible **facade** — re-exports the whole `db/` package (table below). Import `from database import …` as before; add new queries to the matching `db/*.py` module and re-export here |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed |
 | [`config.py`](../backend/config.py) | Defines `Camera(id, name, path)` and `load_cameras()` which queries the database and appends `CAMERA_ROOT`. |
 | [`settings_manager.py`](../backend/settings_manager.py) | Persists user settings (without credentials) to `settings.json` on the server |
@@ -29,6 +29,19 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | `snapshots.db` | SQLite database (auto-created on startup). Path = `DATA_DIR/snapshots.db`; `DATA_DIR` env var defaults to `backend/` for local and K8s, set to `/data` for HA add-on |
 | [`pytest.ini`](../backend/pytest.ini) | Pytest config: `tests/` dir, quiet output (`-q --tb=short`) |
 | [`tests/`](../backend/tests/) | Unit tests for documented complex logic (timestamp parsing, ±5 s video matching, golden-section search, AI JSON/cost, path contract, SpeedTracker). See [`testing.md`](testing.md) |
+
+
+### DB layer (`backend/db/`)
+
+The SQL access layer, split by domain. The `database.py` facade re-exports all of these.
+
+| File | Role |
+|---|---|
+| [`connection.py`](../backend/db/connection.py) | `DB_PATH` (under `DATA_DIR`) + `get_connection()` (WAL, foreign keys on) |
+| [`schema.py`](../backend/db/schema.py) | Table creation + migrations: `init_db()` plus per-table `init_*`. Tables: `cameras`, `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks`, `tuning_sessions`. On first start with empty `cameras` table, `_seed_default_cameras()` inserts the Demo Camera and a placeholder HA camera |
+| [`files.py`](../backend/db/files.py) | `files` + stats + basic-thumbnail queries: upsert/delete, `_where()` filter builder, `get_stats_*`, pagination, uniform sampling, `get_hour_distribution` |
+| [`ai.py`](../backend/db/ai.py) | Analysis result writes/reads: `save_object_detection`, `save_video_preview`, `save_ai_analysis`, `get_combined_analysis_by_file_ids` |
+| [`tasks.py`](../backend/db/tasks.py) | Task-queue CRUD + `append_task_log` |
 
 
 ### Task executors (`backend/task_executors/`)
@@ -202,9 +215,15 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) | Combined AI tab: 3 sections — Detection (YOLO model, confidence, classes checklist), Google Gemini (API key, model, prompt), Claude Anthropic (API key, model) |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
 | [`GoogleTab.jsx`](../frontend/src/components/tools/GoogleTab.jsx) | Google account: OAuth client setup (redirect URI display, client id/secret), connect/disconnect with status polling. See [`google-integration.md`](google-integration.md) |
-| [`ServiceTab.jsx`](../frontend/src/components/tools/ServiceTab.jsx) | Combined service tab: Tasks settings (ETA window, log tail lines), Logging (log level, buffer, live viewer), Maintenance (DB/thumbnail cleanup) |
+| [`ServiceTab.jsx`](../frontend/src/components/tools/ServiceTab.jsx) | Combined service tab — thin shell composing the three sections in `tools/service/` (table below) |
 
-> **Dead files:** `DetectionTab.jsx`, `LoggingTab.jsx`, `MaintenanceTab.jsx` are not imported anywhere — superseded by the merged `AiTab`/`ServiceTab`. Don't edit them; the live code is in the merged tabs.
+#### Service tab sections (`frontend/src/components/tools/service/`)
+
+| File | Role |
+|---|---|
+| [`TasksSection.jsx`](../frontend/src/components/tools/service/TasksSection.jsx) | Task settings: ETA window (minutes), log tail lines |
+| [`LoggingSection.jsx`](../frontend/src/components/tools/service/LoggingSection.jsx) | Backend + compute log level, buffer size, live log viewer (polls `/logging/tail`) |
+| [`MaintenanceSection.jsx`](../frontend/src/components/tools/service/MaintenanceSection.jsx) | DB / thumbnail cleanup actions, storage info, date-range delete |
 
 ### New Task modal parts (`frontend/src/components/newTask/`)
 
@@ -311,10 +330,10 @@ Third deployment target: HA OS / Supervised, exposed via HA ingress (no host por
 | File | Role |
 |---|---|
 | [`repository.yaml`](../repository.yaml) | HA add-on repository manifest (required by HA store) |
-| [`camera-cleaner-addon/config.yaml`](../camera-cleaner-addon/config.yaml) | Add-on manifest: arch, ingress port 8099, `map: media:rw`, options `camera_root` + `compute_remote_url` |
+| [`camera-cleaner-addon/config.yaml`](../camera-cleaner-addon/config.yaml) | Add-on manifest: arch, ingress port 8099, `map: media:rw`; **no `options`** (all config is in-app) |
 | [`camera-cleaner-addon/build.yaml`](../camera-cleaner-addon/build.yaml) | Per-arch base images (`ghcr.io/home-assistant/{arch}-base-debian:bookworm`) |
 | [`camera-cleaner-addon/Dockerfile`](../camera-cleaner-addon/Dockerfile) | Multi-stage: Node.js frontend build → HA Debian base with Python 3 + nginx. Build context = repo root: `docker build -f camera-cleaner-addon/Dockerfile .` |
-| [`camera-cleaner-addon/run.sh`](../camera-cleaner-addon/run.sh) | Container ENTRYPOINT (bypasses s6-overlay): options.json → `CAMERA_ROOT`/`DATA_DIR=/data`, seeds compute config, starts nginx + uvicorn |
+| [`camera-cleaner-addon/run.sh`](../camera-cleaner-addon/run.sh) | Container ENTRYPOINT (bypasses s6-overlay): sets `DATA_DIR=/data`, starts nginx, `exec`s uvicorn (no options — config is in-app) |
 | [`camera-cleaner-addon/rootfs/etc/nginx/nginx.conf`](../camera-cleaner-addon/rootfs/etc/nginx/nginx.conf) | nginx: `allow 172.30.32.2; deny all` (ingress-only); serves SPA; `location /api/` proxies to uvicorn, stripping the prefix |
 | `camera-cleaner-addon/rootfs/etc/services.d/`, `cont-init.d/` | **Not executed** — legacy s6 scripts from before the ENTRYPOINT override; the live logic is in `run.sh` |
 | [`camera-cleaner-addon/DOCS.md`](../camera-cleaner-addon/DOCS.md) | User-facing add-on documentation shown in HA store |

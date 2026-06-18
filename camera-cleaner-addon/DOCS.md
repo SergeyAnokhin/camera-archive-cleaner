@@ -9,7 +9,7 @@ Browse, review, and clean up camera archive files stored on a network share.
 - Delete selected files with matching video preview auto-detection
 - Cloud AI analysis (Google Gemini, Anthropic Claude) per image
 - Local object detection via remote compute service (optional)
-- Task queue for background scanning and batch analysis
+- Background task queue: batch AI analysis & detection, video re-encode, file organizing, Gmail/Drive sync
 - Full camera management via UI (no config file editing)
 - Google OAuth integration: download snapshots from Gmail, upload to Google Drive
 - Mobile-friendly responsive UI
@@ -24,21 +24,19 @@ In Home Assistant: **Settings → System → Storage → Add network storage**
 - Share path: `\\192.168.x.x\Camera` (your NAS / NVR share)
 - Usage: **media** (will appear under `/media/<name>`)
 
-### 2. Configure the add-on
+### 2. Install, start, open
 
-| Option | Description | Example |
-|---|---|---|
-| `camera_root` | Path to the mounted share directory | `/media/Camera` |
-| `compute_remote_url` | URL of a running compute-service for object detection and video previews (optional) | `http://192.168.1.10:8001` |
-
-### 3. Start and open
-
-Click **Start**, then **Open Web UI**. On first launch two cameras are pre-configured:
+The add-on has **no options page** — everything is configured inside the Web UI.
+Click **Install**, **Start**, then **Open Web UI**. On first launch two cameras are
+pre-configured:
 
 - **Demo Camera** — bundled sample images, no setup needed. Click **Scan** to index them.
-- **My Camera** — placeholder pointing to `Camera` under your `camera_root`. The UI shows setup instructions until you point it at a real folder in **Tools → Cameras**.
+- **My Camera** — placeholder; the UI shows setup instructions until you point it at a real folder.
 
-To configure a real camera: go to **Tools → Cameras**, set the path to the subfolder inside `camera_root` that contains your camera's files (e.g. `FrontDoor`), then click **Scan**.
+### 3. Point it at your camera files
+
+1. **Tools → Cameras → Camera Root** — click **Browse /media**, select your mounted share, **Apply**. (Defaults to `/media`.)
+2. Add a camera with the subfolder that holds its files (e.g. `FrontDoor`), then click **Scan**.
 
 ## Google Integration — Gmail Download (optional)
 
@@ -103,53 +101,32 @@ The OAuth token is stored in `/data/google_oauth.json` and persists across add-o
 
 ## Compute Service (optional)
 
-Enables **local object detection** (person, car, animal, etc.) and **video preview generation** — without sending images to a cloud API.
+Enables **local object detection** (person, car, animal…) and **video preview /
+re-encode** tasks — without sending images to a cloud API. It runs separately on any
+machine with spare CPU (a Linux server, NAS, or Windows PC); the add-on then talks to
+it over HTTP.
 
-The compute service runs separately on any machine with spare CPU (a Linux server, NAS, or Windows PC). Point the add-on to it via `compute_remote_url`.
+Why it is split out and the full off/local/remote design are documented on GitHub:
+[**docs/compute-service.md**](https://github.com/SergeyAnokhin/camera-archive-cleaner/blob/main/docs/compute-service.md).
 
-### Docker — Linux or Windows with Docker Desktop
-
-The pre-built image has YOLO models baked in (no download at startup):
+**Quick start (Docker)** — the pre-built image has the YOLO models baked in:
 
 ```bash
-docker run -d \
-  --name camera-compute \
-  --restart unless-stopped \
-  -p 8001:8001 \
-  -e CAMERA_ROOT=/camera \
+docker run -d --name camera-compute --restart unless-stopped \
+  -p 8001:8001 -e CAMERA_ROOT=/camera \
   -v /mnt/Camera:/camera:ro \
   ghcr.io/sergeyanokhin/camera-compute:latest
 ```
 
-Replace `/mnt/Camera` with the path where the camera share is mounted on that machine.
-
-**Windows with Docker Desktop** — use forward-slash UNC paths for the volume:
-```
--v //192.168.1.99/Camera:/camera:ro
-```
-
-### Without Docker — Windows (Python 3.11+)
-
-```powershell
-# Run in compute-service/ folder from the project repo
-pip install -r requirements.txt
-$env:CAMERA_ROOT = "\\192.168.1.99\Camera"
-uvicorn app:app --host 0.0.0.0 --port 8001
-```
-
-### Without Docker — Linux (Python 3.11+)
-
-```bash
-pip install -r requirements.txt
-export CAMERA_ROOT=/mnt/Camera
-uvicorn app:app --host 0.0.0.0 --port 8001
-```
+Replace `/mnt/Camera` with where the camera share is mounted on that machine (Windows
+Docker Desktop: `-v //192.168.1.99/Camera:/camera:ro`). Without Docker, run
+`uvicorn app:app --host 0.0.0.0 --port 8001` from `compute-service/` with `CAMERA_ROOT`
+set — see the GitHub doc above.
 
 ### Connect to the add-on
 
-1. Set `compute_remote_url` to `http://<machine-ip>:8001` in add-on options and restart.
-2. Open **Tools → Compute** and switch to **Remote**.
-3. Use **Test connection** to confirm the add-on can reach the service.
+1. Open **Tools → Compute**, switch to **Remote**, and set the URL to `http://<machine-ip>:8001`.
+2. Use **Test connection** to confirm the add-on can reach the service.
 
 ---
 

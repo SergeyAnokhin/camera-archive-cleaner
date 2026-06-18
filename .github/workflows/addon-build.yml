@@ -54,7 +54,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: camera-archive-cleaner-addon/Dockerfile
+          file: camera-cleaner-addon/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
           build-args: BUILD_FROM=${{ matrix.base }}
