@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   clearDatabase, clearAllThumbnails, clearThumbnails,
-  clearDiffThumbnails, clearErosionThumbnails,
+  clearDiffThumbnails,
   clearVideoThumbnails, clearOpenVinoThumbnails,
   vacuumDatabase, getStorageInfo, getCameraDateRange,
 } from '../../../api.js'
@@ -137,12 +137,8 @@ export default function MaintenanceSection({ onDatabaseCleared, cameraId, camera
 
   async function handleClearMotion() {
     await motionThumb.run(async () => {
-      const results = await Promise.all([
-        clearDiffThumbnails(cameraId, df, dt),
-        clearErosionThumbnails(cameraId, df, dt),
-      ])
-      const total = results.reduce((s, r) => s + (r.deleted_files || 0), 0)
-      return { total }
+      const r = await clearDiffThumbnails(cameraId, df, dt)
+      return { total: r.deleted_files || 0 }
     })
     refreshStorage()
   }
@@ -255,7 +251,7 @@ export default function MaintenanceSection({ onDatabaseCleared, cameraId, camera
 
         <ActionRow
           name="Motion thumbnails"
-          desc="Motion highlight, Motion noise-filtered — motion analysis modes"
+          desc="Motion highlight — motion analysis mode"
           onAction={handleClearMotion}
           busy={motionThumb.busy}
           result={motionThumb.result}

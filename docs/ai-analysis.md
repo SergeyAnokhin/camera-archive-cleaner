@@ -269,7 +269,7 @@ Restart the compute-service afterwards. The export folder must be named exactly 
 
 The structured prompt is a template with `{n}` placeholder (replaced with actual image count at run time).
 
-**Single source of truth:** all prompt templates live in [`frontend/src/prompts.js`](../frontend/src/prompts.js) — `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude structured), `GEMINI_FREEFORM_PROMPT` (non-structured Gemini), `CELL_ANALYSIS_PROMPT(n)` (heatmap CellSelBar batch).
+**Single source of truth:** all prompt templates live in [`frontend/src/prompts.js`](../frontend/src/prompts.js) — `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude structured), `CELL_ANALYSIS_PROMPT(n)` (heatmap CellSelBar batch).
 
 **Stored in:** `localStorage` key `gemini_structured_prompt`
 **Editable in:** Tools modal → Google AI tab → "Structured prompt template"

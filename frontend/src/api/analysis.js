@@ -2,10 +2,6 @@
 import { DETECTION_CLASSES_DEFAULT } from '../cocoClasses.js'
 import { BASE, get, buildQuery, postJson } from './http.js'
 
-export function geminiAnalyze({ fileIds, prompt, model, apiKey }) {
-  return postJson('/gemini_analyze', { file_ids: fileIds, prompt, model, api_key: apiKey })
-}
-
 export function geminiAnalyzeBatch({ fileIds, prompt, model, apiKey }) {
   return postJson('/gemini_analyze_batch', { file_ids: fileIds, prompt, model, api_key: apiKey })
 }

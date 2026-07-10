@@ -1,25 +1,19 @@
-"""Google Gemini image analysis — free-form (/gemini_analyze) and structured batch."""
+"""Google Gemini image analysis — structured batch (/gemini_analyze_batch)."""
 import logging
 import time
-from pathlib import Path
 
 from fastapi import HTTPException
 
 from ai_pricing import GEMINI_PRICING
 
 from .common import (
+    SINGLE_IMAGE_PROMPT,
     compute_cost,
     fetch_file_rows,
     open_thumbnails,
     parse_json_response,
+    save_single_result,
     save_structured,
-)
-
-_SINGLE_PROMPT = (
-    "Analyze this surveillance camera photo. Return JSON only (no markdown fences):\n"
-    '{"description": "1-2 sentences about visible dynamic objects and activity", '
-    '"objects": ["object1", "object2"]}\n'
-    "Use Russian names: человек, мужчина, женщина, ребёнок, кошка, собака, машина, велосипед, etc."
 )
 
 logger = logging.getLogger("api")
@@ -50,51 +44,17 @@ def _usage(response):
     )
 
 
-def analyze(file_ids, prompt, model, api_key):
-    """Free-form analysis — returns the raw response text plus token/cost stats."""
-    rows = fetch_file_rows(file_ids)
-    images, rows_used = open_thumbnails(rows)
-    if not images:
-        raise HTTPException(status_code=400, detail="No valid photo files found")
-
-    logger.info("🤖 Gemini %s: %d изображений, prompt=%d символов", model, len(images), len(prompt))
-    response, elapsed_ms = _generate(prompt, images, model, api_key)
-
-    in_tok, out_tok, tot_tok = _usage(response)
-    cost = compute_cost(model, in_tok, out_tok, GEMINI_PRICING)
-    logger.info("   └─ %d токенов (in:%d out:%d), %.0f мс, $%.6f", tot_tok, in_tok, out_tok, elapsed_ms, cost)
-
-    return {
-        "text": response.text,
-        "input_tokens": in_tok,
-        "output_tokens": out_tok,
-        "total_tokens": tot_tok,
-        "cost_usd": cost,
-        "elapsed_ms": elapsed_ms,
-        "images_used": len(images),
-        "filenames": [Path(r["file_path"]).name for r in rows_used],
-    }
-
-
 def analyze_single(file_id, model, api_key):
     """Analyze one photo and save result to DB. Returns True if saved."""
-    from database import get_connection, save_ai_analysis
     rows = fetch_file_rows([file_id])
     images, rows_used = open_thumbnails(rows)
     if not images:
         return False
-    response, elapsed_ms = _generate(_SINGLE_PROMPT, images, model, api_key)
-    raw = response.text or ""
-    parsed = parse_json_response(raw)
-    description = parsed.get("description", "") if parsed else ""
-    objects_str = " ".join(str(o) for o in parsed.get("objects", [])) if parsed else ""
+    response, elapsed_ms = _generate(SINGLE_IMAGE_PROMPT, images, model, api_key)
     in_tok, out_tok, _ = _usage(response)
     cost = compute_cost(model, in_tok, out_tok, GEMINI_PRICING)
-    with get_connection() as conn:
-        save_ai_analysis(conn, rows_used[0]["id"], "gemini", model, "", description, objects_str,
-                         input_tokens=in_tok, output_tokens=out_tok,
-                         cost_usd=cost, elapsed_ms=elapsed_ms)
-    return True
+    return save_single_result(rows_used[0]["id"], "gemini", model, response.text or "",
+                              in_tok, out_tok, cost, elapsed_ms)
 
 
 def analyze_batch(file_ids, prompt, model, api_key):

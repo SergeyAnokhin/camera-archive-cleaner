@@ -18,9 +18,6 @@
   "motion_modes": {
     "motion_diff": {
       "threshold": 20
-    },
-    "erosion": {
-      "threshold": 20
     }
   },
   "google_ai": {

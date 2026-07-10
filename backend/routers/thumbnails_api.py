@@ -1,7 +1,6 @@
 """On-demand thumbnail generation.
 
-Endpoints: /thumbnail, /diff_thumbnail, /erosion_thumbnail,
-/openvino_thumbnail, /video_thumbnail.
+Endpoints: /thumbnail, /diff_thumbnail, /openvino_thumbnail, /video_thumbnail.
 Serving original files lives in `routers/media.py`.
 """
 import base64
@@ -15,7 +14,6 @@ from database import get_connection, get_file_by_id, save_object_detection, save
 from shared.contract import VIDEO_THUMB_MODES
 from thumbnails import get_or_create_thumbnail
 from diff_thumbnails import get_or_create_diff_thumbnail
-from erosion_thumbnails import get_or_create_erosion_thumbnail
 
 router = APIRouter()
 
@@ -34,7 +32,7 @@ def _parse_page_ids(page_ids: str) -> list[int]:
 
 
 def _page_thumbnail_response(file_id: int, kind: str, build) -> FileResponse:
-    """Shared flow for the page-context motion thumbnails (diff / erosion).
+    """Shared flow for the page-context diff motion thumbnail.
 
     Validates the file is a photo, ensures the base thumbnail exists, then runs
     `build(conn)` to get or create the mode-specific thumbnail.
@@ -78,19 +76,6 @@ def get_diff_thumbnail(
     return _page_thumbnail_response(
         file_id, "Diff",
         lambda conn: get_or_create_diff_thumbnail(conn, file_id, ids, threshold),
-    )
-
-
-@router.get("/erosion_thumbnail/{file_id}", summary="Erosion/MOG2 thumbnail for a photo")
-def get_erosion_thumbnail(
-    file_id: int,
-    page_ids: str = Query(description="Comma-separated photo file IDs on the current page"),
-    threshold: int = Query(default=20, ge=0, le=255),
-):
-    ids = _parse_page_ids(page_ids)
-    return _page_thumbnail_response(
-        file_id, "Erosion",
-        lambda conn: get_or_create_erosion_thumbnail(conn, file_id, ids, threshold),
     )
 
 

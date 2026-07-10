@@ -1,7 +1,7 @@
 """AI image-analysis HTTP endpoints.
 
 Thin routing layer — provider logic lives in the ``ai_providers`` package.
-Endpoints: /gemini_analyze, /gemini_analyze_batch, /claude_analyze_batch,
+Endpoints: /gemini_analyze_batch, /claude_analyze_batch,
 /openvino_analyze_batch, /openvino_analyze_range, /ai_analysis, /ai_objects_summary.
 """
 import logging
@@ -23,11 +23,6 @@ class GeminiAnalyzeRequest(BaseModel):
     prompt: str
     model: str
     api_key: str
-
-
-@router.post("/gemini_analyze", summary="Analyze images with Google Gemini AI")
-def gemini_analyze(req: GeminiAnalyzeRequest):
-    return gemini.analyze(req.file_ids, req.prompt, req.model, req.api_key)
 
 
 @router.post("/gemini_analyze_batch", summary="Structured analysis + save to DB")

@@ -14,7 +14,7 @@ For a flat per-file listing see [`code-map.md`](code-map.md). This doc is the *g
 | **Logging** | `logging_setup.py` | — (configures root logger on import) | — |
 | **Config & scan** | `config.py`, `scanner.py` | Indexing/DB | env `CAMERA_ROOT` |
 | **Indexing / DB** | `database.py`, `snapshots.db` (incl. `cameras` table) | — (owns all SQL) | sqlite3 (stdlib) |
-| **Thumbnail pipeline** | `thumbnails.py`, `diff_thumbnails.py`, `erosion_thumbnails.py` | Indexing/DB (cache paths) | Pillow, numpy, opencv |
+| **Thumbnail pipeline** | `thumbnails.py`, `diff_thumbnails.py` | Indexing/DB (cache paths) | Pillow, numpy |
 | **Compute delegation** | `compute_client.py`, `compute_config.py`, `compute_cache.py`, `ai_providers/openvino.py`, `routers/compute.py` | Indexing/DB, compute-service | httpx |
 | **Cloud AI** | `ai_providers/gemini.py`, `ai_providers/claude.py`, `ai_providers/common.py`, `ai_pricing.py` | Indexing/DB | google-genai, anthropic, Pillow |
 | **Task queue** | `task_runner.py`, `task_executors/*`, `routers/tasks.py` | Indexing/DB, Compute delegation | asyncio (stdlib) |
@@ -69,16 +69,15 @@ spelling changes on one side, it must change on the other.
 
 ## Notes for Docker / Home Assistant packaging
 
-Current runtime config is **not** environment-driven — relevant before containerising:
+Runtime config is environment-driven — the knobs that matter when containerising:
 
 | Config | Where it lives | Containerisation note |
 |---|---|---|
-| Camera IDs & paths | SQLite DB (`backend/snapshots.db`, `cameras` table) | Persisted in the DB; CRUD via UI (Tools → Cameras) |
-| Camera media (snapshots/videos) | Paths inside the DB | Must be reachable from the container (volume mount / SMB) |
-| DB & all caches | `backend/*.db`, `backend/*_cache/` | Put on a persistent volume |
-| OpenVINO models | `compute-service/models/` | Lives with the compute-service |
-| Log level | hard-coded `logging.root.setLevel(...)` in `logging_setup.py` | No env override yet |
-| Ports | backend `8000`, frontend `5173` (Vite proxy → `8000`) | Vite dev-proxy is dev-only; production needs a static build + reverse proxy |
-| All user settings | browser `localStorage` (see [`settings.md`](settings.md)) | Per-browser — not portable with the container |
-
-No env-var support exists today; adding it is a code change, not a docs change.
+| Camera IDs & relative paths | SQLite DB (`cameras` table) | CRUD via UI (Tools → Cameras); `CAMERA_ROOT` (env var, or in-app setting persisted to `server_config.json`) is prepended at runtime |
+| Camera media (snapshots/videos) | Under `CAMERA_ROOT` | Must be reachable from the container (volume mount / SMB) |
+| DB + server-side JSON configs | `DATA_DIR` env var (default `backend/`): `snapshots.db`, `settings.json`, `server_config.json`, `compute_config.json`, `google_oauth.json` | Put on a persistent volume (`/data` in the HA add-on) |
+| Thumbnail caches | `CACHE_DIR` env var → [`compute_cache.py`](../backend/compute_cache.py) (default `backend/cache/`) | Persistent volume, or accept regeneration |
+| OpenVINO models | `compute-service/models/` | Baked into the compute image at build time (`export_models.py`) |
+| Log level | Live via `/logging/config` API; defaults in `logging_setup.py` | No restart needed |
+| Ports | backend `8000`, compute `8001`, frontend `5173` (Vite dev proxy) | In containers the frontend is a static nginx build; `/api` is routed by the Ingress / add-on nginx |
+| User settings | browser `localStorage`, mirrored to server `settings.json` via `/settings` (API keys stripped) | Portable across browsers via the server mirror |

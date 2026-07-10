@@ -17,10 +17,6 @@ export function clearDiffThumbnails(cameraId = null, dateFrom = null, dateTo = n
   return del('/diff_thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }
 
-export function clearErosionThumbnails(cameraId = null, dateFrom = null, dateTo = null) {
-  return del('/erosion_thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
-}
-
 export function clearVideoThumbnails(cameraId = null, dateFrom = null, dateTo = null) {
   return del('/video_thumbnails' + buildQuery({ camera_id: cameraId, date_from: dateFrom, date_to: dateTo }))
 }

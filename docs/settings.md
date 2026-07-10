@@ -7,6 +7,15 @@ All user UI preferences, thresholds, and view configuration are synchronized wit
 
 To inspect or clear the cached settings manually: browser DevTools → Application → Local Storage → `http://localhost:5173`.
 
+**Sync direction on page load** (`App.jsx`, mount effect): `GET /settings` is called once.
+- If the server has any settings saved → they **overwrite** this browser's local values (server wins).
+- If the server is empty → this browser's current local values are pushed up via `POST /settings` (first browser to load seeds the server).
+
+Every subsequent save (Tools modal, General tab) also calls `POST /settings`, so the
+**last browser to save wins** for any two browsers that edit settings independently —
+there is no merge. This makes the server a convenience mirror for opening the same
+camera archive from a second browser/device, not a source of truth to resolve conflicts.
+
 
 ---
 
@@ -41,7 +50,6 @@ Key pattern: `mode_params_<mode_key>` (JSON object).
 | localStorage key | Example value | Description |
 |---|---|---|
 | `mode_params_motion_diff` | `{"threshold":20}` | Motion highlight threshold |
-| `mode_params_erosion` | `{"threshold":20}` | Motion (noise-filtered) threshold |
 | `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Written by Tools → Detection tab and OpenVinoAnalysisModal. Read-only in AiModePanel and CellSelBar |
 
 Initial value for motion modes is taken from `diff_threshold` (the global default). OpenVINO defaults to 25.
@@ -167,9 +175,6 @@ hour_view:
 motion_modes:
   motion_diff:
     threshold: 20
-  erosion:
-    threshold: 25
-  # ... other modes
 google_ai:
   model: gemini-2.5-flash
   api_key: '# Get your key at aistudio.google.com'

@@ -1,6 +1,6 @@
 # Visualization Modes
 
-The HourViewer offers 6 visualization modes for browsing camera archives. Modes 2–3 are motion-analysis modes computed server-side and cached on disk. Modes 4–6 are AI / object-detection modes that send photos to an external API or run a local model.
+The HourViewer offers 5 visualization modes for browsing camera archives. Mode 2 is a motion-analysis mode computed server-side and cached on disk. Modes 3–5 are AI / object-detection modes that send photos to an external API or run a local model.
 
 Mode registry: [`viewModes/index.js`](../frontend/src/components/viewModes/index.js) — one file per mode.
 
@@ -10,7 +10,7 @@ Mode registry: [`viewModes/index.js`](../frontend/src/components/viewModes/index
 
 | Control | Where | Effect |
 |---------|-------|--------|
-| **Mode selector** | HourViewer header dropdown | Switch between the 6 modes |
+| **Mode selector** | HourViewer header dropdown | Switch between the 5 modes |
 | **Threshold slider** | Tools → Hour view | 0–100, default 20. Controls sensitivity of motion modes (see per-mode notes below) |
 | **AI mode panel** | Appears below mode selector when an AI mode is active | Model selector, confidence slider (OpenVINO), Analyze button, usage stats |
 
@@ -44,26 +44,7 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ---
 
-## 3. Motion (noise-filtered)
-
-**Key:** `erosion` | **Cache:** `backend/erosion_thumbnails_cache/`
-
-**Algorithm (MOG2 + morphological pipeline):**
-1. Downscale all page frames to 160 × 120.
-2. Feed frames through `cv2.createBackgroundSubtractorMOG2` in sorted order (`varThreshold = threshold`).
-3. Capture the foreground mask at the target frame.
-4. **Erode** with a 3 × 3 elliptical kernel → removes thin spider webs and isolated raindrops.
-5. **Dilate** with a 7 × 7 elliptical kernel → restores the volume of real solid objects.
-6. `findContours` + area filter (≥ 80 px²) → discards small insects and branch tips.
-7. Render: grayscale target + **neon-green mask** + **bounding boxes**.
-
-**Threshold meaning:** `varThreshold` for MOG2. Higher → stricter foreground detection, fewer false positives from slow lighting drift.
-
-**Best for:** General-purpose noise rejection. Good first choice after Normal.
-
----
-
-## 4. AI description (Gemini)
+## 3. AI description (Gemini)
 
 **Key:** `gemini_analysis` | **Cache:** none (results stored in `ai_analysis` DB table) | **`isAiMode: true`**
 
@@ -77,7 +58,7 @@ Sends all photos on the current page to the Google Gemini API (or a selection if
 
 ---
 
-## 5. AI description (Claude)
+## 4. AI description (Claude)
 
 **Key:** `claude_analysis` | **Cache:** none (results in `ai_analysis` table) | **`isAiMode: true`**
 
@@ -89,7 +70,7 @@ Same flow as Gemini but uses the Anthropic Claude API. Sends photos as base64 JP
 
 ---
 
-## 6. Object detection (local)
+## 5. Object detection (local)
 
 **Key:** `openvino_detection` | **Cache:** `backend/openvino_thumbnails_cache/` (bbox JPEG per file+model+confidence) | **`isAiMode: true`**
 
@@ -108,14 +89,6 @@ Runs local YOLOv8 object detection using the Intel OpenVINO runtime (falls back 
 
 ---
 
-## Tuning guide
-
-| Symptom | Adjustment |
-|---------|-----------|
-| Rain / spider web still visible | Raise threshold (stricter MOG2) |
-| Real objects disappear | Lower threshold |
-| Too many tiny boxes | Increase `MIN_CONTOUR_AREA` constant in `erosion_thumbnails.py` |
-
 ---
 
 ## Cache management
@@ -126,7 +99,6 @@ All computed thumbnails are cached on disk to avoid re-processing.
 |----------------|-------|-----------|
 | `backend/thumbnails_cache/` | Normal | Tools → Maintenance → Clear thumbnails |
 | `backend/diff_thumbnails_cache/` | Motion diff | Tools → Maintenance → Clear motion thumbnails |
-| `backend/erosion_thumbnails_cache/` | Erosion | Tools → Maintenance → Clear motion thumbnails |
 | `backend/openvino_thumbnails_cache/` | OpenVINO Detection | Tools → Maintenance → Clear all thumbnails |
 
 Cache keys include the sorted list of page photo IDs and the current threshold value, so changing either will generate new cached images.
@@ -139,6 +111,5 @@ Cache keys include the sorted list of page photo IDs and the current threshold v
 |------|---------------|
 | `backend/thumbnails.py` | Resize + cache regular thumbnails (PIL) |
 | `backend/diff_thumbnails.py` | Motion diff — numpy mean/delta |
-| `backend/erosion_thumbnails.py` | MOG2 + erode/dilate + neon overlay + boxes |
 | `backend/compute_cache.py` | Bbox cache paths (OpenVINO modes) — the JPEG itself is rendered by the compute-service |
 | `compute-service/detection.py` | YOLO/OpenVINO model loading + detection — runs in the [compute-service](compute-service.md) |

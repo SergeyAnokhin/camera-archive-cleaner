@@ -1,6 +1,5 @@
 import normalMode from './normalMode.js'
 import motionDiffMode from './motionDiffMode.js'
-import erosionMode from './erosionMode.js'
 import geminiMode from './geminiMode.js'
 import claudeMode from './claudeMode.js'
 import openvinoMode from './openvinoMode.js'
@@ -8,7 +7,6 @@ import openvinoMode from './openvinoMode.js'
 export const VIEW_MODES = [
   normalMode,
   motionDiffMode,
-  erosionMode,
   geminiMode,
   claudeMode,
   openvinoMode,

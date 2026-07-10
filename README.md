@@ -70,7 +70,7 @@ snapshots.db (cameras table)
     ▼
 config.py ──► scanner.py ──► database.py  (SQLite: snapshots.db)
                                   ▲
-   thumbnail pipeline ────────────┤   thumbnails / diff / erosion
+   thumbnail pipeline ────────────┤   thumbnails / diff
    ai_providers/ ─────────────────┤   gemini · claude
    compute_client.py ─────────────┘   ──HTTP──► compute-service (:8001)
    task_runner.py (asyncio bg loop)  │              YOLO detection · video

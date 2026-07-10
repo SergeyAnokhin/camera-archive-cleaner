@@ -116,7 +116,7 @@ export const U_METRICS = [
 export const U_DEFAULTS = { af: [40, 65], se: [55, 80], bc: [40, 65], combined: [50, 72] }
 
 export const MOTION_MODE_KEYS = [
-  'motion_diff', 'erosion',
+  'motion_diff',
 ]
 
 export const BURST_GAP_KEY     = 'burst_gap_seconds'

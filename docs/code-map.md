@@ -20,15 +20,15 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`database.py`](../backend/database.py) | Backward-compatible **facade** — re-exports the whole `db/` package (table below). Import `from database import …` as before; add new queries to the matching `db/*.py` module and re-export here |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed |
 | [`config.py`](../backend/config.py) | Defines `Camera(id, name, path)` and `load_cameras()` which queries the database and appends `CAMERA_ROOT`. |
+| [`server_store.py`](../backend/server_store.py) | Generic JSON load/save under `DATA_DIR` — shared by `settings_manager.py`, `compute_config.py`, `google_oauth.py`. Each caller keeps its own filename + domain logic (defaults, credential stripping) |
 | [`settings_manager.py`](../backend/settings_manager.py) | Persists user settings (without credentials) to `settings.json` on the server |
 | [`google_oauth.py`](../backend/google_oauth.py) | Google OAuth 2.0: client credentials + tokens in `DATA_DIR/google_oauth.json`, consent URL, code exchange, access-token refresh. See [`google-integration.md`](google-integration.md) |
 | [`google_api.py`](../backend/google_api.py) | Sync REST client for Gmail + Drive (httpx): labels, message/attachment fetch, folder find-or-create, resumable upload. Pure helpers `extract_attachments()` / `split_drive_path()` |
 | [`thumbnails.py`](../backend/thumbnails.py) | Basic 256×256 JPEG thumbnails (Pillow). Cache in `CACHE_BASE_DIR/basic/` |
 | [`diff_thumbnails.py`](../backend/diff_thumbnails.py) | Motion Diff thumbnails: per-pixel delta from page mean (numpy). Cache in `CACHE_BASE_DIR/diff/` |
-| [`erosion_thumbnails.py`](../backend/erosion_thumbnails.py) | Erosion thumbnails: MOG2 + morphological erosion. Cache in `CACHE_BASE_DIR/erosion/` |
 | `snapshots.db` | SQLite database (auto-created on startup). Path = `DATA_DIR/snapshots.db`; `DATA_DIR` env var defaults to `backend/` for local and K8s, set to `/data` for HA add-on |
 | [`pytest.ini`](../backend/pytest.ini) | Pytest config: `tests/` dir, quiet output (`-q --tb=short`) |
-| [`tests/`](../backend/tests/) | Unit tests for documented complex logic (timestamp parsing, ±5 s video matching, golden-section search, AI JSON/cost, path contract, SpeedTracker). See [`testing.md`](testing.md) |
+| [`tests/`](../backend/tests/) | Unit tests for documented complex logic (timestamp parsing, ±5 s video matching, golden-section search, AI JSON/cost, Claude request building, Google OAuth token refresh, path contract, SpeedTracker). External services are always mocked. See [`testing.md`](testing.md) |
 
 
 ### DB layer (`backend/db/`)
@@ -67,11 +67,11 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 |---|---|
 | [`catalog.py`](../backend/routers/catalog.py) | `/cameras` (load from DB), `/cameras/config` (GET/PUT CRUD), `/cameras/check-path` (POST check), `/scan` |
 | [`stats.py`](../backend/routers/stats.py) | `/stats`, `/files`, `/distribution`, `/previews` |
-| [`thumbnails_api.py`](../backend/routers/thumbnails_api.py) | `/thumbnail`, `/diff_thumbnail`, `/erosion_thumbnail`, `/openvino_thumbnail`, `/video_thumbnail`. |
+| [`thumbnails_api.py`](../backend/routers/thumbnails_api.py) | `/thumbnail`, `/diff_thumbnail`, `/openvino_thumbnail`, `/video_thumbnail`. |
 | [`media.py`](../backend/routers/media.py) | `/media/{file_id}` — serves the original photo/video file with the correct MIME type |
 | [`delete.py`](../backend/routers/delete.py) | `/delete/preview`, `/delete/confirm`, `/delete/preview_range`, `/delete/by_range`. |
 | [`maintenance.py`](../backend/routers/maintenance.py) | `/database`, per-type `/*_thumbnails` (except deleted), `/all_thumbnails`, `/storage_info` |
-| [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze`, `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`. |
+| [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`. |
 | [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status` |
 | [`tasks.py`](../backend/routers/tasks.py) | `/tasks` CRUD + `/tasks/metrics` + `GET /tasks/{id}/logs` |
 | [`tuning.py`](../backend/routers/tuning.py) | `/tuning/sessions/*` — model tuning |
@@ -86,7 +86,7 @@ Provider-specific image-analysis logic, called by `routers/ai.py`.
 | File | Role |
 |---|---|
 | [`common.py`](../backend/ai_providers/common.py) | Shared helpers: load photos as PIL images, strip ``` fences + parse JSON, compute USD cost, save structured `{scene, images}` results to DB |
-| [`gemini.py`](../backend/ai_providers/gemini.py) | Google Gemini — `analyze()` (free-form) and `analyze_batch()` (structured + save) |
+| [`gemini.py`](../backend/ai_providers/gemini.py) | Google Gemini — `analyze_batch()` (structured + save) |
 | [`claude.py`](../backend/ai_providers/claude.py) | Anthropic Claude — `analyze_batch()` (base64 JPEG → messages API) |
 | [`openvino.py`](../backend/ai_providers/openvino.py) | `analyze_batch()` / `analyze_range()` — delegates detection to the compute-service, owns the DB read/write |
 
@@ -99,8 +99,7 @@ snapshots.db (cameras)
 config.py ──► scanner.py ──► database.py
                               ▲
 thumbnails.py ───────────────────┤
-diff_thumbnails.py ──────────────┤  (all called from routers/)
-erosion_thumbnails.py ───────────┘
+diff_thumbnails.py ──────────────┘  (all called from routers/)
 
 routers/ ──► compute_client.py ──HTTP──► compute-service (:8001)
 ```
@@ -140,7 +139,7 @@ Imported by both the main backend and the compute-service.
 | [`api.js`](../frontend/src/api.js) | Barrel re-export of `src/api/` domain modules — import from here; **add new endpoints to the matching `api/*.js` module** (see table below) |
 | [`aiHelpers.js`](../frontend/src/aiHelpers.js) | AI display utilities: `resolveAiIcons(str)` → `[{emoji,label}]` — builds lookup from `COCO_CLASSES` (both `en`/`ru` keys), always returns Russian display labels |
 | [`cocoClasses.js`](../frontend/src/cocoClasses.js) | The 80 COCO classes (`{id, en, ru, emoji}`) in class-ID order + `DETECTION_CLASSES_DEFAULT`. Source for the Detection-tab class checklist; IDs flow to YOLO's `classes=` param |
-| [`prompts.js`](../frontend/src/prompts.js) | Single source of truth for all AI prompt templates: `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude), `GEMINI_FREEFORM_PROMPT`, `CELL_ANALYSIS_PROMPT(n)` (heatmap batch). `{n}` = image count |
+| [`prompts.js`](../frontend/src/prompts.js) | Single source of truth for all AI prompt templates: `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude), `CELL_ANALYSIS_PROMPT(n)` (heatmap batch). `{n}` = image count |
 | [`viewedStatus.js`](../frontend/src/viewedStatus.js) | Viewed-hour tracking, localStorage only (`viewed_hours_*`, `data_*` keys): `markHourViewed()`, per-level aggregation for the heatmap viewed strips, `hour-viewed-change` CustomEvent |
 | [`main.jsx`](../frontend/src/main.jsx) | React entry point. Mounts `<App />` |
 | [`test-setup.js`](../frontend/src/test-setup.js) | Vitest setup: in-memory `localStorage` stub (no jsdom). Tests are co-located `*.test.js` files (`components/navUtils.test.js`, `components/hour/hourUtils.test.js`). See [`testing.md`](testing.md) |
@@ -210,7 +209,6 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`SliderSetting.jsx`](../frontend/src/components/tools/SliderSetting.jsx) | Reusable labelled range-slider row used across tabs |
 | [`GeneralTab.jsx`](../frontend/src/components/tools/GeneralTab.jsx) | Font size (2-col layout), YAML export/import |
 | [`CamerasTab.jsx`](../frontend/src/components/tools/CamerasTab.jsx) | Full camera CRUD: add/edit/delete rows, inline path validation via `/cameras/check-path`, saves via `PUT /cameras/config` |
-| [`TasksTab.jsx`](../frontend/src/components/tools/TasksTab.jsx) | Task settings: ETA window (minutes) and log tail lines |
 | [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | View tab: previews per cell, thumb width, hover zoom, diff threshold, page size, burst gap, video preview, uniformity (collapsible, with Low/Medium/High presets) |
 | [`AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) | Combined AI tab: 3 sections — Detection (YOLO model, confidence, classes checklist), Google Gemini (API key, model, prompt), Claude Anthropic (API key, model) |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
@@ -273,7 +271,6 @@ Each file is one visualization mode. Exports a function that takes `file_id` and
 |---|---|
 | [`normalMode.js`](../frontend/src/components/viewModes/normalMode.js) | Normal (basic thumbnail) |
 | [`motionDiffMode.js`](../frontend/src/components/viewModes/motionDiffMode.js) | Motion highlight (per-pixel delta from page mean) |
-| [`erosionMode.js`](../frontend/src/components/viewModes/erosionMode.js) | Motion (noise-filtered) — MOG2 + morphological erosion |
 | [`openvinoMode.js`](../frontend/src/components/viewModes/openvinoMode.js) | Object detection (local) — `isAiMode`, calls `/openvino_thumbnail` with model+confidence+classes params |
 | [`geminiMode.js`](../frontend/src/components/viewModes/geminiMode.js) | AI description (Gemini) — icon overlay from analysis results |
 | [`claudeMode.js`](../frontend/src/components/viewModes/claudeMode.js) | AI description (Claude) — icon overlay from analysis results |
@@ -319,7 +316,7 @@ Containerisation + GitOps deploy. Full architecture and rationale: [`deployment.
 | [`frontend/Dockerfile`](../frontend/Dockerfile) | Vite build → nginx static image |
 | [`frontend/nginx.conf`](../frontend/nginx.conf) | nginx: serves the SPA with `index.html` fallback (no `/api` proxy — the Ingress routes it) |
 | [`.dockerignore`](../.dockerignore) | Keeps `node_modules`, caches, DB, `*.pt` out of the build context |
-| [`deploy/helm/camera-cleaner/`](../deploy/helm/camera-cleaner/) | Helm chart: 3 Deployments+Services, state PVC (subPath mounts), SMB PV/PVC, cameras ConfigMap, Traefik Ingress + StripPrefix middleware. Tags in `values.yaml` are rewritten by CI |
+| [`deploy/helm/camera-cleaner/`](../deploy/helm/camera-cleaner/) | Helm chart: 3 Deployments+Services, state PVC (subPath mounts), SMB PV/PVC, Traefik Ingress + StripPrefix middleware. Tags in `values.yaml` are rewritten by CI |
 | [`deploy/argocd/application.yaml`](../deploy/argocd/application.yaml) | ArgoCD Application — auto-sync from `deploy/helm/camera-cleaner` |
 | [`.github/workflows/build.yml`](../.github/workflows/build.yml) | CI: build+push 3 images to GHCR by git SHA, `yq`-bump tags in `values.yaml`, commit back |
 
@@ -335,7 +332,6 @@ Third deployment target: HA OS / Supervised, exposed via HA ingress (no host por
 | [`camera-cleaner-addon/Dockerfile`](../camera-cleaner-addon/Dockerfile) | Multi-stage: Node.js frontend build → HA Debian base with Python 3 + nginx. Build context = repo root: `docker build -f camera-cleaner-addon/Dockerfile .` |
 | [`camera-cleaner-addon/run.sh`](../camera-cleaner-addon/run.sh) | Container ENTRYPOINT (bypasses s6-overlay): sets `DATA_DIR=/data`, starts nginx, `exec`s uvicorn (no options — config is in-app) |
 | [`camera-cleaner-addon/rootfs/etc/nginx/nginx.conf`](../camera-cleaner-addon/rootfs/etc/nginx/nginx.conf) | nginx: `allow 172.30.32.2; deny all` (ingress-only); serves SPA; `location /api/` proxies to uvicorn, stripping the prefix |
-| `camera-cleaner-addon/rootfs/etc/services.d/`, `cont-init.d/` | **Not executed** — legacy s6 scripts from before the ENTRYPOINT override; the live logic is in `run.sh` |
 | [`camera-cleaner-addon/DOCS.md`](../camera-cleaner-addon/DOCS.md) | User-facing add-on documentation shown in HA store |
 | [`.github/workflows/addon-build.yml`](../.github/workflows/addon-build.yml) | CI: multi-arch (amd64+aarch64) image build and push to `ghcr.io` on `addon/v*` tag (manual tag push) |
 | [`.github/workflows/release-addon.yml`](../.github/workflows/release-addon.yml) | CI: workflow_dispatch release — bumps `config.yaml`, commits, creates tag, then builds + pushes images |

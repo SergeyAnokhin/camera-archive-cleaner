@@ -49,10 +49,6 @@ export function getDiffThumbnailUrl(fileId, pageIds, threshold) {
   return `${BASE}/diff_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
 }
 
-export function getErosionThumbnailUrl(fileId, pageIds, threshold) {
-  return `${BASE}/erosion_thumbnail/${fileId}?page_ids=${pageIds.join(',')}&threshold=${threshold}`
-}
-
 export function getDistribution(cameraId, dateFrom, dateTo) {
   return get('/distribution' + buildQuery({
     camera_id: cameraId,

@@ -58,7 +58,7 @@ export default function HelpModal({ onClose }) {
                 <div className="step-num">4</div>
                 <div className="step-content">
                   <strong>View Mode</strong>
-                  <p>Switch the view mode at the top from <code>Normal</code> to <code>Motion highlight</code> or <code>Erosion</code>. This hides the static background and highlights changes.</p>
+                  <p>Switch the view mode at the top from <code>Normal</code> to <code>Motion highlight</code>. This hides the static background and highlights changes.</p>
                 </div>
               </div>
               <div className="scenario-step-arrow"><i className="mdi mdi-chevron-down" /></div>

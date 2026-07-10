@@ -11,7 +11,7 @@ marked **(docs)** keep the documentation in sync — see [`../CLAUDE.md`](../CLA
 
 ## Add a new view mode
 
-A server-side motion mode (like Erosion). Mode registry: [`viewModes/index.js`](../frontend/src/components/viewModes/index.js).
+A server-side motion mode (like Motion diff). Mode registry: [`viewModes/index.js`](../frontend/src/components/viewModes/index.js).
 
 | # | File | What to add |
 |---|---|---|
@@ -19,7 +19,7 @@ A server-side motion mode (like Erosion). Mode registry: [`viewModes/index.js`](
 | 2 | [`backend/routers/thumbnails_api.py`](../backend/routers/thumbnails_api.py) | New `GET /<name>_thumbnail/{file_id}` endpoint — reuse the `_parse_page_ids()` + `_page_thumbnail_response()` helpers |
 | 3 | [`backend/routers/maintenance.py`](../backend/routers/maintenance.py) | New `DELETE /<name>_thumbnails`; also add the dir to `clear_all_thumbnails()` and `get_storage_info()` |
 | 4 | [`frontend/src/api/files.js`](../frontend/src/api/files.js) | `get<Name>ThumbnailUrl(fileId, pageIds, threshold)` (re-exported via `api.js`) |
-| 5 | `frontend/src/components/viewModes/<name>Mode.js` | Export `{ key, label, params, getImageUrl }` (copy [`erosionMode.js`](../frontend/src/components/viewModes/erosionMode.js)) |
+| 5 | `frontend/src/components/viewModes/<name>Mode.js` | Export `{ key, label, params, getImageUrl }` (copy [`motionDiffMode.js`](../frontend/src/components/viewModes/motionDiffMode.js)) |
 | 6 | [`viewModes/index.js`](../frontend/src/components/viewModes/index.js) | `import` it and append to `VIEW_MODES` |
 | 7 | **(docs)** [`visualization-modes.md`](visualization-modes.md) | New mode section + a row in the cache-management table |
 | 8 | **(docs)** [`api.md`](api.md), [`code-map.md`](code-map.md) | New endpoint row; new backend + `viewModes/` file rows |
@@ -27,6 +27,26 @@ A server-side motion mode (like Erosion). Mode registry: [`viewModes/index.js`](
 **AI mode variant:** add `isAiMode: true` and `aiProvider` to the mode object; add
 `needsCompute: true` if it relies on the [compute-service](compute-service.md)
 (so it auto-hides when compute is off). See [`ai-analysis.md`](ai-analysis.md).
+
+### Remove a view mode
+
+Reverse of the above — delete the same 6 files/rows (backend generator, thumbnail
+endpoint, maintenance cleanup entry, frontend URL builder, `<name>Mode.js`, the
+`VIEW_MODES` entry) plus these touchpoints that only show up on removal, not
+addition, so a case-insensitive repo-wide grep for the mode's key/name is the
+only reliable way to catch all of them:
+
+- `MOTION_MODE_KEYS` in [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js) (motion modes only)
+- The mode's cache dir in `deploy/helm/camera-cleaner/values.yaml` → `backend.cacheDirs`
+- Cache-cleanup grouping in [`MaintenanceSection.jsx`](../frontend/src/components/tools/service/MaintenanceSection.jsx) (e.g. `handleClearMotion`)
+- Prose mentions in [`HelpModal.jsx`](../frontend/src/components/HelpModal.jsx), [`user-guide.md`](user-guide.md), [`README.md`](../README.md) architecture diagram
+- Example/sample settings files: `backend/settings.json`, `snapshots-settings.example.yaml` (motion mode entries are hand-written examples, not generated)
+- `docs/visualization-modes.md`, `docs/api.md`, `docs/subsystems.md`, `docs/code-map.md` — remove the mode's rows/sections and renumber the remaining mode list if the doc numbers them
+
+`applyImportedSettings()` / `collectSettings()` in [`settingsIO.js`](../frontend/src/components/tools/settingsIO.js)
+and `buildInitialModeParams()` in [`hourUtils.js`](../frontend/src/components/hour/hourUtils.js)
+iterate `MOTION_MODE_KEYS` / `VIEW_MODES` generically — no edit needed there once
+the mode is removed from those source lists.
 
 ---
 

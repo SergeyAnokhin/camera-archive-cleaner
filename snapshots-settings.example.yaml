@@ -13,8 +13,6 @@ hour_view:
 motion_modes:
   motion_diff:
     threshold: 26
-  erosion:
-    threshold: 20
 google_ai:
   model: gemini-3.1-flash-lite
   api_key: "# Get your key at aistudio.google.com"

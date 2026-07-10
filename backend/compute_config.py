@@ -9,14 +9,13 @@ remote_url (single string) is kept for backward compatibility — it equals remo
 
 "local" is accepted as a legacy alias for "remote".
 """
-import json
 import logging
-import os
-from pathlib import Path
+
+from server_store import load_json, save_json
 
 logger = logging.getLogger("api")
 
-_CONFIG_PATH = Path(os.getenv('DATA_DIR', str(Path(__file__).parent))) / "compute_config.json"
+_CONFIG_FILE = "compute_config.json"
 _KUBERNETES_URL = "http://camera-cleaner-compute:8001"
 _DEFAULT = {"mode": "kubernetes", "remote_url": "", "remote_urls": []}
 VALID_MODES = ("off", "kubernetes", "local", "remote")
@@ -24,20 +23,17 @@ _LEGACY_ALIASES = {}  # "local" now treated as "remote" in effective_urls
 
 
 def load_config() -> dict:
-    if _CONFIG_PATH.exists():
-        try:
-            data = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
-            cfg = {**_DEFAULT, **data}
-            cfg["mode"] = _LEGACY_ALIASES.get(cfg["mode"], cfg["mode"])
-            # Backfill remote_urls from remote_url for backwards compat
-            if not cfg.get("remote_urls") and cfg.get("remote_url"):
-                cfg["remote_urls"] = [cfg["remote_url"]]
-            if "remote_urls" not in cfg:
-                cfg["remote_urls"] = []
-            return cfg
-        except Exception as e:
-            logger.warning("compute_config.json unreadable, using defaults: %s", e)
-    return dict(_DEFAULT)
+    data = load_json(_CONFIG_FILE)
+    if not data:
+        return dict(_DEFAULT)
+    cfg = {**_DEFAULT, **data}
+    cfg["mode"] = _LEGACY_ALIASES.get(cfg["mode"], cfg["mode"])
+    # Backfill remote_urls from remote_url for backwards compat
+    if not cfg.get("remote_urls") and cfg.get("remote_url"):
+        cfg["remote_urls"] = [cfg["remote_url"]]
+    if "remote_urls" not in cfg:
+        cfg["remote_urls"] = []
+    return cfg
 
 
 def save_config(mode: str, remote_urls: list | None = None, remote_url: str = "") -> dict:
@@ -49,7 +45,7 @@ def save_config(mode: str, remote_urls: list | None = None, remote_url: str = ""
     remote_urls = [u.rstrip("/") for u in remote_urls if u.strip()]
     first_url = remote_urls[0] if remote_urls else remote_url or ""
     cfg = {"mode": mode, "remote_url": first_url, "remote_urls": remote_urls}
-    _CONFIG_PATH.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+    save_json(_CONFIG_FILE, cfg)
     logger.info("⚙️  compute config saved: mode=%s urls=%s", mode, remote_urls or "—")
     return cfg
 

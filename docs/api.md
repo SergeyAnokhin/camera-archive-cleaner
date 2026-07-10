@@ -45,7 +45,6 @@ All thumbnail endpoints generate and cache on first request.
 |---|---|---|
 | `GET` | `/thumbnail/{file_id}` | Basic 256×256 JPEG thumbnail |
 | `GET` | `/diff_thumbnail/{file_id}` | Motion Diff: delta from page mean. Params: `page_ids` (comma-separated), `threshold` (0–255, default 20) |
-| `GET` | `/erosion_thumbnail/{file_id}` | Erosion/MOG2: morphological erosion. Same params |
 | `GET` | `/video_thumbnail/{file_id}` | Video preview image. `mode`: `first_frame` / `last_frame` / `four_frames` (2×2 JPEG grid) / `max_change_gif` (2-frame GIF: first→most-changed) / `four_frames_gif` (4-frame GIF: evenly spaced) / `max_change_4_gif` (4-frame GIF: first→max-diff-from-first→max-diff-from-last→last). Computed by the [compute-service](compute-service.md); cache in `video_thumbnails_cache/`. Returns `503` when compute is off/unreachable |
 
 ---
@@ -67,7 +66,6 @@ All thumbnail endpoints generate and cache on first request.
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/gemini_analyze` | Analyse images with Gemini — free-text response. Body: `file_ids`, `prompt`, `model`, `api_key` |
 | `POST` | `/gemini_analyze_batch` | Gemini analysis with structured JSON response; results saved to `ai_analysis` table |
 | `POST` | `/claude_analyze_batch` | Claude analysis with structured JSON response; results saved to `ai_analysis` table |
 
@@ -199,6 +197,5 @@ Standalone; depends on the compute-service for detection.
 | `DELETE` | `/database` | Delete all file records from DB (does not touch files on disk) |
 | `DELETE` | `/thumbnails` | Delete basic thumbnails (disk + DB) |
 | `DELETE` | `/diff_thumbnails` | Delete diff thumbnails |
-| `DELETE` | `/erosion_thumbnails` | Delete erosion thumbnails |
 | `DELETE` | `/all_thumbnails` | Delete all thumbnails of all types |
 | `GET` | `/storage_info` | DB size and all active thumbnail cache sizes in bytes |

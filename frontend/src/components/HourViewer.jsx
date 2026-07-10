@@ -42,7 +42,6 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [internalRefreshKey, setInternalRefreshKey] = useState(0)
 
   const [geminiOpen, setGeminiOpen]         = useState(false)
-  const [geminiStructured, setGeminiStructured] = useState(false)
   const [claudeOpen, setClaudeOpen]         = useState(false)
   const [openVinoOpen, setOpenVinoOpen]     = useState(false)
   const [aiAnalysisMap, setAiAnalysisMap]   = useState(new Map())
@@ -305,7 +304,6 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
             } else if (activeMode.aiProvider === 'openvino') {
               setOpenVinoOpen(true)
             } else {
-              setGeminiStructured(true)
               setGeminiOpen(true)
             }
           }}
@@ -443,9 +441,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
         return (
           <GeminiAnalysisModal
             fileIds={ids}
-            structured={geminiStructured}
             taskContext={{ cameraId, dateFrom, dateTo }}
-            onClose={() => { setGeminiOpen(false); setGeminiStructured(false) }}
+            onClose={() => setGeminiOpen(false)}
             onComplete={() => { recordAiRequest('gemini'); setAiStatsKey(k => k + 1); reloadAiAnalysis() }}
           />
         )

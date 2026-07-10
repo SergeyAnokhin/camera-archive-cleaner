@@ -4,7 +4,7 @@ Wires together the routers; the actual endpoints live in the `routers/` package.
 HTTP endpoints are split by responsibility:
   catalog        — /cameras, /scan
   stats          — /stats, /files, /distribution, /previews
-  thumbnails_api — /thumbnail, /diff_*, /erosion_*, /motion_*, /openvino_thumbnail, /video_thumbnail
+  thumbnails_api — /thumbnail, /diff_*, /openvino_thumbnail, /video_thumbnail
   media          — /media
   delete         — /delete/*
   maintenance    — /database, /*_thumbnails, /storage_info

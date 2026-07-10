@@ -8,7 +8,6 @@ from fastapi import APIRouter, Query
 from database import DB_PATH, delete_all_thumbnails, get_connection
 from thumbnails import THUMB_DIR
 from diff_thumbnails import DIFF_THUMB_DIR
-from erosion_thumbnails import EROSION_THUMB_DIR
 from compute_cache import OV_THUMB_DIR, VID_THUMB_DIR
 
 router = APIRouter()
@@ -142,20 +141,6 @@ def clear_diff_thumbnails(camera_id: Optional[str] = Query(default=None),
     return {"deleted_files": deleted_files}
 
 
-@router.delete("/erosion_thumbnails", summary="Delete cached erosion thumbnail files")
-def clear_erosion_thumbnails(camera_id: Optional[str] = Query(default=None),
-                             date_from: Optional[str] = Query(default=None),
-                             date_to: Optional[str] = Query(default=None)):
-    logger.info("🧹 Очистка кэша erosion-миниатюр%s", f" (камера: {camera_id})" if camera_id else "")
-    if camera_id or date_from or date_to:
-        file_ids = _filter_file_ids(camera_id, date_from, date_to)
-        deleted_files = _clear_dir_by_ids_suffix(EROSION_THUMB_DIR, file_ids)
-    else:
-        deleted_files, _ = _clear_dir_all(EROSION_THUMB_DIR)
-    logger.info("   └─ erosion-миниатюры очищены → %d файлов", deleted_files)
-    return {"deleted_files": deleted_files}
-
-
 @router.delete("/video_thumbnails", summary="Delete cached video thumbnail files")
 def clear_video_thumbnails(camera_id: Optional[str] = Query(default=None),
                            date_from: Optional[str] = Query(default=None),
@@ -226,13 +211,11 @@ def clear_all_thumbnails(camera_id: Optional[str] = Query(default=None),
                 conn.execute(f"DELETE FROM video_previews WHERE file_id IN ({ph})", file_ids)
 
         diff_files    = _clear_dir_by_ids_suffix(DIFF_THUMB_DIR,      file_ids)
-        erosion_files = _clear_dir_by_ids_suffix(EROSION_THUMB_DIR,    file_ids)
         vid_files     = _clear_dir_by_ids_prefix(VID_THUMB_DIR,        file_ids)
         ov_files      = 0
     else:
         basic_files, _    = _clear_dir_all(THUMB_DIR)
         diff_files, _     = _clear_dir_all(DIFF_THUMB_DIR)
-        erosion_files, _  = _clear_dir_all(EROSION_THUMB_DIR)
         ov_files, _       = _clear_dir_all(OV_THUMB_DIR)
         vid_files, _      = _clear_dir_all(VID_THUMB_DIR)
 
@@ -241,13 +224,12 @@ def clear_all_thumbnails(camera_id: Optional[str] = Query(default=None),
             conn.execute("DELETE FROM object_detection")
             conn.execute("DELETE FROM video_previews")
 
-    total_files = basic_files + diff_files + erosion_files + ov_files + vid_files
+    total_files = basic_files + diff_files + ov_files + vid_files
     logger.info("   └─ все миниатюры очищены → %d файлов", total_files)
     return {
         "types": {
             "basic":    {"deleted_files": basic_files},
             "diff":     {"deleted_files": diff_files},
-            "erosion":  {"deleted_files": erosion_files},
             "openvino": {"deleted_files": ov_files},
             "video":    {"deleted_files": vid_files},
         },
@@ -260,7 +242,7 @@ def clear_all_thumbnails(camera_id: Optional[str] = Query(default=None),
 def get_storage_info():
     db_size = DB_PATH.stat().st_size if DB_PATH.exists() else 0
 
-    thumb_dirs = [THUMB_DIR, DIFF_THUMB_DIR, EROSION_THUMB_DIR, OV_THUMB_DIR, VID_THUMB_DIR]
+    thumb_dirs = [THUMB_DIR, DIFF_THUMB_DIR, OV_THUMB_DIR, VID_THUMB_DIR]
     thumb_size = 0
     for d in thumb_dirs:
         if d.exists():

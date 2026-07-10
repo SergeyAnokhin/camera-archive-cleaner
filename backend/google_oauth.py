@@ -10,17 +10,17 @@ intentionally persisted on the server.
 import base64
 import json
 import logging
-import os
 import secrets
 import time
-from pathlib import Path
 from urllib.parse import urlencode
 
 import httpx
 
+from server_store import load_json, save_json
+
 logger = logging.getLogger("api")
 
-_STORE_PATH = Path(os.getenv("DATA_DIR", str(Path(__file__).parent))) / "google_oauth.json"
+_STORE_FILE = "google_oauth.json"
 
 AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
@@ -43,16 +43,11 @@ class NotConnected(Exception):
 
 
 def _load() -> dict:
-    if _STORE_PATH.exists():
-        try:
-            return json.loads(_STORE_PATH.read_text(encoding="utf-8"))
-        except Exception as e:
-            logger.warning("google_oauth.json unreadable: %s", e)
-    return {}
+    return load_json(_STORE_FILE)
 
 
 def _save(store: dict) -> None:
-    _STORE_PATH.write_text(json.dumps(store, indent=2), encoding="utf-8")
+    save_json(_STORE_FILE, store)
 
 
 def get_status() -> dict:

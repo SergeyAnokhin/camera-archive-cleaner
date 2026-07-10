@@ -19,9 +19,6 @@ scene: 1 предложение — что в целом происходит н
 Ответь СТРОГО JSON (без markdown, без пояснений):
 {"scene": "...", "images": [{"description": "...", "objects": [...]}, ...]}`
 
-// Free-form (non-structured) Gemini prompt — plain-text description, no JSON.
-export const GEMINI_FREEFORM_PROMPT = 'Детально опиши, что происходит на этих снимках с камеры видеонаблюдения. Перечисли все заметные объекты, людей, транспортные средства и события.'
-
 // Heatmap CellSelBar batch analysis — compact English prompt for one preview
 // photo per selected cell.
 export const CELL_ANALYSIS_PROMPT = (n) =>

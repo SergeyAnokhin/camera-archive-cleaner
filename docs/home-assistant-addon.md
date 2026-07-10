@@ -22,11 +22,10 @@ nginx :8099 ── /        → SPA static files (/usr/share/camera-cleaner/)
 [`run.sh`](../camera-cleaner-addon/run.sh) is the container ENTRYPOINT — it
 **bypasses the s6-overlay** of the HA base image (s6 caused startup failures;
 see commit 535fc96). It exports `DATA_DIR=/data`, starts nginx in the
-background, and `exec`s uvicorn as PID 1.
-
-> The s6 scripts under `rootfs/etc/services.d/` and `rootfs/etc/cont-init.d/`
-> are **not executed** — legacy from the s6 attempt. Only
-> `rootfs/etc/nginx/nginx.conf` is used (COPY'd in the Dockerfile).
+background, and `exec`s uvicorn as PID 1. Only `rootfs/etc/nginx/nginx.conf`
+is used (COPY'd in the Dockerfile); the legacy s6 scripts under
+`rootfs/etc/services.d/` and `rootfs/etc/cont-init.d/` from before the
+ENTRYPOINT override were removed since they were never executed.
 
 All state (SQLite DB, thumbnail caches, OAuth tokens, compute config,
 `server_config.json`) lives in `/data` — HA's persistent add-on volume.

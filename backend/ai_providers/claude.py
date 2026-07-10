@@ -9,19 +9,16 @@ from fastapi import HTTPException
 from ai_pricing import CLAUDE_PRICING
 
 from .common import (
+    SINGLE_IMAGE_PROMPT,
     compute_cost,
     fetch_file_rows,
     open_thumbnails,
     parse_json_response,
+    save_single_result,
     save_structured,
 )
 
-_SINGLE_PROMPT = (
-    "Analyze this surveillance camera photo. Return JSON only (no markdown fences):\n"
-    '{"description": "1-2 sentences about visible dynamic objects and activity", '
-    '"objects": ["object1", "object2"]}\n'
-    "Use Russian names: человек, мужчина, женщина, ребёнок, кошка, собака, машина, велосипед, etc."
-)
+logger = logging.getLogger("api")
 
 
 def _encode_jpeg(images):
@@ -40,7 +37,6 @@ def analyze_single(file_id, model, api_key):
         from anthropic import Anthropic
     except ImportError:
         raise RuntimeError("anthropic not installed. Run: pip install anthropic")
-    from database import get_connection, save_ai_analysis
     rows = fetch_file_rows([file_id])
     images, rows_used = open_thumbnails(rows)
     if not images:
@@ -50,7 +46,7 @@ def analyze_single(file_id, model, api_key):
         {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}}
         for b64 in images_b64
     ]
-    content.append({"type": "text", "text": _SINGLE_PROMPT})
+    content.append({"type": "text", "text": SINGLE_IMAGE_PROMPT})
     client = Anthropic(api_key=api_key)
     t0 = time.time()
     response = client.messages.create(
@@ -60,17 +56,11 @@ def analyze_single(file_id, model, api_key):
     )
     elapsed_ms = int((time.time() - t0) * 1000)
     raw = response.content[0].text if response.content else ""
-    parsed = parse_json_response(raw)
-    description = parsed.get("description", "") if parsed else ""
-    objects_str = " ".join(str(o) for o in parsed.get("objects", [])) if parsed else ""
     in_tok = response.usage.input_tokens if response.usage else 0
     out_tok = response.usage.output_tokens if response.usage else 0
     cost = compute_cost(model, in_tok, out_tok, CLAUDE_PRICING)
-    with get_connection() as conn:
-        save_ai_analysis(conn, rows_used[0]["id"], "claude", model, "", description, objects_str,
-                         input_tokens=in_tok, output_tokens=out_tok,
-                         cost_usd=cost, elapsed_ms=elapsed_ms)
-    return True
+    return save_single_result(rows_used[0]["id"], "claude", model, raw,
+                              in_tok, out_tok, cost, elapsed_ms)
 
 
 def analyze_batch(file_ids, prompt, model, api_key):

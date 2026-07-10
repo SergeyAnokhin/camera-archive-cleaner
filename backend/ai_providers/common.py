@@ -6,6 +6,14 @@ from database import get_connection, get_file_by_id, save_ai_analysis
 
 logger = logging.getLogger("api")
 
+# Prompt for per-photo analysis (task executors) — shared by Gemini and Claude.
+SINGLE_IMAGE_PROMPT = (
+    "Analyze this surveillance camera photo. Return JSON only (no markdown fences):\n"
+    '{"description": "1-2 sentences about visible dynamic objects and activity", '
+    '"objects": ["object1", "object2"]}\n'
+    "Use Russian names: человек, мужчина, женщина, ребёнок, кошка, собака, машина, велосипед, etc."
+)
+
 
 def fetch_file_rows(file_ids):
     """Load DB rows for the given file IDs (order preserved, missing IDs become None)."""
@@ -54,6 +62,18 @@ def compute_cost(model, in_tokens, out_tokens, pricing):
         return 0.0
     p = pricing[model]
     return (in_tokens / 1_000_000) * p["input"] + (out_tokens / 1_000_000) * p["output"]
+
+
+def save_single_result(file_id, provider, model, raw_text, in_tokens, out_tokens, cost, elapsed_ms):
+    """Parse a single-photo ``{"description", "objects"}`` response and persist it."""
+    parsed = parse_json_response(raw_text)
+    description = parsed.get("description", "") if parsed else ""
+    objects_str = " ".join(str(o) for o in parsed.get("objects", [])) if parsed else ""
+    with get_connection() as conn:
+        save_ai_analysis(conn, file_id, provider, model, "", description, objects_str,
+                         input_tokens=in_tokens, output_tokens=out_tokens,
+                         cost_usd=cost, elapsed_ms=elapsed_ms)
+    return True
 
 
 def save_structured(parsed, rows_used, provider, model):

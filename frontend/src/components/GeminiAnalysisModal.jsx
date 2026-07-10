@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { geminiAnalyze, geminiAnalyzeBatch } from '../api.js'
-import { STRUCTURED_ANALYSIS_TEMPLATE, GEMINI_FREEFORM_PROMPT } from '../prompts.js'
+import { geminiAnalyzeBatch } from '../api.js'
+import { STRUCTURED_ANALYSIS_TEMPLATE } from '../prompts.js'
 import BaseAiModal from './aiModal/BaseAiModal.jsx'
 import { AiStatsRow, StructuredResponse } from './aiModal/StructuredAiResult.jsx'
 
@@ -14,26 +14,15 @@ function buildStructuredPrompt(n) {
   return template.replace(/\{n\}/g, n)
 }
 
-// structured=true → structured prompt + JSON response + onComplete callback
-// structured=false → free prompt, raw text (original behavior)
 // taskContext: { cameraId, dateFrom, dateTo } — if provided, shows "Send to Task" button
-export default function GeminiAnalysisModal({ fileIds, onClose, structured = false, onComplete, taskContext, onTaskCreated }) {
+export default function GeminiAnalysisModal({ fileIds, onClose, onComplete, taskContext, onTaskCreated }) {
   const apiKey = localStorage.getItem(GEMINI_API_KEY_KEY) || ''
   const model  = localStorage.getItem(GEMINI_MODEL_KEY)  || GEMINI_DEFAULT_MODEL
 
-  const [prompt, setPrompt] = useState(() =>
-    structured
-      ? buildStructuredPrompt(fileIds.length)
-      : (localStorage.getItem('gemini_prompt') || GEMINI_FREEFORM_PROMPT)
-  )
+  const [prompt, setPrompt] = useState(() => buildStructuredPrompt(fileIds.length))
   const [running, setRunning] = useState(false)
   const [result, setResult]   = useState(null)
   const [error, setError]     = useState(null)
-
-  function handlePromptChange(e) {
-    setPrompt(e.target.value)
-    if (!structured) localStorage.setItem(GEMINI_PROMPT_KEY, e.target.value)
-  }
 
   async function handleRun() {
     if (!apiKey) {
@@ -44,14 +33,9 @@ export default function GeminiAnalysisModal({ fileIds, onClose, structured = fal
     setResult(null)
     setError(null)
     try {
-      if (structured) {
-        const data = await geminiAnalyzeBatch({ fileIds, prompt, model, apiKey })
-        setResult(data)
-        if (data.saved_count > 0) onComplete?.()
-      } else {
-        const data = await geminiAnalyze({ fileIds, prompt, model, apiKey })
-        setResult(data)
-      }
+      const data = await geminiAnalyzeBatch({ fileIds, prompt, model, apiKey })
+      setResult(data)
+      if (data.saved_count > 0) onComplete?.()
     } catch (e) {
       setError(e.message)
     } finally {
@@ -62,7 +46,7 @@ export default function GeminiAnalysisModal({ fileIds, onClose, structured = fal
   return (
     <BaseAiModal
       icon="mdi-google"
-      title={structured ? 'Structured analysis (Gemini)' : 'Google AI Analysis'}
+      title="Structured analysis (Gemini)"
       onClose={onClose}
       fileCount={fileIds.length} model={model} showNoKey={!apiKey}
       beforeRunRow={
@@ -71,14 +55,14 @@ export default function GeminiAnalysisModal({ fileIds, onClose, structured = fal
           <textarea
             className="gai-prompt-area"
             value={prompt}
-            onChange={handlePromptChange}
-            rows={structured ? 12 : 4}
+            onChange={e => setPrompt(e.target.value)}
+            rows={12}
             disabled={running}
           />
         </div>
       }
       running={running} onRun={handleRun} runDisabled={running || !apiKey}
-      task={taskContext && structured ? {
+      task={taskContext ? {
         type: 'gemini',
         params: {
           camera_id: taskContext.cameraId,
@@ -101,15 +85,7 @@ export default function GeminiAnalysisModal({ fileIds, onClose, structured = fal
         </div>
       )}
 
-      {structured && <StructuredResponse result={result} />}
-
-      {/* Free-text response */}
-      {!structured && result && (
-        <div className="gai-response">
-          <div className="gai-response-label">Response</div>
-          <div className="gai-response-text">{result.text}</div>
-        </div>
-      )}
+      <StructuredResponse result={result} />
     </BaseAiModal>
   )
 }

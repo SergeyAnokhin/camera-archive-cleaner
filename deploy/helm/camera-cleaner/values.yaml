@@ -37,7 +37,6 @@ backend:
     - openvino_thumbnails_cache
     - video_thumbnails_cache
     - diff_thumbnails_cache
-    - erosion_thumbnails_cache
 compute:
   replicas: 1
   service:
@@ -66,7 +65,7 @@ camera:
   smb:
     # SMB source in //server/share form.
     source: "//192.168.1.91/Camera"
-    # Mount point inside both pods — MUST match the prefix used in camerasConfig.
+    # Mount point inside both pods — injected as CAMERA_ROOT into both containers.
     mountPath: /camera
     size: 100Gi
     # Secret holding the SMB credentials (keys: username, password).
