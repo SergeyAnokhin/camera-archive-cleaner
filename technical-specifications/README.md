@@ -1,5 +1,21 @@
 # Technical Specification — Camera Snapshots Archive Manager
 
+> ## ⚠️ Frozen snapshot — not a source of truth
+>
+> **This spec is not kept in sync with the code and is known to be stale.** It
+> still describes an Erosion view mode and `/erosion_thumbnail/`,
+> `/motion_thumbnail/` (4 modes), and the old flat `*_thumbnails_cache/`
+> directory layout — none of which exist any more.
+>
+> **For any code work, use [`docs/`](../docs/) instead** (index: the
+> Documentation table in [`README.md`](../README.md)). Per
+> [`CLAUDE.md`](../CLAUDE.md) §7, do not read this directory during normal
+> development — it is not code-level and costs tokens without adding anything
+> `docs/` does not already have.
+>
+> Open it only when the spec **itself** is the task ("update the spec"). If you
+> do, re-verify every factual claim against the code before acting on it.
+
 This directory contains the functional specification of the system, written so
 that the product could be **rebuilt from scratch on any technology stack** by a
 team (or an AI) that has never seen the existing code.

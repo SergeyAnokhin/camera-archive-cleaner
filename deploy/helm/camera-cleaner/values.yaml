@@ -30,13 +30,13 @@ backend:
   state:
     size: 5Gi
     storageClass: "" # "" = cluster default StorageClass
-  # Cache directories created under /app/backend by the app — mounted via subPath
-  # so they persist without shadowing the code copied into the image.
-  cacheDirs:
-    - thumbnails_cache
-    - openvino_thumbnails_cache
-    - video_thumbnails_cache
-    - diff_thumbnails_cache
+  # All regeneratable thumbnail caches live under one root; the backend reads it
+  # from the CACHE_DIR env var (compute_cache.py → CACHE_BASE_DIR) and creates the
+  # per-type subdirs itself (basic/, diff/, openvino/, video/). Mounted via a
+  # single subPath so it persists without shadowing the code copied into the image.
+  # Must match cacheDir below — one mount, not one per type.
+  cacheDir: /app/backend/cache
+  cacheSubPath: cache
 compute:
   replicas: 1
   service:

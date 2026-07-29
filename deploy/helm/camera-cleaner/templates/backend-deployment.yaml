@@ -54,6 +54,9 @@ spec:
           env:
             - name: CAMERA_ROOT
               value: {{ .Values.camera.smb.mountPath | quote }}
+            # Cache root — the app creates basic/, diff/, openvino/, video/ under it.
+            - name: CACHE_DIR
+              value: {{ .Values.backend.cacheDir | quote }}
           readinessProbe:
             httpGet:
               path: /cameras
@@ -67,11 +70,9 @@ spec:
             - name: state
               mountPath: /app/backend/compute_config.json
               subPath: compute_config.json
-            {{- range $dir := .Values.backend.cacheDirs }}
             - name: state
-              mountPath: /app/backend/{{ $dir }}
-              subPath: {{ $dir }}
-            {{- end }}
+              mountPath: {{ .Values.backend.cacheDir }}
+              subPath: {{ .Values.backend.cacheSubPath }}
             - name: camera-share
               mountPath: {{ .Values.camera.smb.mountPath }}
       volumes:

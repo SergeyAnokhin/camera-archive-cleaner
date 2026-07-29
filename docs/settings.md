@@ -50,7 +50,7 @@ Key pattern: `mode_params_<mode_key>` (JSON object).
 | localStorage key | Example value | Description |
 |---|---|---|
 | `mode_params_motion_diff` | `{"threshold":20}` | Motion highlight threshold |
-| `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Written by Tools → Detection tab and OpenVinoAnalysisModal. Read-only in AiModePanel and CellSelBar |
+| `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Written by Tools → AI tab (Detection section) and OpenVinoAnalysisModal. Read-only in AiModePanel and CellSelBar |
 
 Initial value for motion modes is taken from `diff_threshold` (the global default). OpenVINO defaults to 25.
 
@@ -64,7 +64,12 @@ Initial value for motion modes is taken from `diff_threshold` (the global defaul
 
 ---
 
-## AI settings (Tools modal → AI tab)
+## AI settings (Tools modal → AI tab → Google Gemini / Claude Anthropic sections)
+
+The AI tab is a single component, [`tools/AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx),
+with three sections: **Detection**, **Google Gemini**, **Claude Anthropic**.
+(There is no separate Detection tab — it was merged in; `TAB_ALIASES` in
+`ToolsModal.jsx` still maps the old `detection` deep-link id to `ai`.)
 
 | localStorage key | Default | Description |
 |---|---|---|
@@ -76,13 +81,13 @@ Initial value for motion modes is taken from `diff_threshold` (the global defaul
 
 ---
 
-## Detection settings (Tools modal → Detection tab)
+## Detection settings (Tools modal → AI tab → Detection section)
 
 | localStorage key | Default | Description |
 |---|---|---|
-| `openvino_model` | `yolov8n` | Selected YOLO model. Options: `yolov8n`, `yolov8s`, `yolov8m`. Written **only** by the Detection tab. `AiModePanel` and `CellSelBar` display this value read-only |
-| `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Written by the Detection tab and `OpenVinoAnalysisModal`. Read-only in `AiModePanel` and `CellSelBar` |
-| `detection_classes` | `[0,14,15,16,24,26]` (JSON array of COCO class IDs) | Which YOLO classes the model is allowed to detect — passed as the `classes=` inference param so other classes are skipped entirely. UI: 80-class emoji checklist in the Detection tab (All / None / Defaults). Class list lives in [`frontend/src/cocoClasses.js`](../frontend/src/cocoClasses.js). Empty/unset → detect all 80 |
+| `openvino_model` | `yolov8n` | Selected YOLO model. Options: `yolov8n`, `yolov8s`, `yolov8m`. Written **only** by the AI tab's Detection section. `AiModePanel` and `CellSelBar` display this value read-only |
+| `mode_params_openvino_detection` | `{"confidence":25}` | OpenVINO confidence % (10–80). Written by the AI tab's Detection section and `OpenVinoAnalysisModal`. Read-only in `AiModePanel` and `CellSelBar` |
+| `detection_classes` | `[0,14,15,16,24,26]` (JSON array of COCO class IDs) | Which YOLO classes the model is allowed to detect — passed as the `classes=` inference param so other classes are skipped entirely. UI: 80-class emoji checklist in the Detection section (All / None / Defaults). Class list lives in [`frontend/src/cocoClasses.js`](../frontend/src/cocoClasses.js). Empty/unset → detect all 80 |
 
 ---
 
@@ -95,8 +100,9 @@ whenever the Compute tab saves. See [`compute-service.md`](compute-service.md).
 
 | localStorage key | Default | Description |
 |---|---|---|
-| `compute_mode` | `local` | `off` / `local` / `remote`. When `off`, OpenVINO view modes are hidden in the HourViewer |
-| `compute_remote_url` | `''` | Base URL of the remote compute-service (used when mode is `remote`) |
+| `compute_mode` | (mirrored, `kubernetes` for a fresh config) | `off` / `kubernetes` / `local` / `remote` — mirrors `VALID_MODES` in [`compute_config.py`](../backend/compute_config.py). Not defaulted in the frontend: written verbatim from the backend's `cfg.mode` by [`main.jsx`](../frontend/src/main.jsx) on page load and by `ComputeTab` on save. When `off`, view modes flagged `needsCompute` are hidden in the HourViewer |
+| `compute_mode_ui` | `''` | **UI-level label only, distinct from `compute_mode`.** Holds `browser` for an auto-detected browser-local service — the backend mode in that case is `remote`. Written only by `ComputeTab`; never sent to the backend |
+| `compute_remote_url` | `''` | Base URL of the remote compute-service (used when mode is `local` or `remote`; `kubernetes` uses a fixed in-cluster DNS name) |
 
 ---
 
@@ -158,32 +164,12 @@ All settings can be saved to and loaded from a YAML file via the **Export YAML**
 
 Downloads `snapshots-settings.yaml` to the browser's downloads folder. Contains all settings listed above except `nav_state` and `ai_requests_*` (those are session/stats state, not configuration).
 
-Example output:
-```yaml
-# Camera Archive Cleaner — settings export
-# Generated: 2026-05-19T10:30:00.000Z
-
-ui:
-  font_size: 15
-  previews_per_cell: 3
-hour_view:
-  page_size: 50
-  thumb_width: 140
-  hover_zoom: 1.5
-  diff_threshold: 20
-  view_mode: normal
-motion_modes:
-  motion_diff:
-    threshold: 20
-google_ai:
-  model: gemini-2.5-flash
-  api_key: '# Get your key at aistudio.google.com'
-  prompt: |
-    Ты анализируешь {n} снимков...
-claude_ai:
-  model: claude-haiku-4-5-20251001
-  api_key: '# Get your key at console.anthropic.com'
-```
+Top-level groups: `ui`, `hour_view`, `motion_modes`, `google_ai`, `claude_ai`.
+`api_key` fields are emitted as a placeholder comment, never the real key.
+The writer is `exportSettingsYaml()` in
+[`settingsIO.js`](../frontend/src/components/tools/settingsIO.js) — read it for
+the exact shape, and see [`snapshots-settings.example.yaml`](../snapshots-settings.example.yaml)
+for a full sample file.
 
 ### Import
 

@@ -28,7 +28,7 @@ Shows the original JPEG thumbnail, resized to 256 × 256. No processing.
 
 ## 2. Motion highlight
 
-**Key:** `motion_diff` | **Cache:** `backend/diff_thumbnails_cache/`
+**Key:** `motion_diff` | **Cache:** `CACHE_BASE_DIR/diff/`
 
 **Algorithm:**
 1. Load all photo thumbnails on the current page as float32 numpy arrays.
@@ -72,7 +72,7 @@ Same flow as Gemini but uses the Anthropic Claude API. Sends photos as base64 JP
 
 ## 5. Object detection (local)
 
-**Key:** `openvino_detection` | **Cache:** `backend/openvino_thumbnails_cache/` (bbox JPEG per file+model+confidence) | **`isAiMode: true`**
+**Key:** `openvino_detection` | **Cache:** `CACHE_BASE_DIR/openvino/` (bbox JPEG per file+model+confidence+classes) | **`isAiMode: true`**
 
 Runs local YOLOv8 object detection using the Intel OpenVINO runtime (falls back to PyTorch if no exported model is found). No API key or internet connection required.
 
@@ -93,15 +93,31 @@ Runs local YOLOv8 object detection using the Intel OpenVINO runtime (falls back 
 
 ## Cache management
 
-All computed thumbnails are cached on disk to avoid re-processing.
+All computed thumbnails are cached on disk to avoid re-processing. Every cache
+lives under a single root, `CACHE_BASE_DIR` — defined in
+[`compute_cache.py`](../backend/compute_cache.py) as `CACHE_DIR` env var →
+falling back to `DATA_DIR/cache/` (i.e. `backend/cache/` in local dev). One
+subdirectory per type:
 
-| Cache directory | Modes | Clear via |
-|----------------|-------|-----------|
-| `backend/thumbnails_cache/` | Normal | Tools → Maintenance → Clear thumbnails |
-| `backend/diff_thumbnails_cache/` | Motion diff | Tools → Maintenance → Clear motion thumbnails |
-| `backend/openvino_thumbnails_cache/` | OpenVINO Detection | Tools → Maintenance → Clear all thumbnails |
+Clear actions live in **Tools → Service → Maintenance → Thumbnail cache**
+([`MaintenanceSection.jsx`](../frontend/src/components/tools/service/MaintenanceSection.jsx)),
+each row scoped by the date range set at the top of that section:
+
+| Subdirectory | Constant | Modes | Maintenance row |
+|----------------|---|-------|-----------|
+| `cache/basic/` | `THUMB_DIR` ([`thumbnails.py`](../backend/thumbnails.py)) | Normal | "Basic thumbnails" |
+| `cache/diff/` | `DIFF_THUMB_DIR` ([`diff_thumbnails.py`](../backend/diff_thumbnails.py)) | Motion highlight | "Motion thumbnails" |
+| `cache/openvino/` | `OV_THUMB_DIR` ([`compute_cache.py`](../backend/compute_cache.py)) | Object detection (local) | "Object detection (local)" — clears `object_detection` rows for the range; the bbox JPEGs only on a full (unscoped) clear |
+| `cache/video/` | `VID_THUMB_DIR` ([`compute_cache.py`](../backend/compute_cache.py)) | Video previews (not a view mode) | "Video thumbnails" — also clears `video_previews` rows |
+
+"All thumbnails" clears all four at once.
 
 Cache keys include the sorted list of page photo IDs and the current threshold value, so changing either will generate new cached images.
+
+> Keeping every cache under one root is what makes it safe to point `CACHE_DIR`
+> at ephemeral storage (the HA add-on sets `CACHE_DIR=/tmp/camera-cleaner-cache`
+> so caches stay out of HA backups). A new cache **must** hang off
+> `CACHE_BASE_DIR` — a hard-coded path silently escapes that.
 
 ---
 

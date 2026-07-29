@@ -23,7 +23,7 @@ Results are stored in two separate tables: cloud AI (Gemini/Claude) in `ai_analy
 | Anthropic Claude | `claude` | `claude_api_key` | `claude_model` |
 | OpenVINO (local) | `openvino` | — | `openvino_model` |
 
-OpenVINO uses a single confidence value: `mode_params_openvino_detection.confidence` (integer %, default `25`). Written by the Detection tab and `OpenVinoAnalysisModal`; read-only in `AiModePanel` and `CellSelBar`.
+OpenVINO uses a single confidence value: `mode_params_openvino_detection.confidence` (integer %, default `25`). Written by the AI tab's Detection section and `OpenVinoAnalysisModal`; read-only in `AiModePanel` and `CellSelBar`.
 
 ---
 
@@ -79,7 +79,7 @@ GET /openvino_thumbnail/{file_id}?model=…&confidence=…
     │
     └─ cache miss → run YOLO
                     draw bounding boxes  (results[0].plot())
-                    save JPEG to openvino_thumbnails_cache/
+                    save JPEG to CACHE_BASE_DIR/openvino/
                     save_object_detection() → object_detection table
                     return JPEG
     │
@@ -100,7 +100,7 @@ Opens `OpenVinoAnalysisModal` → `POST /openvino_analyze_batch` → saves to DB
 **Modal files:**
 - [`frontend/src/components/GeminiAnalysisModal.jsx`](../frontend/src/components/GeminiAnalysisModal.jsx) — editable prompt, token stats, cost estimate
 - [`frontend/src/components/ClaudeAnalysisModal.jsx`](../frontend/src/components/ClaudeAnalysisModal.jsx) — same format
-- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider (reads/writes `mode_params_openvino_detection` shared with the Detection tab), per-photo object list, ms/photo timing
+- [`frontend/src/components/OpenVinoAnalysisModal.jsx`](../frontend/src/components/OpenVinoAnalysisModal.jsx) — confidence slider (reads/writes `mode_params_openvino_detection` shared with the AI tab's Detection section), per-photo object list, ms/photo timing
 - All three are built on [`aiModal/BaseAiModal.jsx`](../frontend/src/components/aiModal/BaseAiModal.jsx) (shell: Escape, header, run row, task submission); Gemini/Claude also share [`aiModal/StructuredAiResult.jsx`](../frontend/src/components/aiModal/StructuredAiResult.jsx) (stats row + scene/images rendering)
 - Shared CSS: [`frontend/src/components/GeminiAnalysisModal.css`](../frontend/src/components/GeminiAnalysisModal.css)
 
@@ -134,11 +134,11 @@ Same flow, but converts images to base64 JPEG and sends via `anthropic` SDK (`cl
 Request: `{ file_ids, model_name, confidence }`
 
 1. For each photo, calls the compute-service `POST /detect` (`draw=false`) — see [`compute-service.md`](compute-service.md)
-2. The compute-service runs YOLOv8 detection and maps COCO English → Russian via `COCO_TO_RUSSIAN`
+2. The compute-service runs YOLOv8 detection and returns **canonical English COCO class names** (straight from `yolo.names`) — no translation happens on the backend
 3. Saves each result via `save_object_detection()` to the `object_detection` table
-4. Returns: `{ elapsed_ms, images_used, saved_count, results: { file_id: [ru_word, ...] } }`
+4. Returns: `{ elapsed_ms, images_used, saved_count, results: { file_id: [class_name, ...] } }`
 
-Returns `503` if the compute-service is off or unreachable. Objects are stored as Russian words so they match the existing `AI_ICON_MAP` in `aiHelpers.js`.
+Returns `503` if the compute-service is off or unreachable. Objects are stored as English class names; translation to Russian display labels happens in the frontend via `cocoClasses.js` (see [Object vocabulary & emoji](#object-vocabulary--emoji)).
 
 ### `POST /openvino_analyze_range`
 
@@ -166,7 +166,7 @@ Returns a JPEG with bounding boxes drawn by YOLO's built-in `.plot()` renderer:
 **On cache miss:** the main backend calls the compute-service `POST /detect` (`draw=true`), writes the returned JPEG to the cache, and **also calls `save_object_detection()`** to persist detected objects in the `object_detection` table. Returns `503` if the compute-service is off/unreachable.
 
 Cache key: `sha256("v5:{file_id}:{model}:{conf:.2f}:{sorted_classes}")[:16].jpg`  
-Directory: `backend/openvino_thumbnails_cache/` — included in `DELETE /all_thumbnails` cleanup.
+Directory: `CACHE_BASE_DIR/openvino/` (`OV_THUMB_DIR` in [`compute_cache.py`](../backend/compute_cache.py)) — included in `DELETE /all_thumbnails` cleanup. Bump `OV_THUMB_VERSION` to invalidate.
 
 ### `GET /ai_analysis?file_ids=1,2,3`
 
@@ -188,7 +188,7 @@ Returns unique object words across all `ai_analysis` rows for files in the given
 
 ## Database schema
 
-Two tables in [`backend/database.py`](../backend/database.py); see [`docs/database.md`](database.md) for full column details.
+Two tables, created in [`backend/db/schema.py`](../backend/db/schema.py); see [`docs/database.md`](database.md) for full column details.
 
 | Table | Used for | UNIQUE key |
 |---|---|---|
@@ -199,50 +199,21 @@ Both have `FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE`.
 
 Running detection and cloud AI on the same photo no longer conflicts — each has its own row in its own table.
 
-DB helpers: `save_ai_analysis()`, `save_object_detection()`, `get_combined_analysis_by_file_ids()` in [`backend/database.py`](../backend/database.py).
+DB helpers: `save_ai_analysis()`, `save_object_detection()`, `get_combined_analysis_by_file_ids()` live in [`backend/db/ai.py`](../backend/db/ai.py) and are re-exported by the [`database.py`](../backend/database.py) facade — `from database import …` still works.
 
 ---
 
 ## Object vocabulary & emoji
 
-Object words are short Russian (or English) keywords stored space-separated in `ai_analysis.objects`, e.g. `"человек кошка"`.
+Object words are short keywords stored space-separated in the `objects` column. **OpenVINO writes English COCO class names** (`"person cat"`); **cloud AI (Gemini/Claude) writes Russian words**, because the prompt asks for them (`"человек кошка"`). Both forms resolve to the same icon.
+
+**Single source of truth:** [`frontend/src/cocoClasses.js`](../frontend/src/cocoClasses.js) — all 80 COCO classes as `{ id, en, ru, emoji }` in class-ID order. There is **no backend translation table** — the backend stores whatever the provider returned, and mapping to a display label happens only in the frontend.
 
 **[`frontend/src/aiHelpers.js`](../frontend/src/aiHelpers.js)**
-- `resolveAiIcons(objectsStr)` — splits string, deduplicates by label, looks up emoji from `COCO_CLASSES` (both `en` and `ru` keys), returns `[{ emoji, label }]`. Unknown objects → `●`.
+- `resolveAiIcons(objectsStr)` — splits the string, deduplicates, looks up emoji from `COCO_CLASSES` by **both** the `en` and `ru` keys (so it resolves either provider's output), and returns `[{ emoji, label }]` with the Russian display label.
+- **Unmatched words render as `●` with the raw word as the label.** This is the normal case for a good share of cloud-AI output: [`prompts.js`](../frontend/src/prompts.js) deliberately asks for a *finer* vocabulary than COCO (`мужчина`, `женщина`, `ребёнок`, `курица`, `лиса`, `дождь`, `снег`, `пакет` …), and none of those are COCO classes. To give one of them an emoji you must add it to the lookup — `cocoClasses.js` alone cannot cover it, since that file is pinned to the 80 COCO classes.
 
-Emoji come from [`frontend/src/cocoClasses.js`](../frontend/src/cocoClasses.js) — the single authoritative source of all 80 COCO classes with emojis.
-
-### COCO classes detected by OpenVINO — Russian translation
-
-`shared/coco_names.py` → `COCO_TO_RUSSIAN` dict (23 entries mapped; unmapped classes fall back to English):
-
-| COCO English | Russian word stored in DB |
-|---|---|
-| person | человек |
-| bicycle | велосипед |
-| car | машина |
-| motorcycle | мотоцикл |
-| airplane | самолёт |
-| bus | автобус |
-| train | поезд |
-| truck | грузовик |
-| boat | лодка |
-| bird | птица |
-| cat | кошка |
-| dog | собака |
-| horse | лошадь |
-| sheep | овца |
-| cow | корова |
-| elephant | слон |
-| bear | медведь |
-| zebra | зебра |
-| giraffe | жираф |
-| backpack | рюкзак |
-| umbrella | зонт |
-| handbag | сумка |
-| suitcase | чемодан |
-
-All remaining COCO 80 classes (bench, chair, tv, laptop, cell phone, etc.) fall through as English — they have emoji in `cocoClasses.js`.
+**Cross-boundary contract:** [`compute-service/detection.py`](../compute-service/detection.py) returns names from `yolo.names`. If a class-name spelling changes there, the matching `en` key in `cocoClasses.js` must change too — nothing else sits between them.
 
 ---
 
@@ -272,7 +243,7 @@ The structured prompt is a template with `{n}` placeholder (replaced with actual
 **Single source of truth:** all prompt templates live in [`frontend/src/prompts.js`](../frontend/src/prompts.js) — `STRUCTURED_ANALYSIS_TEMPLATE` (Gemini + Claude structured), `CELL_ANALYSIS_PROMPT(n)` (heatmap CellSelBar batch).
 
 **Stored in:** `localStorage` key `gemini_structured_prompt`
-**Editable in:** Tools modal → Google AI tab → "Structured prompt template"
+**Editable in:** Tools modal → AI tab → Google Gemini section → "Structured prompt template"
 **Default if empty:** `STRUCTURED_ANALYSIS_TEMPLATE` from `prompts.js` (also the editable default exported as `GEMINI_DEFAULT_PROMPT` in `tools/settingsConfig.js`). Claude reuses the same template.
 
 The prompt instructs the model to return strict JSON:
@@ -373,17 +344,17 @@ Displayed in `AiModePanel` after each completed analysis.
 
 ## Settings (Tools modal)
 
-**Files:** [`tools/DetectionTab.jsx`](../frontend/src/components/tools/DetectionTab.jsx), [`tools/AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) — keys/defaults in [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js)
+**File:** [`tools/AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) — one tab with three sections (Detection, Google Gemini, Claude Anthropic). Keys/defaults in [`tools/settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js).
 
-| Tab | Setting | localStorage key |
+| Section | Setting | localStorage key |
 |-----|---------|-----------------|
 | **Detection** | YOLO model | `openvino_model` (default `yolov8n`; options: `yolov8n/s/m`) |
 | **Detection** | OpenVINO confidence | `mode_params_openvino_detection` → `{confidence: N}` (integer %, 10–80) |
 | **Detection** | Detected YOLO classes (80-class checklist) | `detection_classes` (JSON array of COCO class IDs) |
-| **AI** | Gemini API key | `gemini_api_key` |
-| **AI** | Gemini model | `gemini_model` |
-| **AI** | Prompt template | `gemini_structured_prompt` |
-| **AI** | Claude API key | `claude_api_key` |
-| **AI** | Claude model | `claude_model` |
+| **Google Gemini** | Gemini API key | `gemini_api_key` |
+| **Google Gemini** | Gemini model | `gemini_model` |
+| **Google Gemini** | Prompt template | `gemini_structured_prompt` |
+| **Claude Anthropic** | Claude API key | `claude_api_key` |
+| **Claude Anthropic** | Claude model | `claude_model` |
 
 **Model selection is centralised in the Tools modal only.** `AiModePanel` and `CellSelBar` show the active model as a read-only label. `NewTaskModal` reads model/mode from localStorage and shows a read-only summary for the selected task type.

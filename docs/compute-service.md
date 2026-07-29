@@ -17,15 +17,20 @@ When the compute-service is disabled, the main backend's heavy endpoints return
 
 | Block | Path | Role | Heavy deps |
 |---|---|---|---|
-| Main backend | [`backend/`](../backend/) | DB, scanning, light thumbnails, diff/MOG2 modes, cloud AI, **all disk caches**, routing to the compute-service | — |
-| Compute-service | [`compute-service/`](../compute-service/) | YOLO detection + video thumbnails. Stateless — no DB, no cache | `ultralytics`, `openvino`, `opencv` |
-| Shared block | [`shared/`](../shared/) | API contract + COCO→Russian map — imported by both backends | — |
+| Main backend | [`backend/`](../backend/) | DB, scanning, light thumbnails, the motion-diff mode, cloud AI, **all disk caches**, routing to the compute-service | — |
+| Compute-service | [`compute-service/`](../compute-service/) | YOLO detection + video thumbnails + ffmpeg conversion. Stateless — no DB, no cache | `ultralytics`, `openvino`, `opencv` |
+| Shared block | [`shared/`](../shared/) | API contract only — imported by both backends | `pydantic` |
 
-The shared block is deliberately tiny and dependency-light so it can sit on
-both machines as an ordinary folder. [`shared/contract.py`](../shared/contract.py)
-holds the Pydantic request/response models (so the two sides can never drift);
-[`shared/coco_names.py`](../shared/coco_names.py) holds `COCO_TO_RUSSIAN` — the
-cross-boundary contract with the frontend's `OBJECT_EMOJI_DEFAULTS`.
+The shared block is deliberately tiny and dependency-light so it can sit on both
+machines as an ordinary folder. It contains exactly one module:
+[`shared/contract.py`](../shared/contract.py), holding the Pydantic
+request/response models so the two sides can never drift.
+
+There is **no shared class-name translation table.** `detection.py` returns
+canonical English COCO names straight from `yolo.names`; the only consumer that
+maps them to display labels is the frontend's
+[`cocoClasses.js`](../frontend/src/cocoClasses.js). That pair is the whole
+cross-boundary contract — see [`ai-analysis.md`](ai-analysis.md#object-vocabulary--emoji).
 
 ---
 
@@ -34,15 +39,26 @@ cross-boundary contract with the frontend's `OBJECT_EMOJI_DEFAULTS`.
 Config is persisted server-side in `backend/compute_config.json`, edited via
 **Tools → Compute** in the UI (`GET`/`PUT /compute/config`).
 
+`VALID_MODES` in [`compute_config.py`](../backend/compute_config.py) — **four** modes; the default for a fresh config is `kubernetes`:
+
 | Mode | Effective URL | Behaviour |
 |---|---|---|
 | `off` | — | Heavy endpoints return `503`; OpenVINO view modes and video previews hidden in the UI |
-| `local` | `http://localhost:8001` | Calls the compute-service running on the same machine |
+| `kubernetes` | `http://camera-cleaner-compute:8001` (`_KUBERNETES_URL`) | In-cluster Service DNS name from the Helm chart. **Default mode** |
+| `local` | `remote_url`, typically `http://localhost:8001` | Calls the compute-service running on the same machine |
 | `remote` | `remote_url` | Calls the compute-service on another machine |
 
-`local` and `remote` differ only in the URL. The compute-service process is the
-same in both cases — `npm start` always launches it locally; for `remote` you
-run it yourself on the other machine.
+`local` and `remote` differ only by convention — both read `remote_url`. The
+compute-service process is the same in every case; `npm start` always launches it
+locally, and for `remote` you run it yourself on the other machine.
+
+**Multiple URLs:** the config stores `remote_urls` (a list) and
+`effective_urls()` returns every candidate in priority order, so the client can
+fall back from one host to the next. The scalar `remote_url` field is kept only
+for backward compatibility — `load_config()` backfills `remote_urls` from it, and
+`effective_url()` just returns the first entry. When adding a mode, extend
+`VALID_MODES` *and* the `effective_urls()` branch; `_LEGACY_ALIASES` (currently
+empty) is the hook for renaming an existing mode without breaking saved configs.
 
 ---
 
@@ -105,8 +121,7 @@ mount the share wherever it likes.
 | [`compute-service/video.py`](../compute-service/video.py) | Video thumbnail generation (was `backend/video_thumbnails.py`) |
 | [`compute-service/config.py`](../compute-service/config.py) | `CAMERA_ROOT` env var + `to_absolute()` |
 | [`compute-service/export_models.py`](../compute-service/export_models.py) | **Build-time only** — downloads yolov8n/s/m `.pt` weights, exports each to OpenVINO IR (`models/<name>_openvino_model/`), removes the `.pt` files. Run by the Dockerfile `RUN` step; never executed at runtime |
-| [`shared/contract.py`](../shared/contract.py) | Pydantic API models — shared by both backends |
-| [`shared/coco_names.py`](../shared/coco_names.py) | `COCO_TO_RUSSIAN` map (23 entries; others fall back to English) |
+| [`shared/contract.py`](../shared/contract.py) | Pydantic API models — the only module in `shared/`, imported by both backends |
 | [`backend/compute_client.py`](../backend/compute_client.py) | HTTP client used by the main backend |
 | [`backend/compute_config.py`](../backend/compute_config.py) | Routing config (`compute_config.json`) |
 | [`backend/compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for OpenVINO + video thumbnails |

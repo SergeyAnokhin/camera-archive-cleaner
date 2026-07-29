@@ -51,19 +51,24 @@ In short:
   `video_convert` tasks are routed through `compute_client.convert_video()` with
   a 2-hour timeout; `file_organizer` tasks run entirely on the backend (cheap
   `shutil.move` calls — no compute delegation needed).
-- `shared/` holds the API contract and the `COCO_TO_RUSSIAN` map — imported by
-  both processes. `VideoConvertRequest` / `VideoConvertResponse` live in
-  [`shared/contract.py`](../shared/contract.py).
-- Routing (`off` / `local` / `remote`) lives in `backend/compute_config.json`.
+- `shared/` holds the API contract and nothing else — `contract.py` is its only
+  module, imported by both processes. `VideoConvertRequest` /
+  `VideoConvertResponse` live in [`shared/contract.py`](../shared/contract.py).
+- Routing (`off` / `kubernetes` / `local` / `remote`; `kubernetes` is the default)
+  lives in `backend/compute_config.json` — see
+  [`compute-service.md`](compute-service.md#routing-modes).
 - The scanner skips the `organized` folder (defined as `SCANNER_SKIP_DIRS` in
   [`scanner.py`](../backend/scanner.py)) so file-organizer output is never
   re-indexed as fresh snapshots.
 
 **Cross-boundary contract to preserve:** [`detection.py`](../compute-service/detection.py)
-returns **canonical English COCO class names** (from `yolo.names`). The frontend's
-[`aiHelpers.js`](../frontend/src/aiHelpers.js) builds its emoji/label lookup from the
-`en` keys in [`cocoClasses.js`](../frontend/src/cocoClasses.js). If the class-name
-spelling changes on one side, it must change on the other.
+returns **canonical English COCO class names** (from `yolo.names`), and the backend
+stores them verbatim — there is no translation step anywhere on the server. The
+frontend's [`aiHelpers.js`](../frontend/src/aiHelpers.js) builds its emoji/label
+lookup from the `en` **and** `ru` keys in
+[`cocoClasses.js`](../frontend/src/cocoClasses.js) (the `ru` keys resolve cloud-AI
+output, which is Russian). If a class-name spelling changes on one side, it must
+change on the other — those two files are the entire contract.
 
 ---
 

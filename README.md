@@ -101,11 +101,11 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 | [`docs/compute-service.md`](docs/compute-service.md) | Optional compute-service: stateless detection + video backend, routing (off/local/remote), path remapping |
 | [`docs/settings.md`](docs/settings.md) | All user settings: localStorage keys, defaults, ranges, where each is defined |
 | [`docs/api.md`](docs/api.md) | All API endpoints with parameters and descriptions |
-| [`docs/database.md`](docs/database.md) | SQLite schema: `files`, `thumbnails`, `ai_analysis`, `tasks`, `tuning_sessions` tables, cascades, data flow |
+| [`docs/database.md`](docs/database.md) | SQLite schema: `cameras`, `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks`, `tuning_sessions` tables, cascades, data flow |
 | [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis: Gemini, Claude & OpenVINO integration, DB schema, prompt format, icon display |
 | [`docs/tuning.md`](docs/tuning.md) | Model tuning screen: upload images, ground truth, per-model golden-section confidence search, results charts |
 | [`docs/google-integration.md`](docs/google-integration.md) | Google account (OAuth): Gmail attachment download and Drive upload task types |
-| [`docs/visualization-modes.md`](docs/visualization-modes.md) | All 6 view modes: Normal, Motion highlight, Motion (noise-filtered), AI description (Gemini/Claude), Object detection (local) |
+| [`docs/visualization-modes.md`](docs/visualization-modes.md) | All 5 view modes: Normal, Motion highlight, AI description (Gemini), AI description (Claude), Object detection (local) — plus the shared cache layout |
 | [`docs/testing.md`](docs/testing.md) | Unit tests: what rule each test pins, how to run (`npm test`), how to add new ones |
 | [`docs/logging.md`](docs/logging.md) | Log levels, format, colours, how to configure |
 | [`docs/deployment.md`](docs/deployment.md) | k3s deployment: Docker images, Helm chart, ArgoCD GitOps, SMB camera share, node pinning |

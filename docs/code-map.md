@@ -14,8 +14,8 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`api_helpers.py`](../backend/api_helpers.py) | Shared router helpers: `fmt_range()` (log date ranges), `row_to_dict()` (stats-row → dict) |
 | [`ai_pricing.py`](../backend/ai_pricing.py) | Per-million-token USD pricing tables for Gemini and Claude models |
 | [`compute_client.py`](../backend/compute_client.py) | HTTP client for the optional compute-service (`detect`, `video_thumbnail`, `convert_video`, `health`). Strips `CAMERA_ROOT` prefix from all paths before sending (so compute can apply its own root). Raises `ComputeDisabled` / `ComputeUnavailable`. Timeouts: detect 120 s, thumbnail 120 s, convert 7200 s |
-| [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `off` / `local` / `remote`, persisted in `compute_config.json` (path respects `DATA_DIR` env var) |
-| [`compute_cache.py`](../backend/compute_cache.py) | Disk-cache paths for all five thumbnail types. Exports `CACHE_BASE_DIR` (driven by `CACHE_DIR` env var → defaults to `backend/cache/`). `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
+| [`compute_config.py`](../backend/compute_config.py) | Compute-service routing config — `VALID_MODES` = `off` / `kubernetes` / `local` / `remote` (`kubernetes` is the default), persisted in `compute_config.json` (path respects `DATA_DIR` env var). `effective_urls()` returns the candidate list in priority order |
+| [`compute_cache.py`](../backend/compute_cache.py) | **The cache-root owner.** Exports `CACHE_BASE_DIR` = `CACHE_DIR` env var → `DATA_DIR/cache/`. Every cache is a subdir of it: `basic/` (`thumbnails.py`), `diff/` (`diff_thumbnails.py`), `openvino/` + `video/` (here). A new cache must hang off `CACHE_BASE_DIR`, never a hard-coded path. `OV_THUMB_VERSION` — bump to invalidate the bbox cache |
 | [`task_runner.py`](../backend/task_runner.py) | Background asyncio loop — picks queued tasks and dispatches to `task_executors/` by type (registry `EXECUTORS`). Owns global pause and stuck-task reset; per-type logic lives in the executors (see table below) |
 | [`database.py`](../backend/database.py) | Backward-compatible **facade** — re-exports the whole `db/` package (table below). Import `from database import …` as before; add new queries to the matching `db/*.py` module and re-export here |
 | [`scanner.py`](../backend/scanner.py) | Directory walker; parses timestamps from filenames; writes to DB. `SCANNER_SKIP_DIRS = {"organized"}` — directories with this name are never indexed |
@@ -28,7 +28,7 @@ For the *grouped* view (subsystems, dependencies, extraction seams) see [`subsys
 | [`diff_thumbnails.py`](../backend/diff_thumbnails.py) | Motion Diff thumbnails: per-pixel delta from page mean (numpy). Cache in `CACHE_BASE_DIR/diff/` |
 | `snapshots.db` | SQLite database (auto-created on startup). Path = `DATA_DIR/snapshots.db`; `DATA_DIR` env var defaults to `backend/` for local and K8s, set to `/data` for HA add-on |
 | [`pytest.ini`](../backend/pytest.ini) | Pytest config: `tests/` dir, quiet output (`-q --tb=short`) |
-| [`tests/`](../backend/tests/) | Unit tests for documented complex logic (timestamp parsing, ±5 s video matching, golden-section search, AI JSON/cost, Claude request building, Google OAuth token refresh, path contract, SpeedTracker). External services are always mocked. See [`testing.md`](testing.md) |
+| [`tests/`](../backend/tests/) | Unit tests for documented complex logic (timestamp parsing, ±5 s video matching, golden-section search, AI JSON/cost, Claude request building, Google OAuth token refresh, path + cache-root contracts, SpeedTracker). External services are always mocked. See [`testing.md`](testing.md) |
 
 
 ### DB layer (`backend/db/`)
@@ -65,19 +65,19 @@ Each file is a FastAPI `APIRouter` grouping endpoints by responsibility. All rou
 
 | File | Endpoints |
 |---|---|
-| [`catalog.py`](../backend/routers/catalog.py) | `/cameras` (load from DB), `/cameras/config` (GET/PUT CRUD), `/cameras/check-path` (POST check), `/scan` |
+| [`catalog.py`](../backend/routers/catalog.py) | `/cameras` (load from DB), `/cameras/config` (GET/PUT CRUD), `/cameras/check-path` (POST check), `/scan`. **Also owns Camera Root:** `/camera_root` (GET/PUT — PUT applies immediately, no restart), `/camera_root/subdirs`, `/media_dirs` (directory pickers for the Cameras tab) |
 | [`stats.py`](../backend/routers/stats.py) | `/stats`, `/files`, `/distribution`, `/previews` |
 | [`thumbnails_api.py`](../backend/routers/thumbnails_api.py) | `/thumbnail`, `/diff_thumbnail`, `/openvino_thumbnail`, `/video_thumbnail`. |
 | [`media.py`](../backend/routers/media.py) | `/media/{file_id}` — serves the original photo/video file with the correct MIME type |
 | [`delete.py`](../backend/routers/delete.py) | `/delete/preview`, `/delete/confirm`, `/delete/preview_range`, `/delete/by_range`. |
-| [`maintenance.py`](../backend/routers/maintenance.py) | `/database`, per-type `/*_thumbnails` (except deleted), `/all_thumbnails`, `/storage_info` |
-| [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`. |
-| [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status` |
+| [`maintenance.py`](../backend/routers/maintenance.py) | `/database` (DELETE) + `/database/vacuum` (POST), per-type `DELETE /{basic,diff,openvino,video}` → `/thumbnails`, `/diff_thumbnails`, `/openvino_thumbnails`, `/video_thumbnails`, plus `/all_thumbnails`, `/storage_info` |
+| [`ai.py`](../backend/routers/ai.py) | `/gemini_analyze_batch`, `/claude_analyze_batch`, `/openvino_analyze_batch`, `/openvino_analyze_range`, `/ai_analysis`, `/ai_objects_summary`, `/ai_analysis_in_range` (per-file results + timestamps for a range — backs TaskResultsModal) |
+| [`compute.py`](../backend/routers/compute.py) | `/compute/config` (GET/PUT), `/compute/status`, `/compute/ping` (test without saving), `/compute/probe-urls`, `/compute/discover`, `/compute/client-ip`. **Also `/services/status`** — the backend+compute CPU/RAM metrics polled by the header chips (lives here, not in `stats.py`) |
 | [`tasks.py`](../backend/routers/tasks.py) | `/tasks` CRUD + `/tasks/metrics` + `GET /tasks/{id}/logs` |
 | [`tuning.py`](../backend/routers/tuning.py) | `/tuning/sessions/*` — model tuning |
-| [`logging_api.py`](../backend/routers/logging_api.py) | `/logging/config` (GET/PUT), `/logging/tail` |
+| [`logging_api.py`](../backend/routers/logging_api.py) | `/logging/config` (GET/PUT), `/logging/tail`, plus `/logging/compute/*` — the same three proxied to the compute-service over HTTP. The proxied routes swallow errors and return `200` with an `error` field so the log viewer degrades instead of breaking |
 | [`settings.py`](../backend/routers/settings.py) | `/settings` (GET/PUT settings synchronization) |
-| [`google.py`](../backend/routers/google.py) | `/google/auth/*` (status, credentials, url, disconnect), `/google/oauth/callback`, `/google/gmail/labels` |
+| [`google.py`](../backend/routers/google.py) | Prefix `/google`: `/auth/*` (status, credentials, url, disconnect, `manual_callback` — paste-the-URL fallback for HA ingress), `/oauth/callback`, `/gmail/labels` |
 
 ### AI providers (`backend/ai_providers/`)
 
@@ -211,7 +211,7 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`CamerasTab.jsx`](../frontend/src/components/tools/CamerasTab.jsx) | Full camera CRUD: add/edit/delete rows, inline path validation via `/cameras/check-path`, saves via `PUT /cameras/config` |
 | [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | View tab: previews per cell, thumb width, hover zoom, diff threshold, page size, burst gap, video preview, uniformity (collapsible, with Low/Medium/High presets) |
 | [`AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) | Combined AI tab: 3 sections — Detection (YOLO model, confidence, classes checklist), Google Gemini (API key, model, prompt), Claude Anthropic (API key, model) |
-| [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / local / remote + URL, test-connection status |
+| [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / kubernetes / local / remote + URL, auto-discovery, test-connection status. Also owns the UI-only `compute_mode_ui` key (`browser` label for an auto-detected browser-local service) |
 | [`GoogleTab.jsx`](../frontend/src/components/tools/GoogleTab.jsx) | Google account: OAuth client setup (redirect URI display, client id/secret), connect/disconnect with status polling. See [`google-integration.md`](google-integration.md) |
 | [`ServiceTab.jsx`](../frontend/src/components/tools/ServiceTab.jsx) | Combined service tab — thin shell composing the three sections in `tools/service/` (table below) |
 

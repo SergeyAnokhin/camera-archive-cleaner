@@ -71,17 +71,48 @@ caches, the DB and `*.pt` out of the build context.
 | `ingress.yaml` | Traefik Ingress (`/api`→backend, `/`→frontend) + StripPrefix Middleware |
 
 ### State on a PVC without shadowing code
-The backend writes `snapshots.db`, `compute_config.json` and seven `*_cache/`
-directories into `/app/backend` (next to the code). The chart mounts a single state
-PVC into each of those paths via **`subPath`**, so persistence does not overwrite the
-image's code. The cache directory list lives in `values.yaml` (`backend.cacheDirs`).
+The backend writes `snapshots.db`, `compute_config.json` and its thumbnail caches
+into `/app/backend` (next to the code). The chart mounts a single state PVC into
+each of those paths via **`subPath`**, so persistence does not overwrite the
+image's code.
+
+**Caches use one mount, not one per type.** All caches live under a single root
+that the app takes from the `CACHE_DIR` env var
+([`compute_cache.py`](../backend/compute_cache.py) → `CACHE_BASE_DIR`), creating
+the `basic/`, `diff/`, `openvino/`, `video/` subdirs itself. The chart therefore
+sets `CACHE_DIR` and mounts exactly one `subPath`, both driven by
+`values.yaml` → `backend.cacheDir` + `backend.cacheSubPath`:
+
+```yaml
+backend:
+  cacheDir: /app/backend/cache   # → CACHE_DIR env var
+  cacheSubPath: cache            # → subPath on the state PVC
+```
+
+> If you add a cache type, **nothing in the chart changes** — that is the point of
+> the single root. Conversely, a cache that hard-codes its path instead of hanging
+> off `CACHE_BASE_DIR` escapes this mount and is silently written to the pod's
+> ephemeral layer, so it is lost on every restart.
+
+**Not currently persisted:** `settings.json`, `server_config.json` and
+`google_oauth.json` have no `subPath` mount, so the server-side settings mirror,
+the in-app Camera Root override and the Google OAuth tokens are lost when the pod
+restarts. Only `snapshots.db`, `compute_config.json` and the cache root survive.
 
 ### compute_config.json seed
-The on-disk default is `mode=local` (→ `localhost:8001`), wrong when backend and
-compute are separate pods. An initContainer writes
+An initContainer writes
 `{"mode":"remote","remote_url":"http://camera-cleaner-compute:8001"}` to the state PVC
 **if absent**, so the backend reaches the compute Service and later UI edits
-(Tools → Compute) still persist. See [`backend/compute_config.py`](../backend/compute_config.py).
+(Tools → Compute) still persist.
+
+This seed is now **belt-and-braces rather than required**: since
+[`compute_config.py`](../backend/compute_config.py) gained the `kubernetes` mode
+(`_DEFAULT = {"mode": "kubernetes"}`, `_KUBERNETES_URL =
+http://camera-cleaner-compute:8001`), a fresh config already resolves to the same
+in-cluster URL. It still matters if you rename the release, because
+`_KUBERNETES_URL` is hard-coded to the `camera-cleaner` fullname while the seed
+interpolates the actual `fullname` — with a different release name the seed is
+what makes routing correct.
 
 ### Camera files (SMB) and CAMERA_ROOT
 Both pods mount the same NAS share via the SMB CSI driver at the **same** path

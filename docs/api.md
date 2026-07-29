@@ -16,6 +16,19 @@ All filter parameters (`camera_id`, `date_from`, `date_to`) are optional — omi
 | `POST` | `/cameras/check-path` | Check if camera relative path exists on the server under `CAMERA_ROOT` |
 | `POST` | `/scan` | Scan directories and update the DB. `?camera_id=` scans one camera; omit to scan all |
 
+### Camera Root
+
+`CAMERA_ROOT` is the base folder prepended to every camera's relative path. It
+can come from the env var or be overridden in-app; the in-app value wins. These
+endpoints back the **Tools → Cameras → Camera Root** UI.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/camera_root` | `{camera_root, from_server_config, from_env}` — current value plus where it came from |
+| `PUT` | `/camera_root` | Body `{camera_root}`. Persists to `server_config.json` and applies **immediately** (no restart) via `config.set_camera_root()`. `400` on empty |
+| `GET` | `/camera_root/subdirs` | `{exists, path, dirs[]}` — immediate subdirectories of `CAMERA_ROOT`, for the camera-path picker. Returns `exists: false` + `error` instead of raising when the path is an unreachable UNC share |
+| `GET` | `/media_dirs` | `{exists, path, dirs[]}` — subdirectories of the hard-coded `/media`, for picking a Camera Root in the HA add-on |
+
 ---
 
 ## Statistics
@@ -45,7 +58,7 @@ All thumbnail endpoints generate and cache on first request.
 |---|---|---|
 | `GET` | `/thumbnail/{file_id}` | Basic 256×256 JPEG thumbnail |
 | `GET` | `/diff_thumbnail/{file_id}` | Motion Diff: delta from page mean. Params: `page_ids` (comma-separated), `threshold` (0–255, default 20) |
-| `GET` | `/video_thumbnail/{file_id}` | Video preview image. `mode`: `first_frame` / `last_frame` / `four_frames` (2×2 JPEG grid) / `max_change_gif` (2-frame GIF: first→most-changed) / `four_frames_gif` (4-frame GIF: evenly spaced) / `max_change_4_gif` (4-frame GIF: first→max-diff-from-first→max-diff-from-last→last). Computed by the [compute-service](compute-service.md); cache in `video_thumbnails_cache/`. Returns `503` when compute is off/unreachable |
+| `GET` | `/video_thumbnail/{file_id}` | Video preview image. `mode`: `first_frame` / `last_frame` / `four_frames` (2×2 JPEG grid) / `max_change_gif` (2-frame GIF: first→most-changed) / `four_frames_gif` (4-frame GIF: evenly spaced) / `max_change_4_gif` (4-frame GIF: first→max-diff-from-first→max-diff-from-last→last). Computed by the [compute-service](compute-service.md); cache in `CACHE_BASE_DIR/video/`. Returns `503` when compute is off/unreachable |
 
 ---
 
@@ -77,7 +90,7 @@ compute-service is disabled or unreachable.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/openvino_thumbnail/{file_id}` | Returns a JPEG with YOLO bounding boxes drawn. Params: `model` (default `yolov8n`), `confidence` (default `0.25`), `classes` (comma-separated COCO class IDs; empty = all 80). `classes` restricts YOLO inference and is part of the cache key. Caches on first request; **also saves detected objects to `ai_analysis`** on cache miss. Cache: `backend/openvino_thumbnails_cache/` |
+| `GET` | `/openvino_thumbnail/{file_id}` | Returns a JPEG with YOLO bounding boxes drawn. Params: `model` (default `yolov8n`), `confidence` (default `0.25`), `classes` (comma-separated COCO class IDs; empty = all 80). `classes` restricts YOLO inference and is part of the cache key. Caches on first request; **also saves detected objects to `object_detection`** on cache miss. Cache: `CACHE_BASE_DIR/openvino/` |
 | `POST` | `/openvino_analyze_batch` | Run YOLO on a list of photos. Body: `file_ids`, `model_name`, `confidence`, `classes` (optional list of COCO class IDs, `null` = all). Saves results to `ai_analysis`. Returns `{elapsed_ms, images_used, saved_count, results}` |
 | `POST` | `/openvino_analyze_range` | Same as `/openvino_analyze_batch` but fetches all photos in a date range. Body: `camera_id`, `date_from`, `date_to`, `model_name`, `confidence`, `classes` (optional). Used by heatmap batch analysis |
 
@@ -87,6 +100,7 @@ compute-service is disabled or unreachable.
 |---|---|---|
 | `GET` | `/ai_analysis` | Fetch saved AI results. Param: `file_ids` comma-separated |
 | `GET` | `/ai_objects_summary` | Unique object keywords for a date range. Optional: `camera_id`, `date_from`, `date_to`. Used by heatmap cells for icon display |
+| `GET` | `/ai_analysis_in_range` | Per-file results **with timestamps** for a date range, plus aggregate stats. Required: `camera_id`, `date_from`, `date_to`. Optional: `provider` (default `openvino` → reads `object_detection`; otherwise `ai_analysis`), `limit` (1–5000, default 200). Rows newest-first. Backs the AI task results modal |
 
 ---
 
@@ -97,9 +111,34 @@ config is persisted server-side in `backend/compute_config.json`.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/compute/config` | Current routing config: `{mode, remote_url}`. `mode` is `off` / `local` / `remote` |
-| `PUT` | `/compute/config` | Update routing config. Body: `{mode, remote_url}`. Rejects an unknown `mode` with `400` |
+| `GET` | `/compute/config` | Current routing config: `{mode, remote_url, remote_urls}`. `mode` is `off` / `kubernetes` / `local` / `remote` — see [routing modes](compute-service.md#routing-modes) |
+| `PUT` | `/compute/config` | Update routing config. Body: `{mode, remote_url, remote_urls}`. Rejects an unknown `mode` with `400` |
 | `GET` | `/compute/status` | Reachability check: `{mode, url, reachable, capabilities}`. Pings the compute-service `/health` |
+| `POST` | `/compute/ping` | Test a config **without saving it**. Body: `{mode, remote_url}`. Same response shape as `/compute/status`. Backs the "Test connection" button |
+| `POST` | `/compute/probe-urls` | Body `{urls: []}`. Probes every URL (3 s timeout each) and returns `{results: [{url, reachable, capabilities?, error?}]}`. Used to validate a multi-URL config |
+| `GET` | `/compute/discover` | Auto-detect: tries `http://localhost:8001` then the in-cluster `http://camera-cleaner-compute:8001`, returns `{found, url, health}` for the first that answers `/health` |
+| `GET` | `/compute/client-ip` | `{ip}` — the browser's real LAN IP as the backend sees it (prefers the first `X-Forwarded-For` entry, so it is the client IP and not a pod IP behind Traefik). Used to pre-fill a `remote` URL |
+| `GET` | `/services/status` | Backend + compute status and metrics: CPU %, memory used/total for both. Polled every 5 s by the header status chips. Backend metrics come from `psutil` (omitted as `null` if unavailable); compute metrics are fetched over HTTP with a short timeout |
+
+---
+
+## Logging
+
+Live log-level control and log tail, for the backend and (proxied) the
+compute-service. No restart needed. See [`logging.md`](logging.md).
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/logging/config` | Current backend log config: `{level, file_max_lines}` |
+| `PUT` | `/logging/config` | Body `{level, file_max_lines}` (defaults `INFO` / `500`). Reconfigures the root logger live and returns the new config |
+| `GET` | `/logging/tail` | Last `n` lines (default 200) from the backend ring buffer: `{lines, total}` |
+| `GET` | `/logging/compute/config` | Same as above, proxied to the compute-service |
+| `PUT` | `/logging/compute/config` | Proxied; body `{level, file_max_lines}` (default `file_max_lines` 200) |
+| `GET` | `/logging/compute/tail` | Proxied; param `n` (default 200) |
+
+The four proxied routes **never raise** — when compute is unreachable they return
+a normal `200` with an `error` field and empty/`null` data, so the log viewer
+degrades instead of breaking.
 
 ---
 
@@ -152,6 +191,7 @@ types. Full flow: [`google-integration.md`](google-integration.md).
 | `PUT` | `/google/auth/credentials` | `{client_id, client_secret}` | Save the OAuth client (Google Cloud Console, type "Web application") |
 | `GET` | `/google/auth/url` | `redirect_uri` | Consent URL for the popup |
 | `GET` | `/google/oauth/callback` | `code`, `state` | OAuth redirect target — exchanges the code, returns a small HTML page |
+| `POST` | `/google/auth/manual_callback` | `{url}` | Fallback for when Google cannot reach the redirect URI (HA ingress, plain-IP host): the user pastes the full callback URL from the browser bar and the backend extracts the code itself. `400` on a malformed URL |
 | `POST` | `/google/auth/disconnect` | — | Drop tokens (client credentials kept) |
 | `GET` | `/google/gmail/labels` | — | `{labels: [{id, name}]}` (400 if not connected) |
 
@@ -192,10 +232,18 @@ Standalone; depends on the compute-service for detection.
 
 ## Maintenance
 
+Every `DELETE` here accepts the optional `camera_id` / `date_from` / `date_to`
+filters. **Passing any filter scopes the operation to the matching `file_id`s;
+passing none wipes the whole cache/table.** Cache layout:
+[`visualization-modes.md`](visualization-modes.md#cache-management).
+
 | Method | Path | Description |
 |---|---|---|
-| `DELETE` | `/database` | Delete all file records from DB (does not touch files on disk) |
-| `DELETE` | `/thumbnails` | Delete basic thumbnails (disk + DB) |
-| `DELETE` | `/diff_thumbnails` | Delete diff thumbnails |
-| `DELETE` | `/all_thumbnails` | Delete all thumbnails of all types |
-| `GET` | `/storage_info` | DB size and all active thumbnail cache sizes in bytes |
+| `DELETE` | `/database` | Delete scanned file records from DB (does not touch files on disk) |
+| `POST` | `/database/vacuum` | `VACUUM` the SQLite file to reclaim space after large deletes. Returns `{ok: true}`. Backs "Optimize database" |
+| `DELETE` | `/thumbnails` | Delete basic thumbnails — `cache/basic/` (disk + DB) |
+| `DELETE` | `/diff_thumbnails` | Delete motion-highlight thumbnails — `cache/diff/` |
+| `DELETE` | `/openvino_thumbnails` | Delete `object_detection` rows; the bbox JPEGs in `cache/openvino/` are removed **only on an unscoped (no-filter) call**, because the cache key is a hash that cannot be mapped back to a `file_id`. Returns `{deleted_files, deleted_rows}` |
+| `DELETE` | `/video_thumbnails` | Delete video previews — `cache/video/` **and** the matching `video_previews` DB rows |
+| `DELETE` | `/all_thumbnails` | Delete all four cache types at once. Returns `{total_files, types: {…}}` per-type breakdown |
+| `GET` | `/storage_info` | DB size and all four thumbnail cache sizes in bytes |
