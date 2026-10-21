@@ -78,7 +78,7 @@ camera:
 ingress:
   enabled: true
   className: traefik
-  host: camera.local
+  host: camera-cleaner.192.168.1.97.nip.io
   # Traefik middleware that strips the /api prefix before forwarding to backend.
   # The frontend calls relative /api/... (see frontend/src/api.js); the backend
   # serves routes at the root, so the prefix must be removed.
