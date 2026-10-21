@@ -145,8 +145,8 @@ request body ([`backend/routers/ai.py`](../backend/routers/ai.py)).
 
 ## CI/CD
 
-[`.github/workflows/build.yml`](../.github/workflows/build.yml) (push to `main`):
-builds + pushes the three images to `ghcr.io/<owner>/<repo>/{backend,compute,frontend}` tagged with the short git SHA, then `yq`-rewrites `image.*.tag` in `values.yaml` and commits back (`[skip ci]`; the bump path is outside the workflow's trigger paths, so it does not re-trigger). ArgoCD ([`deploy/argocd/application.yaml`](../deploy/argocd/application.yaml)) auto-syncs the change.
+[`.github/workflows/build.yml`](../.github/workflows/build.yml) (push to `main` touching `backend/`, `compute-service/`, `frontend/`, `shared/`, `deploy/` or the workflow itself; also manual via Actions → **Run workflow**, `workflow_dispatch`):
+builds + pushes the three images to `ghcr.io/<owner>/<repo>/{backend,compute,frontend}` tagged with the short git SHA, then `yq`-rewrites `image.*.tag` in `values.yaml` and force-pushes the result to the `deploy` branch (`[skip ci]`; the bump lands on `deploy`, not `main`, so it does not re-trigger). A `values.yaml` change on `main` (e.g. `ingress.host`) therefore reaches ArgoCD only after this workflow runs. ArgoCD ([`deploy/argocd/application.yaml`](../deploy/argocd/application.yaml)) auto-syncs the change.
 
 ---
 

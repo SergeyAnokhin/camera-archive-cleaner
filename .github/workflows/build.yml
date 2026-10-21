@@ -3,9 +3,11 @@ name: build-and-push
 # Build the three images on every push to main, then write the new image tags
 # back into the Helm values so ArgoCD picks up the change and rolls the pods.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
+      - deploy/**
       - backend/**
       - compute-service/**
       - frontend/**
