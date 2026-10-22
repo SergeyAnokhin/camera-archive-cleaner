@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import SliderSetting from './SliderSetting.jsx'
+import { COCO_CLASSES } from '../../cocoClasses.js'
+import { loadSelectPresets, saveSelectPresets } from './selectPresets.js'
 import {
   PREVIEWS_PER_CELL_KEY, PREVIEWS_PER_CELL_MIN, PREVIEWS_PER_CELL_MAX, PREVIEWS_PER_CELL_DEFAULT,
   PAGE_SIZE_KEY, PAGE_SIZE_MIN, PAGE_SIZE_MAX, PAGE_SIZE_DEFAULT,
@@ -9,6 +11,7 @@ import {
   VIDEO_PREVIEW_KEY, VIDEO_PREVIEW_DEFAULT, VIDEO_PREVIEW_OPTIONS,
   UNIFORMITY_METHOD_KEY, UNIFORMITY_METHOD_DEFAULT, U_METRICS, U_DEFAULTS,
   BURST_GAP_KEY, BURST_GAP_DEFAULT, BURST_GAP_MIN, BURST_GAP_MAX,
+  SELECT_PRESETS_DEFAULT,
 } from './settingsConfig.js'
 
 export default function HourViewTab() {
@@ -40,6 +43,8 @@ export default function HourViewTab() {
     }
     return t
   })
+  const [selectPresets, setSelectPresets] = useState(loadSelectPresets)
+  const [openPresetId, setOpenPresetId] = useState(null)
   const [uniformityMethod, setUniformityMethod] = useState(
     () => localStorage.getItem(UNIFORMITY_METHOD_KEY) || UNIFORMITY_METHOD_DEFAULT
   )
@@ -86,6 +91,26 @@ export default function HourViewTab() {
     setBurstGap(v)
     localStorage.setItem(BURST_GAP_KEY, v)
     document.dispatchEvent(new CustomEvent('burst-gap-change', { detail: v }))
+  }
+
+  function updatePresets(next) {
+    setSelectPresets(next)
+    saveSelectPresets(next)
+  }
+
+  function updatePreset(id, patch) {
+    updatePresets(selectPresets.map(p => p.id === id ? { ...p, ...patch } : p))
+  }
+
+  function togglePresetClass(preset, classId) {
+    const has = preset.classes.includes(classId)
+    updatePreset(preset.id, {
+      classes: has ? preset.classes.filter(c => c !== classId) : [...preset.classes, classId].sort((a, b) => a - b),
+    })
+  }
+
+  function addPreset() {
+    updatePresets([...selectPresets, { id: `p${Date.now()}`, label: 'New preset', classes: [0] }])
   }
 
   function handleVideoPreviewModeChange(e) {
@@ -199,6 +224,56 @@ export default function HourViewTab() {
         </select>
         <div className="modal-setting-hint">
           How video-file previews are rendered on the cards. GIFs take longer to generate and are cached.
+        </div>
+      </div>
+
+      <div className="modal-section col-span-2">
+        <div className="modal-section-title">Selection presets</div>
+        <div className="modal-setting-hint" style={{ marginBottom: 6 }}>
+          Each preset adds a button to the selection bar: it selects the photos in which the checked objects were
+          <b> not</b> detected (no boxes checked = no object at all), plus the videos recorded around them. Only photos
+          already analysed by YOLO are considered; a video is kept if any photo within 30 s shows the object.
+        </div>
+        {selectPresets.map(p => (
+          <div key={p.id} style={{ marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input className="modal-text-input" style={{ maxWidth: 220 }} value={p.label}
+                maxLength={40} onChange={e => updatePreset(p.id, { label: e.target.value })} />
+              <span className="modal-setting-hint">
+                {p.classes.length ? `${p.classes.length} object(s)` : 'any object'}
+              </span>
+              <button className="modal-btn neutral" onClick={() => setOpenPresetId(openPresetId === p.id ? null : p.id)}>
+                <i className={`mdi mdi-chevron-${openPresetId === p.id ? 'up' : 'down'}`} /> Objects
+              </button>
+              <button className="modal-btn neutral" title="Delete preset"
+                onClick={() => updatePresets(selectPresets.filter(x => x.id !== p.id))}>
+                <i className="mdi mdi-delete-outline" />
+              </button>
+            </div>
+            {openPresetId === p.id && (
+              <>
+                <div style={{ display: 'flex', gap: 6, margin: '8px 0 6px' }}>
+                  <button className="modal-btn neutral" onClick={() => updatePreset(p.id, { classes: COCO_CLASSES.map(c => c.id) })}>All</button>
+                  <button className="modal-btn neutral" onClick={() => updatePreset(p.id, { classes: [] })}>None (any object)</button>
+                </div>
+                <div className="detection-emoji-grid">
+                  {COCO_CLASSES.map(c => (
+                    <label key={c.id} className="detection-class-row" title={`${c.ru} (id ${c.id})`}>
+                      <input type="checkbox" checked={p.classes.includes(c.id)} onChange={() => togglePresetClass(p, c.id)} />
+                      <span className="detection-emoji-char">{c.emoji}</span>
+                      <span className="detection-emoji-label">{c.en}</span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="modal-btn neutral" onClick={addPreset}><i className="mdi mdi-plus" /> Add preset</button>
+          <button className="modal-btn neutral" onClick={() => updatePresets(SELECT_PRESETS_DEFAULT)}>
+            <i className="mdi mdi-restore" /> Defaults
+          </button>
         </div>
       </div>
 

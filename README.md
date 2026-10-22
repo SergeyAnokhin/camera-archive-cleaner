@@ -103,6 +103,7 @@ Subsystem grouping and extraction seams: [`docs/subsystems.md`](docs/subsystems.
 | [`docs/api.md`](docs/api.md) | All API endpoints with parameters and descriptions |
 | [`docs/database.md`](docs/database.md) | SQLite schema: `cameras`, `files`, `thumbnails`, `ai_analysis`, `object_detection`, `video_previews`, `tasks`, `tuning_sessions` tables, cascades, data flow |
 | [`docs/ai-analysis.md`](docs/ai-analysis.md) | AI analysis: Gemini, Claude & OpenVINO integration, DB schema, prompt format, icon display |
+| [`docs/hour-selection.md`](docs/hour-selection.md) | Selection presets in the hour viewer: "select photos/videos without these objects" buttons, video-follows-photos rule |
 | [`docs/tuning.md`](docs/tuning.md) | Model tuning screen: upload images, ground truth, per-model golden-section confidence search, results charts |
 | [`docs/google-integration.md`](docs/google-integration.md) | Google account (OAuth): Gmail attachment download and Drive upload task types |
 | [`docs/visualization-modes.md`](docs/visualization-modes.md) | All 5 view modes: Normal, Motion highlight, AI description (Gemini), AI description (Claude), Object detection (local) — plus the shared cache layout |

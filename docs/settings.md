@@ -39,6 +39,7 @@ Keys and defaults are defined in [`tools/settingsConfig.js`](../frontend/src/com
 | `hover_zoom` | `1.5` | 1.0–3.0 | Photo scale factor on mouse hover. `1.0` disables zoom |
 | `diff_threshold` | `20` | 0–100 | Motion sensitivity threshold. Used as the default for all motion modes |
 | `video_preview_mode` | `none` | — | Preview mode for video cards: `none` (camera icon), `first_frame`, `last_frame`, `four_frames` (2×2 JPEG grid), `max_change_gif` (2-frame GIF), `four_frames_gif` (4-frame GIF evenly spaced), `max_change_4_gif` (4-frame GIF max-change). Thumbnail generated and cached by `/video_thumbnail` |
+| `select_presets` | `[{"id":"none","label":"No objects","classes":[]}, {"id":"people","label":"No person/animal","classes":[0,14…23]}]` | JSON array of `{id, label, classes: [COCO ids]}` — one "select without these objects" button each in the hour viewer's selection bar; empty `classes` = any object. Edited in the View tab; included in YAML export/import as `hour_view.select_presets`. See [`hour-selection.md`](hour-selection.md) |
 
 ---
 

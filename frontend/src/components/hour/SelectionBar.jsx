@@ -2,7 +2,8 @@ import { formatBytes } from './hourUtils.js'
 import './SelectionBar.css'
 
 // Horizontal toolbar shown below the distribution chart while in selection mode.
-export default function SelectionBar({ files, selectedCount, selectionStats, onSelectAll, onSelectNone, onDelete, onCancel, loading }) {
+// `presets` = [{ id, label, count, hint }] — "select files without these objects" buttons (Tools → View).
+export default function SelectionBar({ files, selectedCount, selectionStats, presets = [], onSelectAll, onSelectNone, onSelectPreset, onDelete, onCancel, loading }) {
   return (
     <div className="hv-select-bar">
       <button className="hv-sbar-btn" onClick={onSelectAll}>
@@ -11,6 +12,12 @@ export default function SelectionBar({ files, selectedCount, selectionStats, onS
       <button className="hv-sbar-btn" onClick={onSelectNone} disabled={selectedCount === 0}>
         <i className="mdi mdi-select-off" /> None
       </button>
+      {presets.map(p => (
+        <button key={p.id} className="hv-sbar-btn" onClick={() => onSelectPreset(p.id)}
+          disabled={p.count === 0} title={p.hint}>
+          <i className="mdi mdi-eye-off-outline" /> {p.label} ({p.count})
+        </button>
+      ))}
       {selectedCount > 0 && (
         <div className="hv-sbar-stats">
           {selectionStats.photos > 0 && <span><i className="mdi mdi-image-outline" /> {selectionStats.photos}</span>}

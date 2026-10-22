@@ -58,6 +58,7 @@ no jsdom). [`src/test-setup.js`](../frontend/src/test-setup.js) stubs
 | Test file | Rule under test | Defined in |
 |---|---|---|
 | [`hourUtils.test.js`](../frontend/src/components/hour/hourUtils.test.js) | Uniformity metrics: AF = nActive/60×100, SE = H/log₂60×100, BC = blocks/12×100, combined = 0.40·AF+0.35·SE+0.25·BC; default warn/alert thresholds | [`settings.md`](settings.md) → Distribution uniformity |
+| [`selectByObjects.test.js`](../frontend/src/components/hour/selectByObjects.test.js) | Selection presets: photo selected only if analysed and free of target classes (unanalysed ≠ empty); video follows photos within ±30 s (all near photos clear, ≥1 near); videos near an open page edge skipped | [`hour-selection.md`](hour-selection.md) |
 | [`navUtils.test.js`](../frontend/src/components/navUtils.test.js) | Drill-down date ranges cover whole periods (leap-year February); intensity buckets 0–9 with 0 reserved for empty cells; `formatBytes` units | [`code-map.md`](code-map.md) navUtils |
 
 ---

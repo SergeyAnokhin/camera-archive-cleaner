@@ -124,6 +124,15 @@ export const BURST_GAP_DEFAULT = 30
 export const BURST_GAP_MIN     = 5
 export const BURST_GAP_MAX     = 300
 
+// Selection-mode presets ("select files without these objects"). JSON array of
+// { id, label, classes: [COCO class ids] }; empty `classes` = any object.
+export const SELECT_PRESETS_KEY = 'select_presets'
+export const SELECT_PRESETS_DEFAULT = [
+  { id: 'none',   label: 'No objects',       classes: [] },
+  // person + bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe
+  { id: 'people', label: 'No person/animal', classes: [0, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23] },
+]
+
 export const LOG_TAIL_KEY     = 'log_tail_lines'
 export const LOG_TAIL_DEFAULT = 10
 export const LOG_TAIL_MIN     = 5

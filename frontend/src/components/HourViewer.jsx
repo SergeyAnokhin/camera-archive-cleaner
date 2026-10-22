@@ -16,6 +16,8 @@ import Lightbox from './hour/Lightbox.jsx'
 import { useHourKeyboard } from './hour/useHourKeyboard.js'
 import { useHourDelete } from './hour/useHourDelete.js'
 import { markHourViewed } from '../viewedStatus.js'
+import { selectFilesWithoutObjects } from './hour/selectByObjects.js'
+import { loadSelectPresets } from './tools/selectPresets.js'
 import {
   getPageSize, getHoverZoom, getThumbWidth, buildInitialModeParams,
   saveModeParams, recordAiRequest, VIEW_MODE_KEY,
@@ -31,6 +33,7 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
   const [hoverZoom, setHoverZoom]       = useState(getHoverZoom)
   const [thumbWidth, setThumbWidth]     = useState(getThumbWidth)
   const [burstGap, setBurstGap]         = useState(getBurstGap)
+  const [selectPresets, setSelectPresets] = useState(loadSelectPresets)
   const [viewMode, setViewMode]         = useState(() => localStorage.getItem(VIEW_MODE_KEY) || DEFAULT_VIEW_MODE_KEY)
   const [modeParams, setModeParams]     = useState(buildInitialModeParams)
   const [peekOriginal, setPeekOriginal] = useState(false)
@@ -81,11 +84,14 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     function onZoom()       { setHoverZoom(getHoverZoom()) }
     function onThumbWidth() { setThumbWidth(getThumbWidth()) }
     function onBurstGap(e)  { setBurstGap(e.detail) }
+    function onPresets()    { setSelectPresets(loadSelectPresets()) }
+    document.addEventListener('select-presets-change', onPresets)
     document.addEventListener('hour-page-size-change', onPageSize)
     document.addEventListener('hover-zoom-change', onZoom)
     document.addEventListener('thumb-width-change', onThumbWidth)
     document.addEventListener('burst-gap-change', onBurstGap)
     return () => {
+      document.removeEventListener('select-presets-change', onPresets)
       document.removeEventListener('hour-page-size-change', onPageSize)
       document.removeEventListener('hover-zoom-change', onZoom)
       document.removeEventListener('thumb-width-change', onThumbWidth)
@@ -134,6 +140,26 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
     }
     return set
   }, [files, burstGap])
+
+  // "Select without objects" preset buttons — computed live from the page's detection results
+  const presetButtons = useMemo(() => selectPresets.map(p => {
+    const { ids, unanalyzedPhotos } = selectFilesWithoutObjects(files, aiAnalysisMap, p.classes, {
+      hasPrevPage: page > 1, hasNextPage: page < totalPages,
+    })
+    const hint = unanalyzedPhotos > 0
+      ? `Photos and videos without ${p.classes.length ? 'these objects' : 'any object'}. ${unanalyzedPhotos} photo(s) not analysed yet — skipped`
+      : `Photos and videos without ${p.classes.length ? 'these objects' : 'any object'}`
+    return { id: p.id, label: p.label, count: ids.length, ids, hint }
+  }), [selectPresets, files, aiAnalysisMap, page, totalPages])
+
+  function selectPreset(presetId) {
+    const preset = presetButtons.find(p => p.id === presetId)
+    if (!preset) return
+    const byId = new Map(files.map(f => [f.id, f]))
+    setSelectedMap(new Map(preset.ids.map(id => [id, byId.get(id)])))
+    anchorIdxRef.current = null
+    anchorActionRef.current = null
+  }
 
   function toggleSelectionMode() {
     setSelectionMode(v => !v)
@@ -340,6 +366,8 @@ export default function HourViewer({ cameraId, camera, dateFrom, dateTo, label, 
           files={files}
           selectedCount={selectedIds.size}
           selectionStats={selectionStats}
+          presets={presetButtons}
+          onSelectPreset={selectPreset}
           onSelectAll={() => setSelectedMap(new Map(files.map(f => [f.id, f])))}
           onSelectNone={() => setSelectedMap(new Map())}
           onDelete={del.handleDeletePreview}

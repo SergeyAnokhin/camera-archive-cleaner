@@ -206,10 +206,11 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 |---|---|
 | [`settingsConfig.js`](../frontend/src/components/tools/settingsConfig.js) | All Tools constants: localStorage keys, defaults, ranges, model/option lists, pricing tables |
 | [`settingsIO.js`](../frontend/src/components/tools/settingsIO.js) | `exportSettingsYaml()`, `applyImportedSettings()`, `initFontSize()`/`applyFontSize()` |
+| [`selectPresets.js`](../frontend/src/components/tools/selectPresets.js) | Load/validate/save the selection-mode presets (`select_presets` key); shared by HourViewTab, HourViewer and `settingsIO.js` import |
 | [`SliderSetting.jsx`](../frontend/src/components/tools/SliderSetting.jsx) | Reusable labelled range-slider row used across tabs |
 | [`GeneralTab.jsx`](../frontend/src/components/tools/GeneralTab.jsx) | Font size (2-col layout), YAML export/import |
 | [`CamerasTab.jsx`](../frontend/src/components/tools/CamerasTab.jsx) | Full camera CRUD: add/edit/delete rows, inline path validation via `/cameras/check-path`, saves via `PUT /cameras/config` |
-| [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | View tab: previews per cell, thumb width, hover zoom, diff threshold, page size, burst gap, video preview, uniformity (collapsible, with Low/Medium/High presets) |
+| [`HourViewTab.jsx`](../frontend/src/components/tools/HourViewTab.jsx) | View tab: previews per cell, thumb width, hover zoom, diff threshold, page size, burst gap, video preview, selection presets editor, uniformity (collapsible, with Low/Medium/High presets) |
 | [`AiTab.jsx`](../frontend/src/components/tools/AiTab.jsx) | Combined AI tab: 3 sections — Detection (YOLO model, confidence, classes checklist), Google Gemini (API key, model, prompt), Claude Anthropic (API key, model) |
 | [`ComputeTab.jsx`](../frontend/src/components/tools/ComputeTab.jsx) | Compute-service routing: off / kubernetes / local / remote + URL, auto-discovery, test-connection status. Also owns the UI-only `compute_mode_ui` key (`browser` label for an auto-detected browser-local service) |
 | [`GoogleTab.jsx`](../frontend/src/components/tools/GoogleTab.jsx) | Google account: OAuth client setup (redirect URI display, client id/secret), connect/disconnect with status polling. See [`google-integration.md`](google-integration.md) |
@@ -257,7 +258,8 @@ HTTP calls to the backend, split by domain. `api.js` re-exports everything, so c
 | [`VideoCard.jsx`](../frontend/src/components/hour/VideoCard.jsx) | Single video card. Default (`video_preview_mode = none`): camera icon + timestamp, no image. With a preview mode set: fetches `/video_thumbnail` and shows a JPEG or animated GIF. Opens VideoModal on click |
 | [`VideoModal.jsx`](../frontend/src/components/hour/VideoModal.jsx) | Fullscreen video player: Space = play/pause, ←/→ = skip ±1/5 duration, Escape = close, download, open externally, VLC fallback |
 | [`DistributionChart.jsx`](../frontend/src/components/hour/DistributionChart.jsx) | 60-bar per-minute distribution chart; click a bar to jump to its page. Shows AF/SE/BC uniformity badges (green/yellow/red) in the header |
-| [`SelectionBar.jsx`](../frontend/src/components/hour/SelectionBar.jsx) | Selection-mode toolbar: select all/none, selection stats, delete |
+| [`SelectionBar.jsx`](../frontend/src/components/hour/SelectionBar.jsx) | Selection-mode toolbar: select all/none, preset buttons ("without objects"), selection stats, delete |
+| [`selectByObjects.js`](../frontend/src/components/hour/selectByObjects.js) | Pure logic behind the preset buttons: `selectFilesWithoutObjects()` (photos by YOLO result, videos follow photos ±30 s). See [`hour-selection.md`](hour-selection.md) |
 | [`ModeSettingsPanel.jsx`](../frontend/src/components/hour/ModeSettingsPanel.jsx) | Slider panel for non-AI view modes with tunable params (e.g. motion threshold) |
 | [`AiModePanel.jsx`](../frontend/src/components/hour/AiModePanel.jsx) | AI mode panel: compact 2-row layout — label + read-only model label + run on row 1, threshold display (OpenVINO)/stats/emojis on row 2. Exports `AI_PROVIDER_CONFIG` |
 | [`useHourKeyboard.js`](../frontend/src/components/hour/useHourKeyboard.js) | Custom hook holding all keyboard handling: peek original, browse-mode keys, selection-mode keys |

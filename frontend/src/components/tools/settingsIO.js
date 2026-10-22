@@ -14,6 +14,7 @@ import {
   MOTION_MODE_KEYS,
   BURST_GAP_KEY, BURST_GAP_DEFAULT, BURST_GAP_MIN, BURST_GAP_MAX,
 } from './settingsConfig.js'
+import { loadSelectPresets, sanitizePresets, saveSelectPresets } from './selectPresets.js'
 
 export function applyFontSize(px) {
   document.documentElement.style.setProperty('--font-base', px + 'px')
@@ -49,6 +50,7 @@ export function collectSettings() {
       diff_threshold:  Number(localStorage.getItem(DIFF_THRESHOLD_KEY) ?? DIFF_THRESHOLD_DEFAULT),
       burst_gap:       Number(localStorage.getItem(BURST_GAP_KEY)) || BURST_GAP_DEFAULT,
       view_mode:       localStorage.getItem('hour_view_mode') || 'normal',
+      select_presets:  loadSelectPresets(),
     },
     motion_modes: motionModes,
     google_ai: {
@@ -135,6 +137,8 @@ export function applyImportedSettings(data) {
   }
   const vm = safeStr(data?.hour_view?.view_mode)
   if (vm !== null) { localStorage.setItem('hour_view_mode', vm); applied++ }
+  const presets = sanitizePresets(data?.hour_view?.select_presets)
+  if (presets !== null) { saveSelectPresets(presets); applied++ }
 
   const mm = data?.motion_modes
   if (mm && typeof mm === 'object') {
