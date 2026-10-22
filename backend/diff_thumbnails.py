@@ -24,7 +24,7 @@ def get_or_create_diff_thumbnail(
     page_file_ids: list[int],
     threshold: int,
 ) -> Path:
-    DIFF_THUMB_DIR.mkdir(exist_ok=True)
+    DIFF_THUMB_DIR.mkdir(parents=True, exist_ok=True)
     key = _cache_key(page_file_ids, threshold)
     cache_path = DIFF_THUMB_DIR / f"{key}_{file_id}.jpg"
     if cache_path.exists():

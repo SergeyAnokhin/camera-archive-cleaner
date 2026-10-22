@@ -17,6 +17,7 @@ backend/snapshots.db
 backend/snapshots.db*
 backend/*_cache
 backend/compute_config.json
+backend/server_config.json
 backend/models
 compute-service/models
 **/*.pt

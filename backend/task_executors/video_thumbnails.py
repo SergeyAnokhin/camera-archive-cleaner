@@ -37,7 +37,7 @@ def pregen_video_thumbs_sync(camera_id, date_from, date_to, mode):
             continue
         try:
             data, _ = compute_client.video_thumbnail(row["file_path"], mode)
-            VID_THUMB_DIR.mkdir(exist_ok=True)
+            VID_THUMB_DIR.mkdir(parents=True, exist_ok=True)
             cache_path.write_bytes(data)
             generated += 1
         except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable):

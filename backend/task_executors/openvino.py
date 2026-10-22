@@ -28,7 +28,7 @@ def _detect_and_save(file_id: int, file_path: str, model_name: str, confidence: 
         save_object_detection(conn, file_id, model_name, " ".join(result.objects))
     if result.annotated_jpeg_b64:
         cache_path = ov_cache_path(file_id, model_name, confidence, classes_tuple)
-        OV_THUMB_DIR.mkdir(exist_ok=True)
+        OV_THUMB_DIR.mkdir(parents=True, exist_ok=True)
         cache_path.write_bytes(base64.b64decode(result.annotated_jpeg_b64))
 
 

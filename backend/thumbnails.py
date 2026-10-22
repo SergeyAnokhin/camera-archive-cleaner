@@ -21,7 +21,7 @@ def get_or_create_thumbnail(conn: sqlite3.Connection, file_id: int, file_path: s
     if not src.exists():
         raise FileNotFoundError(f"Source file not found: {file_path}")
 
-    THUMB_DIR.mkdir(exist_ok=True)
+    THUMB_DIR.mkdir(parents=True, exist_ok=True)
     thumb_path = THUMB_DIR / f"{file_id}.jpg"
 
     with Image.open(src) as img:

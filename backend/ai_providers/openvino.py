@@ -45,7 +45,7 @@ def analyze_batch(file_ids, model_name="yolov8n", confidence=0.25, classes=None)
 
                 if result.annotated_jpeg_b64:
                     cache_path = ov_cache_path(fid, model_name, confidence, classes_tuple)
-                    OV_THUMB_DIR.mkdir(exist_ok=True)
+                    OV_THUMB_DIR.mkdir(parents=True, exist_ok=True)
                     cache_path.write_bytes(base64.b64decode(result.annotated_jpeg_b64))
 
             except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable):
@@ -106,7 +106,7 @@ def _pregen_video_thumbs(camera_id, date_from, date_to, mode):
             continue
         try:
             data, _ = compute_client.video_thumbnail(row["file_path"], mode)
-            VID_THUMB_DIR.mkdir(exist_ok=True)
+            VID_THUMB_DIR.mkdir(parents=True, exist_ok=True)
             cache_path.write_bytes(data)
             generated += 1
         except (compute_client.ComputeDisabled, compute_client.ComputeUnavailable):

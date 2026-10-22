@@ -110,7 +110,7 @@ def get_openvino_thumbnail(
     if not result.annotated_jpeg_b64:
         raise HTTPException(status_code=500, detail="Compute-service returned no image")
 
-    OV_THUMB_DIR.mkdir(exist_ok=True)
+    OV_THUMB_DIR.mkdir(parents=True, exist_ok=True)
     cache_path.write_bytes(base64.b64decode(result.annotated_jpeg_b64))
 
     with get_connection() as conn:
@@ -147,7 +147,7 @@ def get_video_thumbnail(
     except compute_client.ComputeUnavailable as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    VID_THUMB_DIR.mkdir(exist_ok=True)
+    VID_THUMB_DIR.mkdir(parents=True, exist_ok=True)
     cache_path.write_bytes(data)
     with get_connection() as conn:
         save_video_preview(conn, file_id, mode, str(cache_path))

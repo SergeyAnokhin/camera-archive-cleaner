@@ -99,6 +99,10 @@ backend:
 the in-app Camera Root override and the Google OAuth tokens are lost when the pod
 restarts. Only `snapshots.db`, `compute_config.json` and the cache root survive.
 
+> `backend/server_config.json` is git-ignored and in `.dockerignore`: if it were baked into the
+> image, its local-dev `camera_root` (a Windows UNC path) would override the pod's
+> `CAMERA_ROOT=/camera` on startup and every camera would report `path_exists: false`.
+
 ### compute_config.json seed
 An initContainer writes
 `{"mode":"remote","remote_url":"http://camera-cleaner-compute:8001"}` to the state PVC
